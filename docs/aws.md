@@ -79,20 +79,29 @@ do SPEC já proíbe (visão só sob disparo explícito).
   ativo no dev e verificado (upload → objeto no bucket → URL assinada abre
   com 200).
 - **Textract**: funcionando (DetectDocumentText validado com credencial atual).
-- **Bedrock**: modelos Claude visíveis no catálogo, mas TODO invoke falha até
-  enviar o formulário **"Anthropic use case details"** no console (Bedrock →
-  Model access) — é o único bloqueio restante da AWS. Ao liberar, se o id
-  `anthropic.claude-*` responder erro de inference profile, usar o prefixo
-  `us.` (ex.: `us.anthropic.claude-opus-5`) via env `BEDROCK_MODEL_ID`.
+- **Bedrock** (atualizado ao fim de 2026-07-25): formulário de use case
+  ACEITO (o erro mudou de "details not submitted" para throttling), mas a
+  conta é nova e TODAS as cotas de inferência on-demand Claude estão
+  **aplicadas em 0** (default 10k RPM / 5M+ TPM — restrição automática de
+  conta nova). Enviados 4 pedidos de aumento via Service Quotas, todos
+  PENDING: L-CCA5DF70 (RPM Haiku 4.5), L-58BE175A e L-9A11C666 (TPM Haiku),
+  L-99296DCD (TPM Opus 5). Acompanhar em Service Quotas → Bedrock →
+  Quota request history; se houver plano de suporte, responder/escalar o
+  caso acelera. PLANO B do spike: Textract já funciona — com as fotos reais
+  dá para validar placa/serigrafia hoje; chumbado e layout (papel do Bedrock)
+  ficam pendentes da cota. Ao liberar, se o id `anthropic.claude-*` responder
+  erro de inference profile, usar prefixo `us.` via env `BEDROCK_MODEL_ID`.
 - **ALERTA de segurança**: a credencial no .env é do usuário **root** da conta
   (`arn:...:root`) — contra o checklist acima. Criar IAM user com a política
   mínima, trocar a chave no .env e DESATIVAR a chave root. Vazamento da chave
   root = conta inteira comprometida.
-- **RDS** (`database-1...rds.amazonaws.com`): sem acesso público — resolve IP
-  privado de VPC e trava o boot local (foi o que aconteceu; o dev usa o
-  Postgres do Docker, e o endpoint do RDS ficou comentado no .env). Se o time
-  quiser usá-lo no dev: habilitar Public access + security group liberando os
-  IPs do time, e rodar migrations/seeds lá. Não é necessário para a demo.
+- **RDS** (`database-1...rds.amazonaws.com`): o time habilitou acesso público
+  (IP público, TCP e auth OK) e as **migrations + seeds já foram rodadas lá**
+  (PostgreSQL 18.3; 4 checkpoints, 1 projeto, admin seed). Pronto para servir
+  de banco compartilhado: qualquer dev aponta o .env com
+  DATABASE_HOST=<endpoint> USERNAME=postgres NAME=postgres
+  DATABASE_SSL_ENABLED=true (endpoint e senha no .env comentado). O dev do
+  Victor segue no Postgres local (latência menor); trocar é só env.
 - **Redis/ElastiCache**: criado na conta, mas o stack atual não consome Redis
   (nenhum módulo ativo usa o WORKER_HOST do boilerplate). Sem ação; pode ser
   desligado para não gastar crédito.
