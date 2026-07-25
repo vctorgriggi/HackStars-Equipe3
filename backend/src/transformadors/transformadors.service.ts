@@ -1,6 +1,11 @@
+import { ProjetoModelosService } from '../projeto-modelos/projeto-modelos.service';
+import { ProjetoModelo } from '../projeto-modelos/domain/projeto-modelo';
+
 import {
   // common
   Injectable,
+  HttpStatus,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { CreateTransformadorDto } from './dto/create-transformador.dto';
 import { UpdateTransformadorDto } from './dto/update-transformador.dto';
@@ -11,6 +16,8 @@ import { Transformador } from './domain/transformador';
 @Injectable()
 export class TransformadorsService {
   constructor(
+    private readonly projetoModeloService: ProjetoModelosService,
+
     // Dependencies here
     private readonly transformadorRepository: TransformadorRepository,
   ) {}
@@ -18,10 +25,30 @@ export class TransformadorsService {
   async create(createTransformadorDto: CreateTransformadorDto) {
     // Do not remove comment below.
     // <creating-property />
+    let projetoModelo: ProjetoModelo | null | undefined = undefined;
+
+    if (createTransformadorDto.projetoModelo) {
+      const projetoModeloObject = await this.projetoModeloService.findById(
+        createTransformadorDto.projetoModelo.id,
+      );
+      if (!projetoModeloObject) {
+        throw new UnprocessableEntityException({
+          status: HttpStatus.UNPROCESSABLE_ENTITY,
+          errors: {
+            projetoModelo: 'notExists',
+          },
+        });
+      }
+      projetoModelo = projetoModeloObject;
+    } else if (createTransformadorDto.projetoModelo === null) {
+      projetoModelo = null;
+    }
 
     return this.transformadorRepository.create({
       // Do not remove comment below.
       // <creating-property-payload />
+      projetoModelo,
+
       descricao: createTransformadorDto.descricao,
 
       cliente: createTransformadorDto.cliente,
@@ -64,10 +91,30 @@ export class TransformadorsService {
   ) {
     // Do not remove comment below.
     // <updating-property />
+    let projetoModelo: ProjetoModelo | null | undefined = undefined;
+
+    if (updateTransformadorDto.projetoModelo) {
+      const projetoModeloObject = await this.projetoModeloService.findById(
+        updateTransformadorDto.projetoModelo.id,
+      );
+      if (!projetoModeloObject) {
+        throw new UnprocessableEntityException({
+          status: HttpStatus.UNPROCESSABLE_ENTITY,
+          errors: {
+            projetoModelo: 'notExists',
+          },
+        });
+      }
+      projetoModelo = projetoModeloObject;
+    } else if (updateTransformadorDto.projetoModelo === null) {
+      projetoModelo = null;
+    }
 
     return this.transformadorRepository.update(id, {
       // Do not remove comment below.
       // <updating-property-payload />
+      projetoModelo,
+
       descricao: updateTransformadorDto.descricao,
 
       cliente: updateTransformadorDto.cliente,

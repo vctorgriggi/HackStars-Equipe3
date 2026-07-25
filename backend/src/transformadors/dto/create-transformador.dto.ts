@@ -1,8 +1,12 @@
+import { ProjetoModeloDto } from '../../projeto-modelos/dto/projeto-modelo.dto';
+
 import {
   // decorators here
 
   IsString,
   IsOptional,
+  ValidateNested,
+  IsNotEmptyObject,
 } from 'class-validator';
 
 import {
@@ -10,7 +14,22 @@ import {
   ApiProperty,
 } from '@nestjs/swagger';
 
+import {
+  // decorators here
+  Type,
+} from 'class-transformer';
+
 export class CreateTransformadorDto {
+  @ApiProperty({
+    required: false,
+    type: () => ProjetoModeloDto,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ProjetoModeloDto)
+  @IsNotEmptyObject()
+  projetoModelo?: ProjetoModeloDto | null;
+
   @ApiProperty({
     required: false,
     type: () => String,

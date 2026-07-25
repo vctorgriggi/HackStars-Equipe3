@@ -39,10 +39,17 @@ linha, dando rastreabilidade de trânsito.
 ## Entidades
 
 - **Transformador** — identidade esperada da peça, criada a partir do payload
-  do QR: número de série, patrimônio, pedido, seq, cliente, descrição.
-  `numeroSerie` é a chave de negócio (única do fabricante; por isso é chumbada
-  3× no metal): find-or-create usa ela. Patrimônio é numeração do cliente —
-  único por cliente, não globalmente; nunca serve de chave.
+  do QR: número de série, patrimônio, pedido, seq, cliente, descrição, e
+  vínculo opcional ao ProjetoModelo. `numeroSerie` é a chave de negócio (única
+  do fabricante; por isso é chumbada 3× no metal): find-or-create usa ela.
+  Patrimônio é numeração do cliente — único por cliente, não globalmente;
+  nunca serve de chave.
+- **ProjetoModelo** — o projeto de serigrafia de um modelo como dado: código
+  (ex.: EPT-163-PI-676), descrição e checklist de campos a conferir (nome,
+  fonte física, obrigatoriedade). É de onde a engine tira a lista de campos —
+  nunca de constante no código. Seed do MVP: o modelo da peça de demo,
+  transcrito manualmente do desenho; ingestão automática do PDF é evolução
+  (Could).
 - **Conferencia** — uma execução de verificação de uma peça: referência ao
   Transformador, conjunto de CampoConferido, veredito geral, timestamp,
   opcionalmente vinculada a um Checkpoint — quando presente, o vínculo
@@ -69,6 +76,7 @@ linha, dando rastreabilidade de trânsito.
 
 ```mermaid
 erDiagram
+    PROJETO_MODELO ||--o{ TRANSFORMADOR : "define a checklist de"
     TRANSFORMADOR ||--o{ CONFERENCIA : "e conferido em"
     TRANSFORMADOR ||--o{ EVENTO_PASSAGEM : "passa por"
     CHECKPOINT ||--o{ EVENTO_PASSAGEM : "registra"
@@ -77,14 +85,21 @@ erDiagram
     CONFERENCIA |o--o{ FOTO_EVIDENCIA : "recebe"
     FOTO_EVIDENCIA |o--o{ CAMPO_CONFERIDO : "evidencia"
 
+    PROJETO_MODELO {
+        uuid id PK
+        string codigo "ex: EPT-163-PI-676"
+        string descricao "opcional"
+        string checklist "JSON: campo, fonteFisica, obrigatorio"
+    }
     TRANSFORMADOR {
         uuid id PK
-        string numeroSerie "do QR"
-        string patrimonio "do QR"
+        string numeroSerie "do QR; chave de negocio"
+        string patrimonio "do QR; numeracao do cliente, nao e chave"
         string cliente "texto do QR; entidade propria e evolucao futura"
         string pedido "opcional"
         string seq "opcional"
         string descricao "opcional"
+        uuid projetoModeloId FK "opcional"
     }
     CHECKPOINT {
         uuid id PK
@@ -136,6 +151,8 @@ erDiagram
   confiança e vínculo à foto de origem.
 - Comparação campo a campo na API entre valor esperado e valor lido, com
   veredito por campo em 3 estados: `conforme`, `divergente`, `nao_conferivel`.
+- Checklist de campos a conferir carregada do ProjetoModelo da peça (o modelo
+  da demo entra seedado); nenhuma lista de campos vive em código.
 - Veredito geral da conferência: `divergente` se qualquer campo divergir; senão
   `nao_conferivel` se qualquer campo for ilegível; `conforme` somente com todos
   os campos conformes.
@@ -165,6 +182,8 @@ erDiagram
 - Check qualitativo de layout via Bedrock: marcações da face presentes e na
   disposição esperada do projeto da demo — condicionado ao spike T2.1 mostrar
   confiabilidade; nunca rebaixa um `divergente` textual.
+- Ingestão do projeto: upload do PDF, extração da checklist via Bedrock e
+  tela de revisão/aprovação que cria o ProjetoModelo (Fase 6 do PLAN).
 
 ### Won't (nesta rodada)
 
@@ -359,10 +378,10 @@ consegue criar Conferencia.
       cliente). Confirmar com a TRAEL. Consequência já adotada: find-or-create
       de Transformador usa `numeroSerie` como chave (T1.1/T1.3), nunca
       patrimônio.
-- [ ] **Modelagem do Projeto de serigrafia** — quando entrar (rodada futura):
-      entidade própria com campos estruturados ou config JSON por modelo?
-      Afeta a rodada "Projeto de serigrafia por modelo/cliente" do Planejado;
-      no MVP a lista de campos da demo é passada fixa pelo chamador da engine.
+- [x] **Modelagem do Projeto de serigrafia** — resolvido: entidade
+      ProjetoModelo (codigo, descricao, checklist JSON) criada na fundação e
+      seedada com o EPT-163-PI-676; a engine consome a checklist do banco, e a
+      ingestão automática do PDF virou Fase 6 opcional (2026-07-25).
 - [ ] **Promover cliente a entidade própria** — hoje é campo texto em
       Transformador (a comparação do MVP é textual, QR × leitura da placa);
       vira tabela quando entrar validação contra cadastro/ERP (rodada futura).

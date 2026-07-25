@@ -1,3 +1,4 @@
+import { ProjetoModelosModule } from '../projeto-modelos/projeto-modelos.module';
 import {
   // do not remove this comment
   Module,
@@ -8,6 +9,8 @@ import { RelationalTransformadorPersistenceModule } from './infrastructure/persi
 
 @Module({
   imports: [
+    ProjetoModelosModule,
+
     // do not remove this comment
     RelationalTransformadorPersistenceModule,
   ],

@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { ProjetoModeloSeedService } from './projeto-modelo/projeto-modelo-seed.service';
 import { CheckpointSeedService } from './checkpoint/checkpoint-seed.service';
 import { RoleSeedService } from './role/role-seed.service';
 import { SeedModule } from './seed.module';
@@ -14,6 +15,8 @@ const runSeed = async () => {
   await app.get(UserSeedService).run();
 
   await app.get(CheckpointSeedService).run();
+
+  await app.get(ProjetoModeloSeedService).run();
 
   await app.close();
 };

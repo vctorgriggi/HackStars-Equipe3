@@ -43,6 +43,7 @@ não conformidade que chega ao cliente hoje).
 backend/                  # NestJS (base brocoders/nestjs-boilerplate)
   src/
     transformadors/       # CRUD Transformador (gerado); recebe o parser do QR (T1.1)
+    projeto-modelos/      # CRUD ProjetoModelo (gerado); checklist por modelo como dado
     conferencia/          # CRUD Conferencia (gerado); recebe a engine de comparação (T1.2)
     campo-conferidos/     # CRUD CampoConferido (gerado)
     foto-evidencia/       # CRUD FotoEvidencia (gerado); recebe upload/S3 (T2.3)
@@ -82,9 +83,10 @@ cd backend && npm run test    # unit da engine e do parser
   `conforme` só com todos os campos conformes.
 - Limiar de confiança é parâmetro da engine, não constante enterrada (a
   política de campo parcialmente legível está em aberto e vai mudar isso).
-- A lista de campos a conferir também é parâmetro — serigrafia varia por
-  cliente/modelo (projeto de serigrafia, SPEC Planejado); hardcodar a lista da
-  peça de demo dentro da engine geraria falso conforme para outros modelos.
+- A lista de campos a conferir também é parâmetro — o chamador a carrega da
+  checklist do ProjetoModelo da peça (seed da demo: EPT-163-PI-676). Serigrafia
+  varia por cliente/modelo; lista hardcoded geraria falso conforme para outros
+  modelos, e checklist em código morreria a cada modelo novo.
 
 ## Extração e bordas AWS
 
