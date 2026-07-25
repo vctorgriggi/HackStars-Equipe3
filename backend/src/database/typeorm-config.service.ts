@@ -30,28 +30,7 @@ export class TypeOrmConfigService implements TypeOrmOptionsFactory {
 
         subscribersDir: 'subscriber',
       },
-      extra: {
-        // based on https://node-postgres.com/apis/pool
-        // max connection pool size
-        max: this.configService.get('database.maxConnections', { infer: true }),
-        ssl: this.configService.get('database.sslEnabled', { infer: true })
-          ? {
-              rejectUnauthorized: this.configService.get(
-                'database.rejectUnauthorized',
-                { infer: true },
-              ),
-              ca:
-                this.configService.get('database.ca', { infer: true }) ??
-                undefined,
-              key:
-                this.configService.get('database.key', { infer: true }) ??
-                undefined,
-              cert:
-                this.configService.get('database.cert', { infer: true }) ??
-                undefined,
-            }
-          : undefined,
-      },
+      ssl: { rejectUnauthorized: false },
     } as TypeOrmModuleOptions;
   }
 }
