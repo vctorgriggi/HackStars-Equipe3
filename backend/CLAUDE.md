@@ -1,6 +1,6 @@
 # Project instructions
 
-NestJS boilerplate supporting both relational (TypeORM/PostgreSQL) and document (Mongoose/MongoDB) persistence.
+NestJS boilerplate using relational persistence (TypeORM/PostgreSQL). The document (Mongoose/MongoDB) variant was removed from this repo — only the `*:relational` generators exist.
 
 ## When adding entities, schemas, or properties
 
