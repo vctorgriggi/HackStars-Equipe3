@@ -108,9 +108,9 @@ Depende de: Fase 2 completa.
     a peça de demo, na sequência, sem intervenção no banco.
   - Aceitação: critérios 1–4 passam; divergência visualmente inconfundível.
 
-## Fase 4 — Rastreabilidade de trânsito
+## Fase 4 — Rastreabilidade de trânsito e alerta
 
-Objetivo: critério de aceitação 5 do SPEC passando.
+Objetivo: critérios de aceitação 5 e 6 do SPEC passando.
 Depende de: Fase 3 completa.
 
 - [ ] T4.1 — EventoPassagem via scan de QR no checkpoint · módulo: transito (+ frontend)
@@ -121,8 +121,14 @@ Depende de: Fase 3 completa.
 - [ ] T4.2 — Tela de histórico da peça · módulo: frontend
   - Verificação manual: critério 5 do SPEC executado ponta a ponta.
   - Aceitação: histórico em ordem cronológica com nome do checkpoint e hora.
+- [ ] T4.3 — Alerta de divergência · módulo: conformidade (+ frontend)
+  - Desvio: promovido da Fase 5 — alerta virou Should porque divergência para
+    a produção até correção (2026-07-25).
+  - Verificação manual: critério 6 do SPEC executado ponta a ponta.
+  - Aceitação: alerta inconfundível fora da tela de veredito e no scan em
+    checkpoint de peça divergente.
 
-## Fase 5 (opcional) — Dashboard e alertas
+## Fase 5 (opcional) — Dashboard e indicadores
 
 Objetivo: os Could do SPEC, somente se sobrar tempo antes da demo.
 Depende de: Fase 4 completa; pode ser pulada.
@@ -130,9 +136,9 @@ Depende de: Fase 4 completa; pode ser pulada.
 - [ ] T5.1 — Dashboard de linha · módulo: frontend (+ transito)
   - Verificação manual: lista peças × último checkpoint × status de
     conformidade, coerente com o banco.
-- [ ] T5.2 — Alerta de divergência · módulo: conformidade (+ frontend)
-  - Verificação manual: conferência divergente gera alerta visível fora da tela
-    de veredito.
+- [ ] T5.2 — Indicadores de auditoria · módulo: conformidade (+ frontend)
+  - Verificação manual: contagem de divergências por checkpoint e por campo
+    bate com o banco em um cenário montado à mão.
 
 ## Riscos e dependências
 
@@ -158,3 +164,6 @@ Depende de: Fase 4 completa; pode ser pulada.
 - [x] **Framework do front** — resolvido: Next.js 16, scaffold já subido pelo
       time venceu o Angular combinado; T0.2 virou verificação e o módulo `web`
       passou a `frontend` (2026-07-25).
+- [x] **Prioridade do alerta de divergência** — resolvido: T5.2 promovida a
+      T4.3 (Could → Should); divergência para a produção até correção
+      (2026-07-25).

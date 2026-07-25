@@ -50,6 +50,10 @@ backend/                  # NestJS (base brocoders/nestjs-boilerplate; verificad
 frontend/                 # Next.js 16 (verificado em T0.2): leitura QR, fotos, veredito, histórico
 ```
 
+Funcionalidade nova entra como módulo novo atrás das mesmas fronteiras
+(auditoria, ERP e câmeras fixas já estão planejadas assim); nada novo entra
+dentro da engine de conformidade.
+
 ## Como rodar
 
 ```bash

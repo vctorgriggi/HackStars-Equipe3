@@ -81,10 +81,20 @@ linha, dando rastreabilidade de trânsito.
 - Registrar passagem da peça por checkpoint via scan do QR.
 - Tela de histórico da peça: eventos de passagem em ordem cronológica.
 
+**Alerta de divergência**
+
+- Alerta visível fora da tela de veredito quando uma conferência resulta
+  `divergente` — no fluxo TRAEL, divergência para a produção até correção; no
+  MVP o alerta sustenta essa parada humana (bloqueio automático de avanço é
+  futuro).
+- Scan em checkpoint de peça cuja última conferência foi `divergente` exibe o
+  alerta no ato.
+
 ### Could
 
 - Dashboard de linha: peças × último checkpoint × status de conformidade.
-- Alerta visível quando uma conferência resulta divergente.
+- Indicadores de auditoria: contagem de divergências por checkpoint e por
+  campo, agregando os dados que o Must já persiste.
 
 ### Won't (nesta rodada)
 
@@ -109,6 +119,9 @@ API decide. Detalhe das fronteiras no CLAUDE.md.
 
 O que nunca atravessa fronteiras: comparação de campos fora de `conformidade`;
 SDK AWS fora de `extracao`/`evidencias`; veredito calculado no `frontend`.
+
+Funcionalidade futura (auditoria, ERP, câmeras fixas) entra como módulo novo
+atrás dessas mesmas fronteiras; engine e portas não mudam.
 
 ## Stack
 
@@ -154,6 +167,8 @@ SDK AWS fora de `extracao`/`evidencias`; veredito calculado no `frontend`.
    campo não conferível.
 5. Scan do QR em um checkpoint cria EventoPassagem com timestamp, e a tela da
    peça lista os eventos em ordem cronológica.
+6. Conferência com veredito `divergente` gera alerta visível fora da tela de
+   veredito, e o scan dessa peça em um checkpoint exibe o alerta no ato.
 
 ## Planejado / rodadas futuras
 
@@ -183,6 +198,15 @@ O valor esperado passa a ser cruzado com o ERP além do QR; divergência
 QR × ERP vira um novo tipo de alerta. Aceitação futura: conferência aponta
 origem de cada valor esperado (QR ou ERP) e acusa divergência entre origens.
 
+### Auditoria e indicadores avançados
+
+Relatórios de desvios, retrabalho e gargalos por etapa, na linha do doc do
+desafio (não conformidades, OTIF). O modelo de dados do Must já registra a
+matéria-prima — Conferencia, CampoConferido e EventoPassagem com timestamps e
+evidências; esta evolução é leitura agregada, não mudança de escrita.
+Aceitação futura: relatório de divergências por checkpoint e por campo em um
+período escolhido, batendo com os registros brutos.
+
 ### Perfis e permissões
 
 Perfis por setor (montagem final, laboratório, expedição, qualidade) com ações
@@ -200,3 +224,6 @@ consegue criar Conferencia.
       MVP precisa de fallback de digitação manual. Afeta T1.1 e T3.1.
 - [x] **Framework do front** — resolvido: Next.js 16; o time já tinha subido o
       scaffold e ele venceu o Angular combinado na entrevista (2026-07-25).
+- [x] **Prioridade do alerta de divergência** — resolvido: promovido de Could
+      para Should; divergência para a produção até correção, e o alerta é o
+      que sustenta essa parada no MVP (2026-07-25).
