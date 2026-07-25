@@ -1,4 +1,5 @@
 import { EventoPassagem } from '../../../../domain/evento-passagem';
+
 import { CheckpointMapper } from '../../../../../checkpoints/infrastructure/persistence/relational/mappers/checkpoint.mapper';
 
 import { TransformadorMapper } from '../../../../../transformadors/infrastructure/persistence/relational/mappers/transformador.mapper';
@@ -8,6 +9,8 @@ import { EventoPassagemEntity } from '../entities/evento-passagem.entity';
 export class EventoPassagemMapper {
   static toDomain(raw: EventoPassagemEntity): EventoPassagem {
     const domainEntity = new EventoPassagem();
+    domainEntity.observacao = raw.observacao;
+
     if (raw.checkpoint) {
       domainEntity.checkpoint = CheckpointMapper.toDomain(raw.checkpoint);
     }
@@ -27,6 +30,8 @@ export class EventoPassagemMapper {
 
   static toPersistence(domainEntity: EventoPassagem): EventoPassagemEntity {
     const persistenceEntity = new EventoPassagemEntity();
+    persistenceEntity.observacao = domainEntity.observacao;
+
     if (domainEntity.checkpoint) {
       persistenceEntity.checkpoint = CheckpointMapper.toPersistence(
         domainEntity.checkpoint,

@@ -82,6 +82,9 @@ cd backend && npm run test    # unit da engine e do parser
   `conforme` só com todos os campos conformes.
 - Limiar de confiança é parâmetro da engine, não constante enterrada (a
   política de campo parcialmente legível está em aberto e vai mudar isso).
+- A lista de campos a conferir também é parâmetro — serigrafia varia por
+  cliente/modelo (projeto de serigrafia, SPEC Planejado); hardcodar a lista da
+  peça de demo dentro da engine geraria falso conforme para outros modelos.
 
 ## Extração e bordas AWS
 

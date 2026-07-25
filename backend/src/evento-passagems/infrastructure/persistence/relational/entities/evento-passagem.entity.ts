@@ -8,6 +8,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
   ManyToOne,
+  Column,
 } from 'typeorm';
 import { EntityRelationalHelper } from '../../../../../utils/relational-entity-helper';
 
@@ -15,6 +16,12 @@ import { EntityRelationalHelper } from '../../../../../utils/relational-entity-h
   name: 'evento_passagem',
 })
 export class EventoPassagemEntity extends EntityRelationalHelper {
+  @Column({
+    nullable: true,
+    type: String,
+  })
+  observacao?: string | null;
+
   @ManyToOne(() => CheckpointEntity, { eager: true, nullable: false })
   checkpoint: CheckpointEntity;
 

@@ -6,6 +6,12 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class EventoPassagem {
   @ApiProperty({
+    type: () => String,
+    nullable: true,
+  })
+  observacao?: string | null;
+
+  @ApiProperty({
     type: () => Checkpoint,
     nullable: false,
   })

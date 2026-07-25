@@ -72,7 +72,9 @@ Depende de: Fase 0 completa.
     do veredito geral na precedência divergente > nao_conferivel > conforme;
     caso da peça de demo (847233 × 847833) acusando só a série da placa.
   - Aceitação: engine é função pura (valores esperados + leituras com
-    confiança → vereditos); zero imports de I/O ou SDK.
+    confiança → vereditos); zero imports de I/O ou SDK. A lista de campos a
+    conferir é parâmetro de entrada, nunca constante — preparação para o
+    projeto de serigrafia por modelo/cliente (SPEC, Planejado).
 - [ ] T1.3 — Endpoints de conferência com leituras mockadas · módulo: conformidade
   - Verificação: criar conferência via curl com leituras simuladas e receber
     vereditos campo a campo persistidos.

@@ -12,6 +12,8 @@ import {
 
   ValidateNested,
   IsNotEmptyObject,
+  IsString,
+  IsOptional,
 } from 'class-validator';
 
 import {
@@ -20,6 +22,14 @@ import {
 } from '@nestjs/swagger';
 
 export class CreateEventoPassagemDto {
+  @ApiProperty({
+    required: false,
+    type: () => String,
+  })
+  @IsOptional()
+  @IsString()
+  observacao?: string | null;
+
   @ApiProperty({
     required: true,
     type: () => CheckpointDto,

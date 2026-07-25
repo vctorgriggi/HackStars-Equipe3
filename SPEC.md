@@ -58,7 +58,8 @@ linha, dando rastreabilidade de trânsito.
   de metal (última). Seed do MVP com essas etapas; nomes ajustáveis com a
   TRAEL.
 - **EventoPassagem** — registro peça × checkpoint × timestamp, criado por scan
-  do QR no checkpoint. A posição atual da peça na linha é derivada (último
+  do QR no checkpoint, com `observacao` opcional (ex.: "parou por erro aceito
+  pelo time — motivo"). A posição atual da peça na linha é derivada (último
   evento), nunca coluna duplicada.
 
 ```mermaid
@@ -111,6 +112,7 @@ erDiagram
         uuid id PK
         uuid transformadorId FK
         uuid checkpointId FK
+        string observacao "opcional: ex. erro aceito pelo time"
         date createdAt "timestamp da passagem"
     }
 ```
@@ -257,6 +259,20 @@ O valor esperado passa a ser cruzado com o ERP além do QR; divergência
 QR × ERP vira um novo tipo de alerta. Aceitação futura: conferência aponta
 origem de cada valor esperado (QR ou ERP) e acusa divergência entre origens.
 
+### Projeto de serigrafia por modelo/cliente
+
+O layout e o conteúdo das marcações variam por cliente e por modelo: o desenho
+EPT-163-PI-676 é o projeto do modelo da peça de demo; outro cliente (Energisa,
+outras distribuidoras) tem outro projeto, com marcações obrigatórias e
+opcionais próprias e posições definidas. A conferência futura valida contra o
+projeto do modelo: exige exatamente os campos obrigatórios daquele projeto,
+ignora os não aplicáveis, e evolui para checar posição/dimensão das marcações
+conforme o desenho. A engine já nasce preparada: a lista de campos a conferir
+é entrada, nunca constante (ver CLAUDE.md).
+Aceitação futura: dado um modelo com projeto X, a conferência cobra os campos
+obrigatórios de X e nenhum outro; campo obrigatório ilegível ou ausente nunca
+resulta `conforme`; peça de outro projeto conferida contra X é acusada.
+
 ### Auditoria e indicadores avançados
 
 Relatórios de desvios, retrabalho e gargalos por etapa, na linha do doc do
@@ -281,6 +297,10 @@ consegue criar Conferencia.
 - [ ] **Formato do payload do QR** — decodificar uma etiqueta real para saber
       se o QR carrega os campos ou só um código de lookup. Se for só código, o
       MVP precisa de fallback de digitação manual. Afeta T1.1 e T3.1.
+- [ ] **Modelagem do Projeto de serigrafia** — quando entrar (rodada futura):
+      entidade própria com campos estruturados ou config JSON por modelo?
+      Afeta a rodada "Projeto de serigrafia por modelo/cliente" do Planejado;
+      no MVP a lista de campos da demo é passada fixa pelo chamador da engine.
 - [ ] **Promover cliente a entidade própria** — hoje é campo texto em
       Transformador (a comparação do MVP é textual, QR × leitura da placa);
       vira tabela quando entrar validação contra cadastro/ERP (rodada futura).

@@ -30,6 +30,7 @@ export class EventoPassagemsService {
   async create(createEventoPassagemDto: CreateEventoPassagemDto) {
     // Do not remove comment below.
     // <creating-property />
+
     const checkpointObject = await this.checkpointService.findById(
       createEventoPassagemDto.checkpoint.id,
     );
@@ -59,6 +60,8 @@ export class EventoPassagemsService {
     return this.eventoPassagemRepository.create({
       // Do not remove comment below.
       // <creating-property-payload />
+      observacao: createEventoPassagemDto.observacao,
+
       checkpoint,
 
       transformador,
@@ -93,6 +96,7 @@ export class EventoPassagemsService {
   ) {
     // Do not remove comment below.
     // <updating-property />
+
     let checkpoint: Checkpoint | undefined = undefined;
 
     if (updateEventoPassagemDto.checkpoint) {
@@ -130,6 +134,8 @@ export class EventoPassagemsService {
     return this.eventoPassagemRepository.update(id, {
       // Do not remove comment below.
       // <updating-property-payload />
+      observacao: updateEventoPassagemDto.observacao,
+
       checkpoint,
 
       transformador,
