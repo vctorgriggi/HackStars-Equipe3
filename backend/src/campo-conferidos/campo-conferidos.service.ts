@@ -108,6 +108,17 @@ export class CampoConferidosService {
       fotoEvidencia = await this.fotoEvidenciaService.findById(
         dados.fotoEvidenciaId,
       );
+      // Foto já presa a OUTRA conferência não pode lastrear este campo —
+      // evidência emprestada falsificaria a trilha de auditoria.
+      if (
+        fotoEvidencia?.conferencia &&
+        fotoEvidencia.conferencia.id !== dados.conferencia.id
+      ) {
+        throw new UnprocessableEntityException({
+          status: HttpStatus.UNPROCESSABLE_ENTITY,
+          errors: { fotoEvidenciaId: 'foto-evidencia-de-outra-conferencia' },
+        });
+      }
     }
 
     return this.campoConferidoRepository.create({
@@ -150,9 +161,29 @@ export class CampoConferidosService {
     return this.campoConferidoRepository.findByIds(ids);
   }
 
-  async update(
+  update(
     id: CampoConferido['id'],
 
+    updateCampoConferidoDto: UpdateCampoConferidoDto,
+  ): never {
+    // CampoConferido é IMUTÁVEL via HTTP (revisão R1): PATCH em
+    // valorEsperado/valorLido/confianca/fotoEvidencia reescreveria o lastro
+    // de um veredito já emitido sem recalculá-lo — trilha de auditoria
+    // falsificável. Toda escrita legítima nasce em criarComVeredito.
+    void updateCampoConferidoDto;
+    void this.atualizarInterno;
+    throw new UnprocessableEntityException({
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      errors: { id: 'campo-conferido-imutavel' },
+    });
+  }
+
+  /**
+   * Corpo do update gerado pelo hygen, preservado APENAS pelos anchors dos
+   * generators (nunca é chamado): CampoConferido é imutável via HTTP.
+   */
+  private async atualizarInterno(
+    id: CampoConferido['id'],
     updateCampoConferidoDto: UpdateCampoConferidoDto,
   ) {
     // Do not remove comment below.

@@ -114,21 +114,31 @@ Depende de: Fase 0 completa.
 Objetivo: fotos reais → campos com confiança e evidência.
 Depende de: Fase 1 completa.
 
-- [ ] T2.1 — Spike Textract vs Bedrock com as fotos reais · módulo: extracao
+- [x] T2.1 — Spike Textract vs Bedrock com as fotos reais · módulo: extracao
   - Verificação: tabela de acerto por fonte física (placa, serigrafia, série
     chumbada) para cada serviço; timebox de 2h. Incluir no timebox um prompt
     de check qualitativo de layout via Bedrock (marcações presentes e na
     disposição do projeto da demo) — decide se o Could de layout entra.
-  - Bloqueio externo (atualizado 2026-07-25): credenciais entraram e S3 +
-    Textract estão FUNCIONANDO (docs/aws.md, "Estado da conta"). Restam DOIS
-    itens: (1) formulário "Anthropic use case details" no console Bedrock —
-    sem ele todo invoke Claude falha; (2) fotos da peça em arquivo. O
-    executável do spike já existe: `npx ts-node -r tsconfig-paths/register
+  - Bloqueio externo (atualizado 2026-07-25, fim do dia): S3 + Textract
+    FUNCIONANDO; formulário de use case aceito; agreements Opus/Sonnet 5
+    aceitos via CLI. Restam: (1) cotas de inferência Claude zeradas (conta
+    nova) — 4 pedidos PENDING no Service Quotas; (2) invoke dos modelos 5
+    ainda negado (propagação/trava de conta nova — monitor automático
+    acompanhando; Haiku 4.5 já passa em tudo exceto cota); (3) fotos da peça
+    em arquivo. Executável: `npx ts-node -r tsconfig-paths/register
     scripts/spike-extracao.ts <dir-fotos>`. Desvio autorizado: a Fase 3 pode
     iniciar em modo mock (EXTRACTOR_DRIVER=mock) sem esperar este item.
+  - Feito em 2026-07-25 com as fotos reais da peça (fotos-demo/): TEXTRACT
+    ESCOLHIDO — leu placa 847833 (99,8%), chumbado 847233 (99,9% de cima,
+    85,8% de lado), serigrafia 251328/energisa (97-99%) e a etiqueta (100%).
+    Medição e aprendizados em docs/visao-ocr.md.
+  - Desvio: a constraint 2 do SPEC (relevo derrubaria OCR clássico) NÃO se
+    confirmou — Bedrock deixa de ser pré-requisito e vira reforço opcional
+    para foto ruim; o adapter fica no código (troca por EXTRACTOR_DRIVER).
+    O check qualitativo de layout (Could) segue dependendo do Bedrock, que
+    continua bloqueado por cota/registro da conta AWS.
   - Aceitação: escolha registrada como decisão resolvida aqui e no CLAUDE.md;
-    se render aprendizado caro (prompts, pré-processamento), vira
-    docs/visao-ocr.md.
+    aprendizado caro registrado em docs/visao-ocr.md.
 - [x] T2.2 — ExtractorPort e adapter do serviço escolhido · módulo: extracao
   - Testes (primeiro): consumidores da porta testados com mock; adapter real
     verificado manualmente com as fotos da demo.
@@ -162,6 +172,21 @@ Depende de: Fase 1 completa.
     literal de extracao/ports (satisfies quebra o build se divergir).
   - Aceitação: FotoEvidencia persistida e vinculável a CampoConferido; plano B
     registrado: storage em disco local se S3 atrasar a demo (constraint 1).
+
+- [x] T2.4 — Deploy da API na AWS (descoberta desta rodada) · módulo: backend
+  - Verificação: API pública respondendo com banco RDS e fotos no S3. Feito em
+    2026-07-25: ECR + App Runner + IAM roles; health 200, login, cenário-âncora
+    `divergente` só em serie-placa e upload com URL assinada — tudo pela URL
+    pública. Receita e as 4 armadilhas em docs/deploy.md.
+  - Motivo de existir: a Fase 3 precisa de HTTPS (câmera do navegador só abre
+    em origem segura); sem deploy, T3.1 não roda no celular.
+- [x] T2.5 — Página /demo servida pela API (descoberta desta rodada) · módulo: backend
+  - Verificação: abrir /demo no celular, escolher etapa, fotografar, disparar
+    conferência e ver veredito campo a campo. Feito em 2026-07-25 (agente
+    Opus): tela única sem dependência externa, presets com as confianças
+    medidas no spike, foto indo para o S3, veredito 100% vindo da API.
+  - Desvio: é ferramenta TEMPORÁRIA de inspeção, fora de `frontend/` — não
+    substitui a Fase 3; serve para validar a API sem esperar o app.
 
 ## Fase 3 — Fluxo de conferência ponta a ponta
 
@@ -239,16 +264,20 @@ demo.
 
 ## Riscos e dependências
 
-- **Série chumbada ilegível para OCR** (SPEC, constraint 2) → T2.1 decide o
-  serviço; plano B: Bedrock com modelo de visão; plano C: campo
-  `nao_conferivel` com foto para conferência humana — a demo continua válida
-  pelo critério 4.
+- **Série chumbada ilegível para OCR** (SPEC, constraint 2) → RISCO DISSOLVIDO
+  em 2026-07-25: o Textract leu o relevo a 99,9% (topo) e 96,7% (diagonal) nas
+  fotos reais (docs/visao-ocr.md). O plano C (campo `nao_conferivel` com foto)
+  segue valendo para foto ruim — medido: um chumbado saiu a 35,4% e a engine o
+  barrou corretamente.
 - **Prazo de 2 dias** (SPEC, constraint 1) → Fase 5 opcional; T2.3 com fallback
   de disco local; corte na ordem Could → Should, nunca no Must.
 - **Payload do QR desconhecido** (SPEC, constraint 5) → T1.1 na frente de tudo
   que depende dele; plano B: digitação manual dos valores esperados.
 - **Créditos AWS** (SPEC, constraint 4) → visão só sob disparo explícito
-  (T3.2); spike com timebox (T2.1).
+  (T3.2); spike com timebox (T2.1). RISCO NOVO materializado: a conta AWS está
+  com registro incompleto — cotas Bedrock zeradas e Claude Platform recusando
+  cadastro (docs/aws.md). Mitigado: Textract não depende disso e é a escolha do
+  spike; a demo não depende mais de Bedrock.
 
 ## Decisões em aberto
 
@@ -256,8 +285,9 @@ demo.
       similaridade ≥ N% com revisão humana; afeta T1.2.
 - [ ] **Formato do payload do QR** — campos embutidos ou código de lookup;
       afeta T1.1 e T3.1.
-- [ ] **Textract vs Bedrock para extração** — resolver em T2.1 com as fotos
-      reais; afeta T2.2.
+- [x] **Textract vs Bedrock para extração** — resolvido: TEXTRACT, medido com
+      as fotos reais (docs/visao-ocr.md); leu inclusive o relevo chumbado, que
+      era o risco. Bedrock fica como reforço opcional (2026-07-25).
 - [x] **Framework do front** — resolvido: Next.js 16, scaffold já subido pelo
       time venceu o Angular combinado; T0.2 virou verificação e o módulo `web`
       passou a `frontend` (2026-07-25).
@@ -269,4 +299,4 @@ demo.
       checklist do banco desde a T1.2; ingestão automática do PDF virou Fase 6
       opcional (2026-07-25).
 
-<!-- rodada: nucleo @ 3472869 -->
+<!-- rodada: visao-e-deploy @ a67b234 -->

@@ -1,8 +1,10 @@
+import { FONTES_FISICAS } from '../../extracao/ports/extractor.port';
 import { ConferenciaDto } from '../../conferencia/dto/conferencia.dto';
 
 import {
   // decorators here
 
+  IsIn,
   IsString,
   IsOptional,
   ValidateNested,
@@ -35,6 +37,9 @@ export class CreateFotoEvidenciaDto {
     type: () => String,
   })
   @IsString()
+  @IsIn(FONTES_FISICAS, {
+    message: `fonteFisica must be one of the following values: ${FONTES_FISICAS.join(', ')}`,
+  })
   fonteFisica: string;
 
   @ApiProperty({

@@ -18,6 +18,11 @@ export function TransformUrlEvidencia(): PropertyDecorator {
       }
       const config = fileConfig() as FileConfig;
       if (config.driver === FileDriver.LOCAL) {
+        // Valor já absoluto (ex.: criado via CRUD com URL externa) não ganha
+        // prefixo — evitaria "http://localhost:3001https://...".
+        if (/^https?:\/\//i.test(value)) {
+          return value;
+        }
         return (appConfig() as AppConfig).backendDomain + value;
       }
       if ([FileDriver.S3_PRESIGNED, FileDriver.S3].includes(config.driver)) {

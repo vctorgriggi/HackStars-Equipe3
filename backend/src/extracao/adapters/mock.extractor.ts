@@ -35,7 +35,8 @@ export const LEITURAS_DEMO: Record<string, string | null> = {
   'serie-placa': '847833',
   'patrimonio-placa': '251328',
   'patrimonio-serigrafia': '251328',
-  'cliente-serigrafia': '143091 - Energisa Rondonia',
+  'cliente-serigrafia':
+    '143091 - Energisa Rondônia Distribuidora de Energia S.A',
   'potencia-serigrafia': '10 kVA',
 };
 

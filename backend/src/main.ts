@@ -22,7 +22,9 @@ async function bootstrap() {
   app.setGlobalPrefix(
     configService.getOrThrow('app.apiPrefix', { infer: true }),
     {
-      exclude: ['/'],
+      // 'demo': página de demonstração temporária fora do prefixo/versão,
+      // para a URL no celular ser só https://<host>/demo (ver src/demo).
+      exclude: ['/', 'demo'],
     },
   );
   app.enableVersioning({

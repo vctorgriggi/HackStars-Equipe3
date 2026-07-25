@@ -34,8 +34,9 @@ não conformidade que chega ao cliente hoje).
 | ------- | ---------------------------------------------------------------- |
 | API     | NestJS (base brocoders/nestjs-boilerplate), TypeORM + PostgreSQL |
 | Front   | Next.js 16 (React 19, Tailwind 4), mobile-first                  |
-| Visão   | AWS Textract ou Bedrock — decisão no spike T2.1                  |
+| Visão   | AWS Textract (spike T2.1); Bedrock como reforço opcional         |
 | Storage | AWS S3 (fallback: disco local, se S3 ameaçar o prazo)            |
+| Deploy  | ECR + App Runner (HTTPS), RDS PostgreSQL — receita em docs/deploy.md |
 
 ## Estrutura
 
@@ -92,6 +93,10 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
 - Escrita de veredito tem UM caminho: `CampoConferidosService.criarComVeredito`
   (server-side, sem rota HTTP). Nunca crie outro — é o que mantém a regra de
   ouro auditável.
+- CampoConferido é IMUTÁVEL via HTTP (update → 422): PATCH no lastro
+  (valores/confiança/foto) de um veredito já emitido falsificaria a trilha de
+  auditoria (revisão R1). Comparação usa Unicode NFC; confiança <= 0 nunca é
+  lastro, mesmo com limiar 0.
 - Fluxo do endpoint `POST /conferencia/executar`: parse do QR → find-or-create
   por numeroSerie → ProjetoModelo (codigoProjeto do QR → vínculo da peça →
   único do banco) → checklist → engine → persistência. Checkpoint resolve
@@ -107,8 +112,11 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
   `extracao`, storage em `evidencias`. Consumidores testam com mock; o adapter
   real se verifica manualmente com as fotos da demo.
 - Serviços, modelos (IDs Bedrock), custos e checklist de setup AWS:
-  docs/aws.md — o setup (model access, IAM, bucket) precisa acontecer antes da
-  Fase 2.
+  docs/aws.md. Resultado do spike e limites medidos: docs/visao-ocr.md.
+- `EXTRACTOR_DRIVER`: `mock` (default, funciona sem AWS), `textract` (a escolha
+  do spike) ou `bedrock` (reforço; hoje bloqueado pela conta AWS).
+- SSL do banco é condicional a `DATABASE_SSL_ENABLED` — RDS exige TLS, o
+  Postgres local do docker não suporta; fixar um dos dois quebra o outro.
 - Spike T2.1 executável: `npx ts-node -r tsconfig-paths/register
   scripts/spike-extracao.ts <dir-fotos>` (fotos nomeadas pela fonte:
   placa.jpg, chumbado-1.jpg…). Sem credencial, falha com mensagem apontando
@@ -194,6 +202,26 @@ do hackathon:
    default do gerador; unificar só se doer.
 8. `cliente` como string livre — decisão em aberto no SPEC (vira entidade na
    rodada ERP).
+9. Execução da conferência não é transacional — falha no meio do loop de
+   campos deixa conferência com veredito geral e campos parciais; janela
+   pequena, aceito no prazo (revisão R1). Transação entra com o hardening
+   pós-demo.
+10. `confianca` das leituras vem do cliente HTTP até a extração ser plugada
+    no fluxo (T3.2) — confiança forjável por design transitório; a guarda
+    `confianca <= 0` e o limiar mínimo mitigam o caso flagrante.
+11. `POST /conferencia/executar` avalia a checklist INTEIRA: campo sem leitura
+    volta `nao_conferivel` mesmo quando a marcação ainda nem existe na peça
+    (placa na etapa 1). Falta a conferência parcial por etapa — cada item da
+    checklist precisa dizer em qual etapa é validado. Paliativo: o chamador
+    manda só os campos daquela etapa e lê o resultado ciente disso.
+12. Chaves AWS vivem nas variáveis do serviço App Runner porque o boilerplate
+    valida `ACCESS_KEY_ID`/`SECRET_ACCESS_KEY` quando `FILE_DRIVER=s3`
+    (files/config/file.config.ts). A instance role existe e já serve
+    Textract/Bedrock; migrar o S3 para ela exige tornar as credenciais
+    opcionais no boilerplate (4 arquivos).
+13. Página `/demo` (src/demo) é ferramenta temporária de inspeção servida pela
+    API, com credenciais do admin seed pré-preenchidas — remover antes de
+    qualquer uso fora do hackathon.
 
 ## Decisões em aberto
 
@@ -201,7 +229,8 @@ do hackathon:
       similaridade ≥ N% com revisão humana (afeta T1.2).
 - [ ] **Formato do payload do QR** — campos embutidos ou código de lookup
       (afeta T1.1, T3.1).
-- [ ] **Textract vs Bedrock** — resolver no spike T2.1 com as fotos reais
-      (afeta T2.2).
+- [x] **Textract vs Bedrock** — resolvido: Textract (spike T2.1 com fotos
+      reais, docs/visao-ocr.md). `EXTRACTOR_DRIVER=textract`; Bedrock fica
+      como reforço opcional para foto ruim (2026-07-25).
 - [x] **Framework do front** — resolvido: Next.js 16; scaffold já subido pelo
       time venceu o Angular combinado na entrevista (2026-07-25).

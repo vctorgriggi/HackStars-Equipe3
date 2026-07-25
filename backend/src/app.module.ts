@@ -42,8 +42,13 @@ import { ProjetoModelosModule } from './projeto-modelos/projeto-modelos.module';
 
 import { ExtracaoModule } from './extracao/extracao.module';
 
+// Temporário: página de demonstração servida em /demo (remover antes de prod).
+import { DemoModule } from './demo/demo.module';
+
 @Module({
   imports: [
+    DemoModule,
+
     ExtracaoModule,
 
     ProjetoModelosModule,

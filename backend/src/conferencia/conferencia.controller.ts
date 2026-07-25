@@ -13,7 +13,9 @@ import {
 } from '@nestjs/common';
 import { ConferenciaService } from './conferencia.service';
 import { ConferenciaExecucaoService } from './conferencia-execucao.service';
+import { ConferenciaExtracaoService } from './conferencia-extracao.service';
 import { CreateConferenciaDto } from './dto/create-conferencia.dto';
+import { ExecutarComFotosDto } from './dto/executar-com-fotos.dto';
 import { ExecutarConferenciaDto } from './dto/executar-conferencia.dto';
 import { UpdateConferenciaDto } from './dto/update-conferencia.dto';
 import {
@@ -44,6 +46,7 @@ export class ConferenciaController {
   constructor(
     private readonly conferenciaService: ConferenciaService,
     private readonly conferenciaExecucaoService: ConferenciaExecucaoService,
+    private readonly conferenciaExtracaoService: ConferenciaExtracaoService,
   ) {}
 
   @Post()
@@ -69,6 +72,27 @@ export class ConferenciaController {
   })
   executar(@Body() executarConferenciaDto: ExecutarConferenciaDto) {
     return this.conferenciaExecucaoService.executar(executarConferenciaDto);
+  }
+
+  @Post('executar-com-fotos')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiCreatedResponse({
+    description:
+      'Mesma conferencia do POST /executar, mas as leituras vem da VISAO: ' +
+      'cada FotoEvidencia informada e lida do storage e enviada uma unica ' +
+      'vez ao extrator ativo (EXTRACTOR_DRIVER). A resposta acrescenta ' +
+      '`extracao` (driver, fotos, leiturasProduzidas); o veredito continua ' +
+      'nascendo na engine.',
+  })
+  @ApiUnprocessableEntityResponse({
+    description:
+      'payloadQr ilegivel/somente-codigo, etapa-desconhecida, ' +
+      'projeto-modelo-indeterminado ou foto-evidencia-inexistente.',
+  })
+  executarComFotos(@Body() executarComFotosDto: ExecutarComFotosDto) {
+    return this.conferenciaExtracaoService.executarComFotos(
+      executarComFotosDto,
+    );
   }
 
   @Get()
