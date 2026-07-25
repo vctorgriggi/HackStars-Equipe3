@@ -40,6 +40,9 @@ linha, dando rastreabilidade de trânsito.
 
 - **Transformador** — identidade esperada da peça, criada a partir do payload
   do QR: número de série, patrimônio, pedido, seq, cliente, descrição.
+  `numeroSerie` é a chave de negócio (única do fabricante; por isso é chumbada
+  3× no metal): find-or-create usa ela. Patrimônio é numeração do cliente —
+  único por cliente, não globalmente; nunca serve de chave.
 - **Conferencia** — uma execução de verificação de uma peça: referência ao
   Transformador, conjunto de CampoConferido, veredito geral, timestamp,
   opcionalmente vinculada a um Checkpoint — quando presente, o vínculo
@@ -265,6 +268,47 @@ O valor esperado passa a ser cruzado com o ERP além do QR; divergência
 QR × ERP vira um novo tipo de alerta. Aceitação futura: conferência aponta
 origem de cada valor esperado (QR ou ERP) e acusa divergência entre origens.
 
+### Fluxo alvo ponta a ponta (menos pessoas no circuito)
+
+Do upload do projeto até a expedição, com humano apenas em três pontos:
+aprovar a extração do projeto (uma vez por modelo), corrigir a peça física
+quando um gate acusa, e registrar exceção deliberada (observacao no evento).
+
+1. Engenharia sobe o PDF do projeto do modelo → IA (Bedrock) extrai marcações,
+   posições e obrigatoriedade → engenharia revisa e aprova → vira
+   ProjetoModelo estruturado (a checklist que a engine consome).
+2. Pedido entra (futuro: ERP) → transformador cadastrado, etiqueta QR impressa
+   → adesivação na etapa 1 (o QR nasce com a peça, não é conferido — é a
+   referência).
+3. Em cada etapa instrumentada, câmera fixa captura ao detectar a peça →
+   extração → engine compara contra QR + checklist do projeto → conforme:
+   EventoPassagem automático e a peça segue; divergente: alerta e bloqueio de
+   avanço até correção.
+4. Gate final (pós-placa): última conferência total → libera expedição.
+5. Indicadores de auditoria alimentados automaticamente por etapa e campo.
+
+```mermaid
+flowchart LR
+    A[Upload do projeto PDF] --> B[IA extrai marcacoes,<br/>posicoes e obrigatorios]
+    B --> C{Engenharia revisa<br/>uma vez por modelo}
+    C --> D[(ProjetoModelo<br/>estruturado)]
+    E[Pedido / ERP] --> F[Cadastro + etiqueta QR]
+    F --> G[Etapa 1: adesivacao]
+    G --> H{Gate pos-serigrafia<br/>camera + engine}
+    H -- conforme --> I[Etapa 3: oleo e conferencia]
+    H -- divergente --> H2[Alerta + correcao] --> H
+    I --> J{Gate pos-placa<br/>camera + engine}
+    J -- conforme --> K[Expedicao]
+    J -- divergente --> J2[Alerta + correcao] --> J
+    D -. checklist do modelo .-> H
+    D -. checklist do modelo .-> J
+```
+
+O MVP dos 2 dias percorre este mesmo desenho com três substituições: celular
+no lugar da câmera fixa, checklist fixa da demo no lugar do ProjetoModelo, e
+operador disparando o que depois será automático. A arquitetura não muda —
+troca-se quem chama as portas.
+
 ### Projeto de serigrafia por modelo/cliente
 
 O layout e o conteúdo das marcações variam por cliente e por modelo: o desenho
@@ -310,6 +354,11 @@ consegue criar Conferencia.
 - [ ] **Formato do payload do QR** — decodificar uma etiqueta real para saber
       se o QR carrega os campos ou só um código de lookup. Se for só código, o
       MVP precisa de fallback de digitação manual. Afeta T1.1 e T3.1.
+- [ ] **Unicidade do patrimônio entre clientes** — padrão do setor: série do
+      fabricante é única, patrimônio é numeração do cliente (único por
+      cliente). Confirmar com a TRAEL. Consequência já adotada: find-or-create
+      de Transformador usa `numeroSerie` como chave (T1.1/T1.3), nunca
+      patrimônio.
 - [ ] **Modelagem do Projeto de serigrafia** — quando entrar (rodada futura):
       entidade própria com campos estruturados ou config JSON por modelo?
       Afeta a rodada "Projeto de serigrafia por modelo/cliente" do Planejado;

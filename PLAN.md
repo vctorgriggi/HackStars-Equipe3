@@ -78,7 +78,9 @@ Depende de: Fase 0 completa.
 - [ ] T1.3 — Endpoints de conferência com leituras mockadas · módulo: conformidade
   - Verificação: criar conferência via curl com leituras simuladas e receber
     vereditos campo a campo persistidos.
-  - Aceitação: contrato request/response estável para a Fase 3 consumir.
+  - Aceitação: contrato request/response estável para a Fase 3 consumir;
+    Transformador resolvido por find-or-create com `numeroSerie` como chave
+    (patrimônio não é único entre clientes — SPEC, decisões em aberto).
 
 ## Fase 2 — Extração por visão
 
