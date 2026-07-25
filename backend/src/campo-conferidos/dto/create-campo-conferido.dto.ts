@@ -25,6 +25,14 @@ import {
 export class CreateCampoConferidoDto {
   @ApiProperty({
     required: false,
+    type: () => String,
+  })
+  @IsOptional()
+  @IsString()
+  regiaoLeitura?: string | null;
+
+  @ApiProperty({
+    required: false,
     type: () => FotoEvidenciaDto,
   })
   @IsOptional()

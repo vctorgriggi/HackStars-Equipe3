@@ -16,6 +16,12 @@ import { EntityRelationalHelper } from '../../../../../utils/relational-entity-h
   name: 'campo_conferido',
 })
 export class CampoConferidoEntity extends EntityRelationalHelper {
+  @Column({
+    nullable: true,
+    type: String,
+  })
+  regiaoLeitura?: string | null;
+
   @ManyToOne(() => FotoEvidenciaEntity, { eager: true, nullable: true })
   fotoEvidencia?: FotoEvidenciaEntity | null;
 

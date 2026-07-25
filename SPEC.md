@@ -49,7 +49,9 @@ linha, dando rastreabilidade de trânsito.
 - **CampoConferido** — um campo comparado: nome (ex.: serie-placa,
   serie-chumbada-1..3, patrimonio-serigrafia, patrimonio-placa, cliente), valor
   esperado (do QR), valor lido (da visão), score de confiança, veredito
-  (`conforme` | `divergente` | `nao_conferivel`), referência à FotoEvidencia.
+  (`conforme` | `divergente` | `nao_conferivel`), referência à FotoEvidencia e
+  `regiaoLeitura` opcional (bounding box de onde o valor foi lido na foto —
+  matéria-prima da conferência posicional futura, custo zero com Textract).
 - **FotoEvidencia** — foto enviada pelo operador, armazenada com URL e vínculo
   aos campos extraídos dela.
 - **Checkpoint** — etapa ordenada da linha de produção, com posição na
@@ -100,6 +102,7 @@ erDiagram
         string valorLido "da visao; null se ilegivel"
         number confianca "score da extracao"
         string veredito "conforme | divergente | nao_conferivel; so a engine grava"
+        string regiaoLeitura "opcional: bounding box da leitura na foto"
         uuid fotoEvidenciaId FK "opcional"
     }
     FOTO_EVIDENCIA {
@@ -156,6 +159,9 @@ erDiagram
 - Dashboard de linha: peças × último checkpoint × status de conformidade.
 - Indicadores de auditoria: contagem de divergências por etapa (checkpoint) e
   por campo, agregando os dados que o Must já persiste.
+- Check qualitativo de layout via Bedrock: marcações da face presentes e na
+  disposição esperada do projeto da demo — condicionado ao spike T2.1 mostrar
+  confiabilidade; nunca rebaixa um `divergente` textual.
 
 ### Won't (nesta rodada)
 
@@ -268,7 +274,14 @@ opcionais próprias e posições definidas. A conferência futura valida contra 
 projeto do modelo: exige exatamente os campos obrigatórios daquele projeto,
 ignora os não aplicáveis, e evolui para checar posição/dimensão das marcações
 conforme o desenho. A engine já nasce preparada: a lista de campos a conferir
-é entrada, nunca constante (ver CLAUDE.md).
+é entrada, nunca constante (ver CLAUDE.md), e cada leitura persiste seu
+bounding box (`regiaoLeitura`) desde o MVP.
+A verificação posicional tem dois níveis de complexidade distintos: o check
+qualitativo (presença e disposição relativa das marcações) funciona com foto
+de celular e entra cedo (ver Could); o quantitativo (posições em mm do
+desenho) exige projeto transcrito para dado estruturado e geometria de câmera
+conhecida — em tanque cilíndrico com foto não calibrada é fotogrametria, não
+OCR — e por isso pertence à rodada de câmeras fixas calibradas.
 Aceitação futura: dado um modelo com projeto X, a conferência cobra os campos
 obrigatórios de X e nenhum outro; campo obrigatório ilegível ou ausente nunca
 resulta `conforme`; peça de outro projeto conferida contra X é acusada.

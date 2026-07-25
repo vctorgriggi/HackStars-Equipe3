@@ -6,6 +6,12 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class CampoConferido {
   @ApiProperty({
+    type: () => String,
+    nullable: true,
+  })
+  regiaoLeitura?: string | null;
+
+  @ApiProperty({
     type: () => FotoEvidencia,
     nullable: true,
   })

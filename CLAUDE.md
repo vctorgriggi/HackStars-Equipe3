@@ -94,7 +94,9 @@ cd backend && npm run test    # unit da engine e do parser
 - Nenhuma chamada de visão fora de ação explícita do operador — créditos AWS
   são finitos (SPEC, constraint 4); sem reprocessamento em loop.
 - Leitura retornada pelo adapter sempre carrega: valor, confiança, tipo da
-  fonte física (placa, serigrafia, chumbado 1..3) e referência à foto.
+  fonte física (placa, serigrafia, chumbado 1..3), referência à foto e, quando
+  o serviço fornecer, o bounding box da leitura (`regiaoLeitura`) — dado
+  barato agora que habilita a conferência posicional futura.
 
 ## Contrato API ↔ Front
 

@@ -30,6 +30,7 @@ export class CampoConferidosService {
   async create(createCampoConferidoDto: CreateCampoConferidoDto) {
     // Do not remove comment below.
     // <creating-property />
+
     let fotoEvidencia: FotoEvidencia | null | undefined = undefined;
 
     if (createCampoConferidoDto.fotoEvidencia) {
@@ -65,6 +66,8 @@ export class CampoConferidosService {
     return this.campoConferidoRepository.create({
       // Do not remove comment below.
       // <creating-property-payload />
+      regiaoLeitura: createCampoConferidoDto.regiaoLeitura,
+
       fotoEvidencia,
 
       veredito: createCampoConferidoDto.veredito,
@@ -109,6 +112,7 @@ export class CampoConferidosService {
   ) {
     // Do not remove comment below.
     // <updating-property />
+
     let fotoEvidencia: FotoEvidencia | null | undefined = undefined;
 
     if (updateCampoConferidoDto.fotoEvidencia) {
@@ -148,6 +152,8 @@ export class CampoConferidosService {
     return this.campoConferidoRepository.update(id, {
       // Do not remove comment below.
       // <updating-property-payload />
+      regiaoLeitura: updateCampoConferidoDto.regiaoLeitura,
+
       fotoEvidencia,
 
       veredito: updateCampoConferidoDto.veredito,

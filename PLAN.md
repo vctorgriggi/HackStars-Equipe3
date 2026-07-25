@@ -87,7 +87,9 @@ Depende de: Fase 1 completa.
 
 - [ ] T2.1 — Spike Textract vs Bedrock com as fotos reais · módulo: extracao
   - Verificação: tabela de acerto por fonte física (placa, serigrafia, série
-    chumbada) para cada serviço; timebox de 2h.
+    chumbada) para cada serviço; timebox de 2h. Incluir no timebox um prompt
+    de check qualitativo de layout via Bedrock (marcações presentes e na
+    disposição do projeto da demo) — decide se o Could de layout entra.
   - Aceitação: escolha registrada como decisão resolvida aqui e no CLAUDE.md;
     se render aprendizado caro (prompts, pré-processamento), vira
     docs/visao-ocr.md.
@@ -95,7 +97,8 @@ Depende de: Fase 1 completa.
   - Testes (primeiro): consumidores da porta testados com mock; adapter real
     verificado manualmente com as fotos da demo.
   - Aceitação: entrada imagem + tipo de fonte física → saída lista de campos
-    com valor, confiança e vínculo à foto; nenhuma chamada AWS fora do adapter.
+    com valor, confiança, bounding box (`regiaoLeitura`, quando o serviço
+    fornecer) e vínculo à foto; nenhuma chamada AWS fora do adapter.
 - [ ] T2.3 — Upload de fotos e storage S3 · módulo: evidencias
   - Verificação: foto sobe pelo endpoint, URL (assinada) abre no navegador.
   - Aceitação: FotoEvidencia persistida e vinculável a CampoConferido; plano B
