@@ -73,6 +73,30 @@ do SPEC já proíbe (visão só sob disparo explícito).
    qualquer foto, para validar credencial/região/model access sem gastar o
    timebox do T2.1.
 
+## Estado da conta (validado em 2026-07-25, via terminal)
+
+- **Região**: us-east-1. **Bucket**: `trael` — existe e funciona; FILE_DRIVER=s3
+  ativo no dev e verificado (upload → objeto no bucket → URL assinada abre
+  com 200).
+- **Textract**: funcionando (DetectDocumentText validado com credencial atual).
+- **Bedrock**: modelos Claude visíveis no catálogo, mas TODO invoke falha até
+  enviar o formulário **"Anthropic use case details"** no console (Bedrock →
+  Model access) — é o único bloqueio restante da AWS. Ao liberar, se o id
+  `anthropic.claude-*` responder erro de inference profile, usar o prefixo
+  `us.` (ex.: `us.anthropic.claude-opus-5`) via env `BEDROCK_MODEL_ID`.
+- **ALERTA de segurança**: a credencial no .env é do usuário **root** da conta
+  (`arn:...:root`) — contra o checklist acima. Criar IAM user com a política
+  mínima, trocar a chave no .env e DESATIVAR a chave root. Vazamento da chave
+  root = conta inteira comprometida.
+- **RDS** (`database-1...rds.amazonaws.com`): sem acesso público — resolve IP
+  privado de VPC e trava o boot local (foi o que aconteceu; o dev usa o
+  Postgres do Docker, e o endpoint do RDS ficou comentado no .env). Se o time
+  quiser usá-lo no dev: habilitar Public access + security group liberando os
+  IPs do time, e rodar migrations/seeds lá. Não é necessário para a demo.
+- **Redis/ElastiCache**: criado na conta, mas o stack atual não consome Redis
+  (nenhum módulo ativo usa o WORKER_HOST do boilerplate). Sem ação; pode ser
+  desligado para não gastar crédito.
+
 ## O que o spike T2.1 decide (e registra aqui)
 
 - Acerto por fonte física: Textract × Bedrock em placa, serigrafia e chumbado.

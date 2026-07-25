@@ -1,3 +1,4 @@
+import { TransformUrlEvidencia } from './url-evidencia.transform';
 import { Conferencia } from '../../conferencia/domain/conferencia';
 
 import { ApiProperty } from '@nestjs/swagger';
@@ -19,6 +20,7 @@ export class FotoEvidencia {
     type: () => String,
     nullable: false,
   })
+  @TransformUrlEvidencia()
   url: string;
 
   @ApiProperty({

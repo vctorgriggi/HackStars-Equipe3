@@ -27,8 +27,15 @@ import {
  * Bounding box so existe no caminho Textract (`textract.extractor.ts`).
  */
 
-/** Model id no Bedrock leva prefixo `anthropic.` (ver docs/aws.md). */
-export const MODELO_BEDROCK = 'anthropic.claude-opus-5';
+/**
+ * Model id no Bedrock leva prefixo `anthropic.` (ver docs/aws.md).
+ * Sobrescrevível por BEDROCK_MODEL_ID: a conta pode exigir o id de inference
+ * profile (prefixo `us.`, ex.: us.anthropic.claude-opus-5) — o spike T2.1
+ * testa os dois formatos sem mudar código. Chave de bancada, como
+ * EXTRACTOR_DRIVER.
+ */
+export const MODELO_BEDROCK =
+  process.env.BEDROCK_MODEL_ID ?? 'anthropic.claude-opus-5';
 
 /** Teto de saida. A resposta e um JSON curto; nao ha por que dar mais folga. */
 export const MAX_TOKENS_BEDROCK = 1024;

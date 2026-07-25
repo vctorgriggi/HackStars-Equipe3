@@ -119,13 +119,13 @@ Depende de: Fase 1 completa.
     chumbada) para cada serviço; timebox de 2h. Incluir no timebox um prompt
     de check qualitativo de layout via Bedrock (marcações presentes e na
     disposição do projeto da demo) — decide se o Could de layout entra.
-  - Bloqueio externo (2026-07-25): aguarda credenciais AWS no backend/.env
-    (checklist em docs/aws.md) e fotos da peça em arquivo. O executável do
-    spike já existe: `npx ts-node -r tsconfig-paths/register
-    scripts/spike-extracao.ts <dir-fotos>` — roda os dois adapters e imprime
-    o placar de acerto. Desvio autorizado: a Fase 3 pode iniciar em modo mock
-    (EXTRACTOR_DRIVER=mock) sem esperar este item — bloqueio é externo ao
-    time e o mock espelha o cenário-âncora da demo.
+  - Bloqueio externo (atualizado 2026-07-25): credenciais entraram e S3 +
+    Textract estão FUNCIONANDO (docs/aws.md, "Estado da conta"). Restam DOIS
+    itens: (1) formulário "Anthropic use case details" no console Bedrock —
+    sem ele todo invoke Claude falha; (2) fotos da peça em arquivo. O
+    executável do spike já existe: `npx ts-node -r tsconfig-paths/register
+    scripts/spike-extracao.ts <dir-fotos>`. Desvio autorizado: a Fase 3 pode
+    iniciar em modo mock (EXTRACTOR_DRIVER=mock) sem esperar este item.
   - Aceitação: escolha registrada como decisão resolvida aqui e no CLAUDE.md;
     se render aprendizado caro (prompts, pré-processamento), vira
     docs/visao-ocr.md.
@@ -153,6 +153,9 @@ Depende de: Fase 1 completa.
     com fonteFisica validada por whitelist canônica (422 fora dela), url
     fetchável sem auth via rota de files do boilerplate, vínculo opcional a
     conferência validado; driver local ativo, S3 = troca de FILE_DRIVER.
+    Atualização 2026-07-25: S3 LIGADO e verificado (bucket trael, URL
+    assinada 200); `TransformUrlEvidencia` devolve URL pronta nos dois
+    drivers (local → absoluta, s3 → assinada 1h).
   - Desvios: interceptor limpa arquivo órfão quando a validação falha após o
     multer gravar; filtro por mimetype (não extensão) para aceitar HEIC de
     iPhone; fonte única dos valores de fonteFisica reconciliada na união

@@ -1,3 +1,4 @@
+import { TransformUrlEvidencia } from '../domain/url-evidencia.transform';
 import { ApiProperty } from '@nestjs/swagger';
 import { FonteFisicaEnum } from '../fonte-fisica.enum';
 
@@ -10,12 +11,12 @@ export class UploadFotoEvidenciaResponseDto {
 
   @ApiProperty({
     type: String,
-    example: '/api/v1/files/1e0f2c9d6d3f4a1b.png',
+    example: 'https://trael.s3.us-east-1.amazonaws.com/1e0f2c9d.png?X-Amz-...',
     description:
-      'Driver local: caminho relativo ao backend (BACKEND_DOMAIN + url ' +
-      'responde 200 em GET, sem autenticação). Driver s3: chave do objeto ' +
-      'no bucket, resolvida em URL assinada pelo módulo de files.',
+      'URL pronta para abrir: driver local → URL absoluta do backend; ' +
+      'driver s3 → URL assinada (1h). Ver TransformUrlEvidencia.',
   })
+  @TransformUrlEvidencia()
   url: string;
 
   @ApiProperty({

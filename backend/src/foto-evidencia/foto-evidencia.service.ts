@@ -61,12 +61,14 @@ export class FotoEvidenciaService {
         : null,
     });
 
-    return {
+    // Instância de classe (não objeto literal): o ClassSerializerInterceptor
+    // só executa o @TransformUrlEvidencia (URL assinada no s3) em instâncias.
+    return Object.assign(new UploadFotoEvidenciaResponseDto(), {
       id: fotoEvidencia.id,
       url: fotoEvidencia.url,
       fonteFisica: fotoEvidencia.fonteFisica as FonteFisicaEnum,
       conferenciaId: fotoEvidencia.conferencia?.id ?? null,
-    };
+    });
   }
 
   async create(createFotoEvidenciaDto: CreateFotoEvidenciaDto) {
