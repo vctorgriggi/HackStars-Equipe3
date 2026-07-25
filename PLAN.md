@@ -42,10 +42,10 @@ Depende de: nada.
   - Verificação: migration roda limpa em banco vazio; tabelas Transformador,
     Conferencia, CampoConferido, FotoEvidencia, Checkpoint, EventoPassagem
     criadas conforme SPEC (Entidades).
-  - Aceitação: seed mínimo de checkpoints com linha única (ex.: linha 1 —
-    serigrafia, montagem final, laboratório, expedição); Checkpoint carrega a
-    linha desde a primeira migration para várias esteiras não exigirem
-    refatoração.
+  - Aceitação: seed com as etapas reais da linha, ordenadas (adesivação/
+    separação da etiqueta, serigrafia, enchimento de óleo e conferência,
+    fixação da placa); Checkpoint carrega a posição na sequência desde a
+    primeira migration.
 
 ## Fase 1 — Núcleo de conformidade (TDD)
 
@@ -139,8 +139,8 @@ Depende de: Fase 4 completa; pode ser pulada.
   - Verificação manual: lista peças × último checkpoint × status de
     conformidade, coerente com o banco.
 - [ ] T5.2 — Indicadores de auditoria · módulo: conformidade (+ frontend)
-  - Verificação manual: contagem de divergências por linha, checkpoint e campo
-    bate com o banco em um cenário montado à mão.
+  - Verificação manual: contagem de divergências por etapa e por campo bate
+    com o banco em um cenário montado à mão.
 
 ## Riscos e dependências
 
