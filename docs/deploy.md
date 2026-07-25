@@ -87,10 +87,36 @@ configuração do App Runner. Diferenças em relação ao ambiente de dev:
 depois do primeiro deploy; com `FILE_DRIVER=s3` a URL de evidência é assinada
 e não depende dele. Ao ajustar, use `aws apprunner update-service`.
 
+## URL no ar
+
+**https://qzat8cp2m8.us-east-1.awsapprunner.com** — verificada em 2026-07-25:
+health 200, login do admin seed, Swagger em `/docs`, cenário-âncora
+respondendo `divergente` só em `serie-placa` (7 campos no RDS) e upload de
+foto com URL assinada do S3 abrindo no navegador.
+
+## Quatro armadilhas do caminho (custaram 5 tentativas)
+
+1. **`env-cmd` sobrescreve a configuração do serviço.** `npm run
+   migration:run` carrega o `.env` do diretório e ele VENCE as variáveis de
+   ambiente — a migration ia para o host `postgres` do arquivo de exemplo.
+   Correção: chamar o CLI do TypeORM direto e remover o `.env` da imagem.
+2. **Atestações do buildx.** O `buildx` publica provenance/SBOM junto com a
+   imagem; o App Runner puxa e falha sem log. Correção: `--provenance=false
+   --sbom=false`.
+3. **Media type OCI.** O App Runner exige manifest `docker.v2`; o buildx
+   publica OCI por padrão. Correção: `--output type=registry,oci-mediatypes=false`.
+4. **Config do boilerplate exige as chaves AWS.** Com `FILE_DRIVER=s3`,
+   `files/config/file.config.ts` valida `ACCESS_KEY_ID`/`SECRET_ACCESS_KEY`
+   como obrigatórias — sem elas o boot morre ANTES do primeiro log (o que
+   explica as tentativas sem nenhum log de aplicação). Correção: as chaves
+   entram na configuração do serviço. Dívida registrada: para o S3 usar a
+   instance role como Textract/Bedrock já usam, é preciso tornar as
+   credenciais opcionais no boilerplate (4 arquivos).
+
 ## Verificação pós-deploy
 
 ```bash
-BASE=https://<id>.us-east-1.awsapprunner.com
+BASE=https://qzat8cp2m8.us-east-1.awsapprunner.com
 curl -s $BASE/                                   # {"name":"NestJS API"}
 TOKEN=$(curl -s -X POST $BASE/api/v1/auth/email/login \
   -H 'Content-Type: application/json' \

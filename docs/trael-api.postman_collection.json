@@ -1,13 +1,13 @@
 {
   "info": {
     "name": "TRAEL Conferência — API",
-    "description": "Coleção de teste da API de conferência de transformadores (HackStars Batch #2).\n\nImportar no Bruno: Import Collection → Postman Collection → escolher este arquivo.\nImportar no Insomnia: Import → From File.\n\nOrdem sugerida: (1) Health, (2) Login (grava o token na variável), (3) Cenário-âncora, (4) demais.\n\nVariáveis: baseUrl (padrão local) e token (preenchido pelo Login).",
+    "description": "Coleção de teste da API de conferência de transformadores (HackStars Batch #2).\n\nImportar no Bruno: Import Collection → Postman Collection → escolher este arquivo.\nImportar no Insomnia: Import → From File.\n\nOrdem sugerida: (1) Health, (2) Login (grava o token na variável), (3) Cenário-âncora, (4) demais.\n\nVariáveis: baseUrl (aponta para a API no ar na AWS), baseUrlLocal (para rodar contra o backend local — troque o valor de baseUrl) e token (preenchido pelo Login).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     {
       "key": "baseUrl",
-      "value": "http://localhost:3001",
+      "value": "https://qzat8cp2m8.us-east-1.awsapprunner.com",
       "type": "string"
     },
     {
@@ -19,6 +19,11 @@
       "key": "payloadQrDemo",
       "value": "{\"numeroSerie\":\"847233\",\"patrimonio\":\"251328\",\"cliente\":\"143091 - Energisa Rondônia Distribuidora de Energia S.A\",\"codigoProjeto\":\"EPT-163-PI-676\"}",
       "type": "string"
+    },
+    {
+      "key": "baseUrlLocal",
+      "value": "http://localhost:3001",
+      "type": "string"
     }
   ],
   "item": [
@@ -29,8 +34,12 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/",
-          "host": ["{{baseUrl}}"],
-          "path": [""]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            ""
+          ]
         },
         "description": "Deve responder 200 com {\"name\":\"NestJS API\"}. É o health check usado pelo App Runner."
       }
@@ -52,15 +61,28 @@
       ],
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"secret\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/auth/email/login",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "auth", "email", "login"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "email",
+            "login"
+          ]
         },
         "description": "Admin seed do boilerplate. O script de teste grava o token na variável da coleção — os demais requests já o usam."
       }
@@ -70,8 +92,14 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{token}}" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -79,8 +107,15 @@
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/conferencia/executar",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "conferencia", "executar"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "conferencia",
+            "executar"
+          ]
         },
         "description": "A PEÇA DE DEMO: etiqueta e chumbados dizem 847233, a placa foi gravada 847833.\n\nEsperado: 201 com vereditoGeral 'divergente' e o ÚNICO campo divergente sendo serie-placa. O campo opcional potencia-serigrafia é omitido (não tem valor esperado no QR).\n\nRodar duas vezes: a peça NÃO deve duplicar (mesmo transformador.id)."
       }
@@ -90,8 +125,14 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{token}}" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -99,8 +140,15 @@
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/conferencia/executar",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "conferencia", "executar"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "conferencia",
+            "executar"
+          ]
         },
         "description": "Peça correta: esperado 201 com vereditoGeral 'conforme' (critério de aceitação 3 do SPEC)."
       }
@@ -110,8 +158,14 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{token}}" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -119,8 +173,15 @@
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/conferencia/executar",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "conferencia", "executar"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "conferencia",
+            "executar"
+          ]
         },
         "description": "REGRA DE OURO: mesmo com limiar 0 e valor lido igual ao esperado, confiança 0 não é lastro — serie-placa deve sair 'nao_conferivel', nunca 'conforme'."
       }
@@ -130,8 +191,14 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{token}}" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -139,8 +206,15 @@
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/conferencia/executar",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "conferencia", "executar"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "conferencia",
+            "executar"
+          ]
         },
         "description": "Esperado 422 com errors.payloadQr = 'formato-desconhecido'.\n\nVariações para testar trocando o payloadQr:\n- \"847233\" → 422 'payload-somente-codigo' (QR só com código de lookup)\n- etapaCodigo \"nao-existe\" → 422 'etapa-desconhecida'"
       }
@@ -149,18 +223,40 @@
       "name": "7. Upload de foto-evidência",
       "request": {
         "method": "POST",
-        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
         "body": {
           "mode": "formdata",
           "formdata": [
-            { "key": "file", "type": "file", "src": [], "description": "Escolha uma imagem jpg/png/webp (HEIC é rejeitado: os serviços de visão não leem)" },
-            { "key": "fonteFisica", "value": "placa", "type": "text", "description": "placa | serigrafia | chumbado-1 | chumbado-2 | chumbado-3 | geral" }
+            {
+              "key": "file",
+              "type": "file",
+              "src": [],
+              "description": "Escolha uma imagem jpg/png/webp (HEIC é rejeitado: os serviços de visão não leem)"
+            },
+            {
+              "key": "fonteFisica",
+              "value": "placa",
+              "type": "text",
+              "description": "placa | serigrafia | chumbado-1 | chumbado-2 | chumbado-3 | geral"
+            }
           ]
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/foto-evidencia/upload",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "foto-evidencia", "upload"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "foto-evidencia",
+            "upload"
+          ]
         },
         "description": "Esperado 201 com id + url. Com FILE_DRIVER=s3 a url é assinada (1h) e abre direto no navegador.\n\nTeste de borda: fonteFisica 'Placa' (maiúscula) → 422, porque grafia divergente quebraria o pareamento campo ↔ evidência."
       }
@@ -169,11 +265,22 @@
       "name": "8. Etapas da linha (checkpoints)",
       "request": {
         "method": "GET",
-        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/checkpoints",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "checkpoints"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "checkpoints"
+          ]
         },
         "description": "4 etapas ordenadas com slug estável: adesivacao, serigrafia, oleo-conferencia, fixacao-placa."
       }
@@ -182,11 +289,22 @@
       "name": "9. Projetos (checklist por modelo)",
       "request": {
         "method": "GET",
-        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/projeto-modelos",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "projeto-modelos"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "projeto-modelos"
+          ]
         },
         "description": "Seed: EPT-163-PI-676 com a checklist de 8 campos. É daqui que a engine tira a lista do que conferir — nunca de código."
       }
@@ -196,8 +314,14 @@
       "request": {
         "method": "PATCH",
         "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{token}}" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -205,9 +329,21 @@
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/campo-conferidos/:id",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "campo-conferidos", ":id"],
-          "variable": [{ "key": "id", "value": "cole-aqui-um-id-da-resposta-do-request-3" }]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "campo-conferidos",
+            ":id"
+          ],
+          "variable": [
+            {
+              "key": "id",
+              "value": "cole-aqui-um-id-da-resposta-do-request-3"
+            }
+          ]
         },
         "description": "Esperado 422 'campo-conferido-imutavel': reescrever o lastro de um veredito já emitido falsificaria a trilha de auditoria. Toda escrita legítima nasce na engine."
       }
@@ -216,14 +352,31 @@
       "name": "11. Transformadores (peças conhecidas)",
       "request": {
         "method": "GET",
-        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/transformadors?page=1&limit=10",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "transformadors"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "transformadors"
+          ],
           "query": [
-            { "key": "page", "value": "1" },
-            { "key": "limit", "value": "10" }
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "limit",
+              "value": "10"
+            }
           ]
         },
         "description": "Confirma o find-or-create: rodar o request 3 duas vezes não deve criar duas peças com numeroSerie 847233."
