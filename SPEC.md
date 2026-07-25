@@ -42,17 +42,20 @@ linha, dando rastreabilidade de trânsito.
   do QR: número de série, patrimônio, pedido, seq, cliente, descrição.
 - **Conferencia** — uma execução de verificação de uma peça: referência ao
   Transformador, conjunto de CampoConferido, veredito geral, timestamp,
-  opcionalmente vinculada a um Checkpoint. Pode cobrir um subconjunto de
-  campos: no fluxo real da TRAEL a conferência acontece em gates parciais
-  (pós-serigrafia e pós-placa), não de uma vez só.
+  opcionalmente vinculada a um Checkpoint — quando presente, o vínculo
+  registra em qual etapa e em qual linha o erro foi acusado. Pode cobrir um
+  subconjunto de campos: no fluxo real da TRAEL a conferência acontece em
+  gates parciais (pós-serigrafia e pós-placa), não de uma vez só.
 - **CampoConferido** — um campo comparado: nome (ex.: serie-placa,
   serie-chumbada-1..3, patrimonio-serigrafia, patrimonio-placa, cliente), valor
   esperado (do QR), valor lido (da visão), score de confiança, veredito
   (`conforme` | `divergente` | `nao_conferivel`), referência à FotoEvidencia.
 - **FotoEvidencia** — foto enviada pelo operador, armazenada com URL e vínculo
   aos campos extraídos dela.
-- **Checkpoint** — ponto nomeado da linha de produção (ex.: serigrafia,
-  montagem final, laboratório, expedição).
+- **Checkpoint** — ponto nomeado de conferência ou passagem, sempre com a
+  linha de produção (esteira) a que pertence: a fábrica pode ter várias linhas
+  com as mesmas etapas (ex.: linha 1 / serigrafia). No MVP, seed com linha
+  única.
 - **EventoPassagem** — registro peça × checkpoint × timestamp, criado por scan
   do QR no checkpoint.
 
@@ -93,7 +96,7 @@ linha, dando rastreabilidade de trânsito.
 ### Could
 
 - Dashboard de linha: peças × último checkpoint × status de conformidade.
-- Indicadores de auditoria: contagem de divergências por checkpoint e por
+- Indicadores de auditoria: contagem de divergências por linha, checkpoint e
   campo, agregando os dados que o Must já persiste.
 
 ### Won't (nesta rodada)
@@ -204,8 +207,8 @@ Relatórios de desvios, retrabalho e gargalos por etapa, na linha do doc do
 desafio (não conformidades, OTIF). O modelo de dados do Must já registra a
 matéria-prima — Conferencia, CampoConferido e EventoPassagem com timestamps e
 evidências; esta evolução é leitura agregada, não mudança de escrita.
-Aceitação futura: relatório de divergências por checkpoint e por campo em um
-período escolhido, batendo com os registros brutos.
+Aceitação futura: relatório de divergências por linha, checkpoint e campo em
+um período escolhido, batendo com os registros brutos.
 
 ### Perfis e permissões
 
