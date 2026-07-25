@@ -58,7 +58,62 @@ linha, dando rastreabilidade de trânsito.
   de metal (última). Seed do MVP com essas etapas; nomes ajustáveis com a
   TRAEL.
 - **EventoPassagem** — registro peça × checkpoint × timestamp, criado por scan
-  do QR no checkpoint.
+  do QR no checkpoint. A posição atual da peça na linha é derivada (último
+  evento), nunca coluna duplicada.
+
+```mermaid
+erDiagram
+    TRANSFORMADOR ||--o{ CONFERENCIA : "e conferido em"
+    TRANSFORMADOR ||--o{ EVENTO_PASSAGEM : "passa por"
+    CHECKPOINT ||--o{ EVENTO_PASSAGEM : "registra"
+    CHECKPOINT |o--o{ CONFERENCIA : "gate opcional"
+    CONFERENCIA ||--o{ CAMPO_CONFERIDO : "compara"
+    CONFERENCIA |o--o{ FOTO_EVIDENCIA : "recebe"
+    FOTO_EVIDENCIA |o--o{ CAMPO_CONFERIDO : "evidencia"
+
+    TRANSFORMADOR {
+        uuid id PK
+        string numeroSerie "do QR"
+        string patrimonio "do QR"
+        string cliente "texto do QR; entidade propria e evolucao futura"
+        string pedido "opcional"
+        string seq "opcional"
+        string descricao "opcional"
+    }
+    CHECKPOINT {
+        uuid id PK
+        string nome
+        number ordem "posicao na sequencia da linha"
+    }
+    CONFERENCIA {
+        uuid id PK
+        uuid transformadorId FK
+        uuid checkpointId FK "opcional: etapa onde o veredito saiu"
+        string vereditoGeral "so a engine grava; nunca via DTO"
+    }
+    CAMPO_CONFERIDO {
+        uuid id PK
+        uuid conferenciaId FK
+        string nomeCampo "serie-placa, serie-chumbada-1..3, patrimonio-serigrafia, cliente"
+        string valorEsperado "do QR"
+        string valorLido "da visao; null se ilegivel"
+        number confianca "score da extracao"
+        string veredito "conforme | divergente | nao_conferivel; so a engine grava"
+        uuid fotoEvidenciaId FK "opcional"
+    }
+    FOTO_EVIDENCIA {
+        uuid id PK
+        string url
+        string fonteFisica "placa | serigrafia | chumbado-1..3"
+        uuid conferenciaId FK "opcional"
+    }
+    EVENTO_PASSAGEM {
+        uuid id PK
+        uuid transformadorId FK
+        uuid checkpointId FK
+        date createdAt "timestamp da passagem"
+    }
+```
 
 ## Funcionalidades (MoSCoW)
 
@@ -226,6 +281,10 @@ consegue criar Conferencia.
 - [ ] **Formato do payload do QR** — decodificar uma etiqueta real para saber
       se o QR carrega os campos ou só um código de lookup. Se for só código, o
       MVP precisa de fallback de digitação manual. Afeta T1.1 e T3.1.
+- [ ] **Promover cliente a entidade própria** — hoje é campo texto em
+      Transformador (a comparação do MVP é textual, QR × leitura da placa);
+      vira tabela quando entrar validação contra cadastro/ERP (rodada futura).
+      Migration barata pelos generators quando decidir.
 - [x] **Framework do front** — resolvido: Next.js 16; o time já tinha subido o
       scaffold e ele venceu o Angular combinado na entrevista (2026-07-25).
 - [x] **Prioridade do alerta de divergência** — resolvido: promovido de Could
