@@ -168,13 +168,25 @@ export class ConferenciaExecucaoService {
     }
 
     const checklist = this.lerChecklist(projetoModelo);
-    const leituras: LeituraCampo[] = dto.leituras.map((leitura) => ({
-      campo: leitura.campo,
-      valorLido: leitura.valorLido ?? null,
-      confianca: leitura.confianca ?? null,
-      regiaoLeitura: leitura.regiaoLeitura ?? null,
-      fotoEvidenciaId: leitura.fotoEvidenciaId ?? null,
-    }));
+    // Dedup por campo (revisão R1): duas fotos da mesma fonte geram duas
+    // leituras do mesmo campo; sem isto, a PRIMEIRA vencia mesmo sendo nula
+    // e a refoto legível era descartada. Fica a melhor: valorLido presente
+    // primeiro, depois maior confiança.
+    const porCampo = new Map<string, LeituraCampo>();
+    for (const leitura of dto.leituras) {
+      const candidata: LeituraCampo = {
+        campo: leitura.campo,
+        valorLido: leitura.valorLido ?? null,
+        confianca: leitura.confianca ?? null,
+        regiaoLeitura: leitura.regiaoLeitura ?? null,
+        fotoEvidenciaId: leitura.fotoEvidenciaId ?? null,
+      };
+      const atual = porCampo.get(leitura.campo);
+      if (!atual || melhorLeitura(candidata, atual)) {
+        porCampo.set(leitura.campo, candidata);
+      }
+    }
+    const leituras = [...porCampo.values()];
 
     const resultado = conferir(
       checklist,
@@ -289,6 +301,27 @@ export class ConferenciaExecucaoService {
       payload.numeroSerie,
     );
     if (existente) {
+      // QR é a fonte da verdade (SPEC, constraint 5): se a etiqueta traz
+      // dado diferente do registro, o registro é atualizado — antes disso a
+      // resposta exibia o valor antigo enquanto a engine comparava contra o
+      // novo, sem nenhum sinal de conflito (revisão R1).
+      const atualizacao: Record<string, string> = {};
+      if (payload.patrimonio && payload.patrimonio !== existente.patrimonio) {
+        atualizacao.patrimonio = payload.patrimonio;
+      }
+      if (payload.cliente && payload.cliente !== existente.cliente) {
+        atualizacao.cliente = payload.cliente;
+      }
+      if (payload.pedido && payload.pedido !== existente.pedido) {
+        atualizacao.pedido = payload.pedido;
+      }
+      if (Object.keys(atualizacao).length > 0) {
+        const atualizado = await this.transformadorService.update(
+          existente.id,
+          atualizacao,
+        );
+        return atualizado ?? existente;
+      }
       return existente;
     }
 
@@ -381,4 +414,14 @@ export class ConferenciaExecucaoService {
 
     return bruto;
   }
+}
+
+/** Leitura "melhor": valorLido presente vence; empate decide por confiança. */
+function melhorLeitura(a: LeituraCampo, b: LeituraCampo): boolean {
+  const aTemValor = a.valorLido !== null && a.valorLido.trim().length > 0;
+  const bTemValor = b.valorLido !== null && b.valorLido.trim().length > 0;
+  if (aTemValor !== bTemValor) {
+    return aTemValor;
+  }
+  return (a.confianca ?? -1) > (b.confianca ?? -1);
 }

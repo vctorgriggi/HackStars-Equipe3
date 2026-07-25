@@ -576,3 +576,45 @@ describe('conferir — pureza', () => {
     );
   });
 });
+
+// Testes adicionados na rodada de revisão (achados R1: conf=0 e Unicode NFC).
+describe('revisão: confiança zero e equivalência Unicode', () => {
+  const checklistUm = [
+    { campo: 'serie-placa', fonteFisica: 'placa', obrigatorio: true },
+  ];
+
+  it('should tratar confianca 0 como nao_conferivel mesmo com limiar 0', () => {
+    const resultado = conferir(
+      checklistUm,
+      { 'serie-placa': '847233' },
+      [
+        {
+          campo: 'serie-placa',
+          valorLido: '847233',
+          confianca: 0,
+        },
+      ],
+      { limiarConfianca: 0 },
+    );
+    expect(resultado.campos[0].veredito).toBe('nao_conferivel');
+    expect(resultado.vereditoGeral).toBe('nao_conferivel');
+  });
+
+  it('should considerar conforme valores NFC e NFD canonicamente equivalentes', () => {
+    const nfc = 'Energisa Rondônia'; // ô precomposto
+    const nfd = 'Energisa Rondônia'; // o + circunflexo combinante
+    const resultado = conferir(
+      [
+        {
+          campo: 'cliente-serigrafia',
+          fonteFisica: 'serigrafia',
+          obrigatorio: true,
+        },
+      ],
+      { 'cliente-serigrafia': nfc },
+      [{ campo: 'cliente-serigrafia', valorLido: nfd, confianca: 0.95 }],
+      { limiarConfianca: 0.8 },
+    );
+    expect(resultado.campos[0].veredito).toBe('conforme');
+  });
+});

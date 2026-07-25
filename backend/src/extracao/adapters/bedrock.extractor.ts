@@ -163,7 +163,13 @@ export function parseRespostaJson(texto: string): ItemResposta[] | null {
 
     itens.push({
       campo: item.campo,
-      valorLido: typeof item.valorLido === 'string' ? item.valorLido : null,
+      valorLido:
+        typeof item.valorLido === 'string'
+          ? item.valorLido
+          : typeof item.valorLido === 'number' &&
+              Number.isFinite(item.valorLido)
+            ? String(item.valorLido)
+            : null,
       confianca: normalizarConfianca(item.confianca),
       observacao: typeof item.observacao === 'string' ? item.observacao : null,
     });

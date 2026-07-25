@@ -131,7 +131,7 @@ erDiagram
     FOTO_EVIDENCIA {
         uuid id PK
         string url
-        string fonteFisica "obrigatoria: placa | serigrafia | chumbado-1..3"
+        string fonteFisica "obrigatoria: placa | serigrafia | chumbado-1..3 | geral"
         uuid conferenciaId FK "opcional"
     }
     EVENTO_PASSAGEM {
@@ -263,7 +263,8 @@ atrás dessas mesmas fronteiras; engine e portas não mudam.
    veredito geral é `conforme`.
 4. Campo com leitura ilegível ou confiança abaixo do limiar resulta
    `nao_conferivel`, e o veredito geral nunca é `conforme` enquanto existir
-   campo não conferível.
+   campo OBRIGATÓRIO não conferível (campo opcional ilegível não bloqueia o
+   conforme — decisão da rodada nucleo, PLAN T1.2).
 5. Scan do QR em um checkpoint cria EventoPassagem com timestamp, e a tela da
    peça lista os eventos em ordem cronológica.
 6. Conferência com veredito `divergente` gera alerta visível fora da tela de
@@ -394,6 +395,13 @@ consegue criar Conferencia.
       isso, fallback: operador escolhe o modelo no primeiro scan). Se for só
       código, o MVP precisa de fallback de digitação manual. Afeta T1.1 e
       T3.1.
+- [ ] **Código do ProjetoModelo: TPD ou EPT?** — o desenho da TRAEL traz dois
+      números (Projeto TPD-408136, Desenho EPT-163-PI-676) e a etiqueta
+      imprime o TPD; o seed usa o EPT. Hoje a demo resolve pelo fallback
+      "único projeto do banco" — funciona, mas cadastrar um SEGUNDO projeto
+      quebraria a resolução (422 projeto-modelo-indeterminado). Confirmar com
+      a TRAEL qual número identifica o projeto e alinhar seed + cascata.
+      Afeta T2.1/T6.1 (achado da revisão R2, rodada revisao).
 - [ ] **Unicidade do patrimônio entre clientes** — padrão do setor: série do
       fabricante é única, patrimônio é numeração do cliente (único por
       cliente). Confirmar com a TRAEL. Consequência já adotada: find-or-create

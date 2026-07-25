@@ -20,7 +20,10 @@ import {
  * decisao, so igualdade exata do valor normalizado vira `conforme`.
  */
 function normalizar(valor: string): string {
-  return valor.trim().replace(/\s+/g, ' ').toLowerCase();
+  // NFC: 'ô' precomposto e 'o'+combinante são o MESMO texto (equivalência
+  // canônica Unicode) — sem isso, QR gerado em iOS/macOS (NFD) divergiria
+  // de OCR em NFC. Não é fuzzy: perda de acento continua divergente.
+  return valor.normalize('NFC').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
 function temConteudo(valor: string | null | undefined): valor is string {
@@ -100,7 +103,13 @@ export function conferir(
     }
 
     // (c) dado sem lastro nunca vira conforme, mesmo batendo com o esperado.
-    if (confianca === null || confianca < opcoes.limiarConfianca) {
+    // confianca <= 0 nunca é lastro, mesmo com limiar 0 (regra de ouro):
+    // sem essa guarda, limiarConfianca=0 + confianca=0 viraria conforme.
+    if (
+      confianca === null ||
+      confianca <= 0 ||
+      confianca < opcoes.limiarConfianca
+    ) {
       campos.push(
         montarCampo(
           item,

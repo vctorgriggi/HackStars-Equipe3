@@ -92,6 +92,10 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
 - Escrita de veredito tem UM caminho: `CampoConferidosService.criarComVeredito`
   (server-side, sem rota HTTP). Nunca crie outro — é o que mantém a regra de
   ouro auditável.
+- CampoConferido é IMUTÁVEL via HTTP (update → 422): PATCH no lastro
+  (valores/confiança/foto) de um veredito já emitido falsificaria a trilha de
+  auditoria (revisão R1). Comparação usa Unicode NFC; confiança <= 0 nunca é
+  lastro, mesmo com limiar 0.
 - Fluxo do endpoint `POST /conferencia/executar`: parse do QR → find-or-create
   por numeroSerie → ProjetoModelo (codigoProjeto do QR → vínculo da peça →
   único do banco) → checklist → engine → persistência. Checkpoint resolve
@@ -194,6 +198,13 @@ do hackathon:
    default do gerador; unificar só se doer.
 8. `cliente` como string livre — decisão em aberto no SPEC (vira entidade na
    rodada ERP).
+9. Execução da conferência não é transacional — falha no meio do loop de
+   campos deixa conferência com veredito geral e campos parciais; janela
+   pequena, aceito no prazo (revisão R1). Transação entra com o hardening
+   pós-demo.
+10. `confianca` das leituras vem do cliente HTTP até a extração ser plugada
+    no fluxo (T3.2) — confiança forjável por design transitório; a guarda
+    `confianca <= 0` e o limiar mínimo mitigam o caso flagrante.
 
 ## Decisões em aberto
 
