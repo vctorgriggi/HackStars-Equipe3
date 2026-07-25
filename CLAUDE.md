@@ -36,6 +36,7 @@ não conformidade que chega ao cliente hoje).
 | Front   | Next.js 16 (React 19, Tailwind 4), mobile-first                  |
 | Visão   | AWS Textract (spike T2.1); Bedrock como reforço opcional         |
 | Storage | AWS S3 (fallback: disco local, se S3 ameaçar o prazo)            |
+| Deploy  | ECR + App Runner (HTTPS), RDS PostgreSQL — receita em docs/deploy.md |
 
 ## Estrutura
 
@@ -111,8 +112,11 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
   `extracao`, storage em `evidencias`. Consumidores testam com mock; o adapter
   real se verifica manualmente com as fotos da demo.
 - Serviços, modelos (IDs Bedrock), custos e checklist de setup AWS:
-  docs/aws.md — o setup (model access, IAM, bucket) precisa acontecer antes da
-  Fase 2.
+  docs/aws.md. Resultado do spike e limites medidos: docs/visao-ocr.md.
+- `EXTRACTOR_DRIVER`: `mock` (default, funciona sem AWS), `textract` (a escolha
+  do spike) ou `bedrock` (reforço; hoje bloqueado pela conta AWS).
+- SSL do banco é condicional a `DATABASE_SSL_ENABLED` — RDS exige TLS, o
+  Postgres local do docker não suporta; fixar um dos dois quebra o outro.
 - Spike T2.1 executável: `npx ts-node -r tsconfig-paths/register
   scripts/spike-extracao.ts <dir-fotos>` (fotos nomeadas pela fonte:
   placa.jpg, chumbado-1.jpg…). Sem credencial, falha com mensagem apontando
@@ -205,6 +209,19 @@ do hackathon:
 10. `confianca` das leituras vem do cliente HTTP até a extração ser plugada
     no fluxo (T3.2) — confiança forjável por design transitório; a guarda
     `confianca <= 0` e o limiar mínimo mitigam o caso flagrante.
+11. `POST /conferencia/executar` avalia a checklist INTEIRA: campo sem leitura
+    volta `nao_conferivel` mesmo quando a marcação ainda nem existe na peça
+    (placa na etapa 1). Falta a conferência parcial por etapa — cada item da
+    checklist precisa dizer em qual etapa é validado. Paliativo: o chamador
+    manda só os campos daquela etapa e lê o resultado ciente disso.
+12. Chaves AWS vivem nas variáveis do serviço App Runner porque o boilerplate
+    valida `ACCESS_KEY_ID`/`SECRET_ACCESS_KEY` quando `FILE_DRIVER=s3`
+    (files/config/file.config.ts). A instance role existe e já serve
+    Textract/Bedrock; migrar o S3 para ela exige tornar as credenciais
+    opcionais no boilerplate (4 arquivos).
+13. Página `/demo` (src/demo) é ferramenta temporária de inspeção servida pela
+    API, com credenciais do admin seed pré-preenchidas — remover antes de
+    qualquer uso fora do hackathon.
 
 ## Decisões em aberto
 

@@ -173,6 +173,21 @@ Depende de: Fase 1 completa.
   - Aceitação: FotoEvidencia persistida e vinculável a CampoConferido; plano B
     registrado: storage em disco local se S3 atrasar a demo (constraint 1).
 
+- [x] T2.4 — Deploy da API na AWS (descoberta desta rodada) · módulo: backend
+  - Verificação: API pública respondendo com banco RDS e fotos no S3. Feito em
+    2026-07-25: ECR + App Runner + IAM roles; health 200, login, cenário-âncora
+    `divergente` só em serie-placa e upload com URL assinada — tudo pela URL
+    pública. Receita e as 4 armadilhas em docs/deploy.md.
+  - Motivo de existir: a Fase 3 precisa de HTTPS (câmera do navegador só abre
+    em origem segura); sem deploy, T3.1 não roda no celular.
+- [x] T2.5 — Página /demo servida pela API (descoberta desta rodada) · módulo: backend
+  - Verificação: abrir /demo no celular, escolher etapa, fotografar, disparar
+    conferência e ver veredito campo a campo. Feito em 2026-07-25 (agente
+    Opus): tela única sem dependência externa, presets com as confianças
+    medidas no spike, foto indo para o S3, veredito 100% vindo da API.
+  - Desvio: é ferramenta TEMPORÁRIA de inspeção, fora de `frontend/` — não
+    substitui a Fase 3; serve para validar a API sem esperar o app.
+
 ## Fase 3 — Fluxo de conferência ponta a ponta
 
 Objetivo: critérios de aceitação 1–4 do SPEC passando com a peça de demo.
@@ -249,16 +264,20 @@ demo.
 
 ## Riscos e dependências
 
-- **Série chumbada ilegível para OCR** (SPEC, constraint 2) → T2.1 decide o
-  serviço; plano B: Bedrock com modelo de visão; plano C: campo
-  `nao_conferivel` com foto para conferência humana — a demo continua válida
-  pelo critério 4.
+- **Série chumbada ilegível para OCR** (SPEC, constraint 2) → RISCO DISSOLVIDO
+  em 2026-07-25: o Textract leu o relevo a 99,9% (topo) e 96,7% (diagonal) nas
+  fotos reais (docs/visao-ocr.md). O plano C (campo `nao_conferivel` com foto)
+  segue valendo para foto ruim — medido: um chumbado saiu a 35,4% e a engine o
+  barrou corretamente.
 - **Prazo de 2 dias** (SPEC, constraint 1) → Fase 5 opcional; T2.3 com fallback
   de disco local; corte na ordem Could → Should, nunca no Must.
 - **Payload do QR desconhecido** (SPEC, constraint 5) → T1.1 na frente de tudo
   que depende dele; plano B: digitação manual dos valores esperados.
 - **Créditos AWS** (SPEC, constraint 4) → visão só sob disparo explícito
-  (T3.2); spike com timebox (T2.1).
+  (T3.2); spike com timebox (T2.1). RISCO NOVO materializado: a conta AWS está
+  com registro incompleto — cotas Bedrock zeradas e Claude Platform recusando
+  cadastro (docs/aws.md). Mitigado: Textract não depende disso e é a escolha do
+  spike; a demo não depende mais de Bedrock.
 
 ## Decisões em aberto
 
@@ -280,4 +299,4 @@ demo.
       checklist do banco desde a T1.2; ingestão automática do PDF virou Fase 6
       opcional (2026-07-25).
 
-<!-- rodada: extracao @ efc3541 -->
+<!-- rodada: visao-e-deploy @ a67b234 -->
