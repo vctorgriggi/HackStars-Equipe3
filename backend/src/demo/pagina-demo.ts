@@ -5,6 +5,16 @@
  * (nenhum CDN — a página tem de abrir no celular do time dentro da rede da
  * fábrica). Todo fetch usa caminho relativo, então a página funciona em
  * qualquer host/porta onde a API estiver servindo.
+ *
+ * Formato: FLUXO GUIADO numerado (passos 0 a 5) com o caminho de produção em
+ * destaque — leitura real por Textract. O que não vai existir em produção
+ * (leituras digitadas à mão) fica recolhido no "modo avançado" para não
+ * parecer um passo do fluxo.
+ *
+ * O recorte "quais fontes esta etapa confere" NÃO é constante desta página:
+ * sai da checklist do ProjetoModelo (campo 'etapa' por item) cruzada com a
+ * 'ordem' dos Checkpoints, ambas buscadas na API depois do login. Sem esses
+ * dados a página mostra todas as fontes sem destaque — nunca bloqueia.
  */
 export const PAGINA_DEMO = `<!doctype html>
 <html lang="pt-BR">
@@ -53,13 +63,37 @@ export const PAGINA_DEMO = `<!doctype html>
     margin-bottom: 14px;
   }
   section h2 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     margin: 0 0 10px;
+    font-size: 15px;
+    letter-spacing: .02em;
+    color: var(--tinta);
+  }
+  section h2 .num {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: var(--aco);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+  }
+  [data-bloqueado="1"] { opacity: .45; pointer-events: none; }
+  .contexto {
+    margin: 0 0 12px;
+    padding: 9px 11px;
+    border-left: 4px solid var(--acento);
+    background: #eef3f7;
+    border-radius: 0 4px 4px 0;
     font-size: 13px;
-    text-transform: uppercase;
-    letter-spacing: .08em;
     color: var(--tinta-fraca);
   }
-  section[data-bloqueado="1"] { opacity: .45; pointer-events: none; }
+  .contexto b { color: var(--acento); }
   label.rotulo { display: block; font-size: 14px; color: var(--tinta-fraca); margin: 10px 0 4px; }
   input[type=text], input[type=email], input[type=password], input[type=number], textarea, select {
     width: 100%;
@@ -87,6 +121,7 @@ export const PAGINA_DEMO = `<!doctype html>
   button.secundario { background: #fff; color: var(--aco); }
   button:disabled { opacity: .5; cursor: default; }
   button.largo { width: 100%; }
+  button.compacto { min-height: 40px; padding: 8px 12px; font-size: 14px; }
   button.principal {
     background: var(--acento);
     border-color: var(--acento);
@@ -96,6 +131,13 @@ export const PAGINA_DEMO = `<!doctype html>
     text-transform: uppercase;
   }
   button.principal.alternativa { background: var(--aco); border-color: var(--aco); font-size: 17px; }
+  .resumo-passo {
+    display: flex; align-items: center; gap: 10px; justify-content: space-between;
+    padding: 10px 12px; border-radius: 4px; font-size: 14px;
+    background: var(--verde-fundo); border: 1px solid var(--verde); color: var(--verde);
+  }
+  .resumo-passo[hidden] { display: none; }
+  #login-corpo[hidden] { display: none; }
   .faixa-extracao {
     font-size: 14px; padding: 10px 12px; margin-bottom: 10px;
     border: 1px solid var(--borda); border-radius: 4px;
@@ -130,13 +172,24 @@ export const PAGINA_DEMO = `<!doctype html>
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--borda);
+    padding: 10px;
+    margin-bottom: 6px;
+    border: 1px solid var(--borda);
+    border-left: 6px solid var(--borda);
+    border-radius: 4px;
+    background: #fff;
   }
-  .item-foto:last-child { border-bottom: 0; }
+  .item-foto.desta-etapa { border-color: var(--acento); background: #f4f8fb; }
+  .item-foto.fora-etapa { opacity: .62; background: #f7f8f9; }
   .item-foto .nome { flex: 1 1 auto; font-size: 15px; font-family: ui-monospace, Menlo, Consolas, monospace; }
   .item-foto .estado { display: block; font-size: 13px; color: var(--tinta-fraca); font-family: inherit; }
   .item-foto .estado.falhou { color: var(--vermelho); }
+  .item-foto .marca-etapa {
+    display: block; font-size: 12px; font-family: inherit; margin-top: 2px;
+    text-transform: uppercase; letter-spacing: .05em; font-weight: 700;
+  }
+  .item-foto.desta-etapa .marca-etapa { color: var(--acento); }
+  .item-foto.fora-etapa .marca-etapa { color: var(--tinta-fraca); }
   .botao-foto {
     display: inline-flex;
     align-items: center;
@@ -189,39 +242,49 @@ export const PAGINA_DEMO = `<!doctype html>
   .cartao-campo dd { margin: 0; word-break: break-word; color: var(--tinta); }
   .cartao-campo dd.mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
   .cartao-campo a { color: var(--acento); font-size: 14px; display: inline-block; margin-top: 8px; min-height: 24px; }
-  details { margin-top: 12px; border: 1px solid var(--borda); border-radius: 4px; background: #fff; }
+  details { border: 1px solid var(--borda); border-radius: 4px; background: #fff; }
   summary { padding: 12px; font-size: 14px; color: var(--tinta-fraca); cursor: pointer; min-height: 44px; }
+  #sec-avancado { background: #eceef1; border-style: dashed; }
+  #sec-avancado summary { font-weight: 700; color: var(--tinta); }
+  .corpo-avancado { padding: 0 12px 12px; }
   pre {
     margin: 0; padding: 12px; background: #1c2430; color: #dde6ef;
     font-size: 12px; overflow-x: auto; border-radius: 0 0 4px 4px;
   }
   video { width: 100%; max-height: 300px; background: #000; border-radius: 4px; margin-top: 10px; }
   #camera-area[hidden] { display: none; }
-  .dica { font-size: 13px; color: var(--tinta-fraca); margin: 6px 0 0; }
+  .dica { font-size: 13px; color: var(--tinta-fraca); margin: 8px 0 0; }
   .rodape { font-size: 12px; color: var(--tinta-fraca); text-align: center; padding: 4px 0 24px; }
 </style>
 </head>
 <body>
 <header>
   <h1>TRAEL — conferência de peça</h1>
-  <p>Página de demonstração temporária. O veredito é sempre calculado pela API.</p>
+  <p>Demonstração guiada: siga os passos 0 a 5. Cada passo diz o que a linha fará sozinha em produção.</p>
 </header>
 <main>
 
   <section id="sec-login">
-    <h2>1. Acesso</h2>
-    <label class="rotulo" for="email">E-mail</label>
-    <input type="email" id="email" value="admin@example.com" autocomplete="username" autocapitalize="none" spellcheck="false">
-    <label class="rotulo" for="senha">Senha</label>
-    <input type="password" id="senha" value="secret" autocomplete="current-password">
-    <div class="linha-botoes" style="margin-top:12px">
-      <button id="btn-login" class="largo">Entrar</button>
+    <h2><span class="num">0</span> Entrar</h2>
+    <div id="login-corpo">
+      <label class="rotulo" for="email">E-mail</label>
+      <input type="email" id="email" value="admin@example.com" autocomplete="username" autocapitalize="none" spellcheck="false">
+      <label class="rotulo" for="senha">Senha</label>
+      <input type="password" id="senha" value="secret" autocomplete="current-password">
+      <div class="linha-botoes" style="margin-top:12px">
+        <button id="btn-login" class="largo">Entrar</button>
+      </div>
+    </div>
+    <div id="login-resumo" class="resumo-passo" hidden>
+      <span id="login-quem">Conectado.</span>
+      <button id="btn-trocar-login" class="secundario compacto">Trocar</button>
     </div>
     <div id="login-aviso" class="aviso neutro" hidden></div>
   </section>
 
   <section id="sec-etapa" data-bloqueado="1">
-    <h2>2. Etapa da linha (câmera que você simula)</h2>
+    <h2><span class="num">1</span> Etapa da linha</h2>
+    <p class="contexto">Em produção cada câmera fixa nasce amarrada a uma etapa; aqui você escolhe qual câmera está simulando.</p>
     <div class="grade-etapas" id="grade-etapas">
       <button class="secundario etapa" data-codigo="adesivacao" aria-pressed="false">Adesivação</button>
       <button class="secundario etapa" data-codigo="serigrafia" aria-pressed="false">Serigrafia</button>
@@ -232,11 +295,10 @@ export const PAGINA_DEMO = `<!doctype html>
   </section>
 
   <section id="sec-qr" data-bloqueado="1">
-    <h2>3. Etiqueta (QR)</h2>
-    <label class="rotulo" for="payload">Conteúdo da etiqueta</label>
-    <textarea id="payload" spellcheck="false" autocapitalize="none">Pedido: 68202\nNúm. Série: 847233\nSeq: 86\nPatrimônio: 251328\nCliente: 143091 - Energisa Rondônia Distribuidora de Energia S.A\nTPD-408136</textarea>
-    <div class="linha-botoes" style="margin-top:10px">
-      <button id="btn-camera" class="secundario">Ler QR com a câmera</button>
+    <h2><span class="num">2</span> Escanear a etiqueta da peça</h2>
+    <p class="contexto">Em produção a câmera lê o QR sozinha quando a peça chega; a etiqueta é a fonte da verdade — o sistema nunca inventa valor esperado.</p>
+    <div class="linha-botoes">
+      <button id="btn-camera" class="principal alternativa largo">Ler QR com a câmera</button>
     </div>
     <div id="qr-aviso" class="aviso neutro" hidden></div>
     <div id="camera-area" hidden>
@@ -245,6 +307,8 @@ export const PAGINA_DEMO = `<!doctype html>
         <button id="btn-parar-camera" class="secundario">Parar câmera</button>
       </div>
     </div>
+    <label class="rotulo" for="payload">Conteúdo da etiqueta (o que a API vai interpretar)</label>
+    <textarea id="payload" spellcheck="false" autocapitalize="none">Pedido: 68202\nNúm. Série: 847233\nSeq: 86\nPatrimônio: 251328\nCliente: 143091 - Energisa Rondônia Distribuidora de Energia S.A\nTPD-408136</textarea>
     <div id="qr-bruto" class="bloco-bruto" hidden>
       <p class="titulo-bruto">Conteúdo bruto lido do QR (texto exato da etiqueta)</p>
       <pre id="qr-bruto-texto"></pre>
@@ -252,38 +316,54 @@ export const PAGINA_DEMO = `<!doctype html>
         <button id="btn-copiar-qr" class="secundario">Copiar</button>
       </div>
     </div>
+    <p class="dica">Se a API responder que o formato não é reconhecido, ou que o QR traz só um código de lookup (HTTP 422), <b>copie o conteúdo bruto e mande para o time</b>: o formato do QR da TRAEL ainda está sendo fechado. Não é defeito da peça nem erro seu.</p>
   </section>
 
   <section id="sec-fotos" data-bloqueado="1">
-    <h2>4. Fotos por fonte física</h2>
+    <h2><span class="num">3</span> Fotografar a peça</h2>
+    <p class="contexto">Em produção a câmera captura sozinha as vistas ao detectar a peça.</p>
+    <p class="dica" id="fotos-recorte">Escolha uma etapa no passo 1 para ver quais vistas ela confere.</p>
     <div id="lista-fotos"></div>
     <div id="fotos-aviso" class="aviso neutro" hidden></div>
   </section>
 
-  <section id="sec-leituras" data-bloqueado="1">
-    <h2>5. Leituras da peça</h2>
-    <p class="dica">Enquanto a extração automática não está plugada ao fluxo, os valores lidos entram aqui à mão. Os presets usam os números medidos pelo Textract nas fotos reais.</p>
-    <div class="linha-botoes" style="margin:10px 0">
-      <button class="secundario" id="preset-demo">Peça de demo (defeito real)</button>
-      <button class="secundario" id="preset-correta">Peça correta</button>
-      <button class="secundario" id="preset-ruim">Foto ruim (baixa confiança)</button>
+  <section id="sec-conferir" data-bloqueado="1">
+    <h2><span class="num">4</span> Extrair e conferir</h2>
+    <p class="contexto">Em produção dispara automático na passagem da peça; aqui é um toque porque cada chamada de visão consome crédito AWS (nada roda em loop).</p>
+    <div class="linha-botoes">
+      <button id="btn-extrair" class="principal largo" disabled>EXTRAIR COM TEXTRACT</button>
     </div>
-    <div class="linha-botoes" style="margin:0 0 10px">
-      <button class="secundario" id="btn-campos-etapa">Só os campos desta etapa</button>
-    </div>
-    <p class="dica">A etapa escolhida define quais campos são cobrados — os que ainda não existem na peça (ex.: placa na adesivação) ficam de fora do recorte.</p>
-    <div id="lista-leituras"></div>
+    <p class="dica" id="extrair-dica">Envie ao menos uma foto no passo 3 para liberar a extração.</p>
+    <div id="conferir-aviso" class="aviso neutro" hidden></div>
   </section>
 
-  <section id="sec-conferir" data-bloqueado="1">
-    <h2>6. Conferência</h2>
-    <div class="linha-botoes">
-      <button id="btn-extrair" class="principal" disabled>EXTRAIR COM TEXTRACT</button>
-      <button id="btn-conferir" class="principal alternativa">CONFERIR AGORA</button>
-    </div>
-    <p class="dica" id="extrair-dica">Extrair com Textract usa as fotos da seção 4 e a visão real da API — envie ao menos uma foto para liberar. "Conferir agora" usa as leituras digitadas da seção 5.</p>
-    <div id="conferir-aviso" class="aviso neutro" hidden></div>
+  <section id="sec-veredito" data-bloqueado="1">
+    <h2><span class="num">5</span> Veredito</h2>
+    <p class="contexto">Esta resposta é exatamente o que a tela final do app vai renderizar — o veredito nasce na API, nunca no navegador.</p>
+    <p class="dica" id="veredito-vazio">Ainda sem veredito: conclua o passo 4.</p>
     <div id="resultado"></div>
+  </section>
+
+  <section id="sec-avancado" data-bloqueado="1" style="padding:0">
+    <details id="modo-avancado">
+      <summary>Modo avançado — testar a engine sem gastar AWS (não existe em produção)</summary>
+      <div class="corpo-avancado">
+        <p class="dica">Leituras digitadas à mão, sem chamar a visão: serve para exercitar a engine de conformidade. Em produção nenhum operador digita valor lido — quem lê a peça é a câmera. Os presets usam as confianças medidas pelo Textract nas fotos reais.</p>
+        <div class="linha-botoes" style="margin:10px 0">
+          <button class="secundario" id="preset-demo">Peça de demo (defeito real)</button>
+          <button class="secundario" id="preset-correta">Peça correta</button>
+          <button class="secundario" id="preset-ruim">Foto ruim (baixa confiança)</button>
+        </div>
+        <div class="linha-botoes" style="margin:0 0 10px">
+          <button class="secundario" id="btn-campos-etapa">Só os campos desta etapa</button>
+        </div>
+        <div id="lista-leituras"></div>
+        <div class="linha-botoes" style="margin-top:12px">
+          <button id="btn-conferir" class="principal alternativa largo">CONFERIR AGORA</button>
+        </div>
+        <div id="avancado-aviso" class="aviso neutro" hidden></div>
+      </div>
+    </details>
   </section>
 
   <p class="rodape">Página temporária de demonstração — remover antes de produção.</p>
@@ -327,7 +407,10 @@ export const PAGINA_DEMO = `<!doctype html>
     'serie-chumbada-1': ['347233', 0.354]
   });
 
-  // Quais campos cada etapa consegue enxergar na linha real.
+  // FALLBACK do modo avançado: usado só enquanto a checklist do ProjetoModelo
+  // não chegou da API. O recorte de verdade é derivado dos dados (ver
+  // carregarRecorte/camposDaEtapa) — esta tabela é a última escolha, nunca a
+  // primeira.
   var CAMPOS_POR_ETAPA = {
     'adesivacao': ['serie-chumbada-1', 'serie-chumbada-2', 'serie-chumbada-3'],
     'serigrafia': ['serie-chumbada-1', 'serie-chumbada-2', 'serie-chumbada-3', 'patrimonio-serigrafia', 'cliente-serigrafia'],
@@ -345,7 +428,12 @@ export const PAGINA_DEMO = `<!doctype html>
     token: null,
     etapa: null,
     fotos: {},
-    camera: null
+    camera: null,
+    // Vindos da API depois do login (null = ainda não carregados/falharam):
+    checklist: null,      // itens do ProjetoModelo único
+    ordemPorCodigo: null, // codigo do Checkpoint -> ordem
+    nomePorCodigo: null,  // codigo do Checkpoint -> nome exibido
+    mapaFontes: null      // fonteFisica -> { ordem, etapaCodigo, sempre, campos }
   };
 
   function el(id) { return document.getElementById(id); }
@@ -371,7 +459,7 @@ export const PAGINA_DEMO = `<!doctype html>
   }
 
   function liberar(liberado) {
-    ['sec-etapa', 'sec-qr', 'sec-fotos', 'sec-leituras', 'sec-conferir'].forEach(function (id) {
+    ['sec-etapa', 'sec-qr', 'sec-fotos', 'sec-conferir', 'sec-veredito', 'sec-avancado'].forEach(function (id) {
       if (liberado) {
         el(id).removeAttribute('data-bloqueado');
       } else {
@@ -414,7 +502,26 @@ export const PAGINA_DEMO = `<!doctype html>
     });
   }
 
-  // --- A. Login -----------------------------------------------------------
+  // --- A. Passo 0: login --------------------------------------------------
+
+  function mostrarLoginCompacto(usuario) {
+    el('login-corpo').hidden = true;
+    el('login-resumo').hidden = false;
+    el('login-quem').textContent = 'Conectado como ' + usuario + '.';
+    aviso('login-aviso', '');
+  }
+
+  function mostrarLoginAberto() {
+    el('login-corpo').hidden = false;
+    el('login-resumo').hidden = true;
+  }
+
+  el('btn-trocar-login').addEventListener('click', function () {
+    estado.token = null;
+    liberar(false);
+    mostrarLoginAberto();
+    aviso('login-aviso', 'Sessão encerrada nesta página — entre de novo.', 'neutro');
+  });
 
   el('btn-login').addEventListener('click', function () {
     var botao = el('btn-login');
@@ -428,43 +535,215 @@ export const PAGINA_DEMO = `<!doctype html>
     }).then(function (resposta) {
       if (!resposta.ok || !resposta.corpo || !resposta.corpo.token) {
         liberar(false);
+        mostrarLoginAberto();
         aviso('login-aviso', mensagemDeErro(resposta.corpo, resposta.status), 'erro');
         return;
       }
       estado.token = resposta.corpo.token;
       liberar(true);
       var usuario = resposta.corpo.user && resposta.corpo.user.email ? resposta.corpo.user.email : el('email').value;
-      aviso('login-aviso', 'Conectado como ' + usuario + '.', 'ok');
+      mostrarLoginCompacto(usuario);
+      carregarRecorte();
     }).catch(function (erro) {
       liberar(false);
+      mostrarLoginAberto();
       aviso('login-aviso', 'Falha de rede: ' + erro.message, 'erro');
     }).then(function () {
       botao.disabled = false;
     });
   });
 
-  // --- B. Etapa -----------------------------------------------------------
+  // --- B. Recorte por etapa, derivado dos dados da API ---------------------
+
+  // O que cada etapa confere NÃO é constante desta página: sai da checklist do
+  // ProjetoModelo (cada item traz 'etapa' = codigo do Checkpoint em que a
+  // marcação passa a existir na peça) cruzada com a ordem dos Checkpoints.
+  // A regra é a MESMA da API (cumulativa): a etapa N confere o que ela e as
+  // anteriores gravaram. Falhou a busca? mapaFontes fica null e a página
+  // mostra tudo sem destaque — nunca bloqueia o upload.
+  function carregarRecorte() {
+    Promise.all([
+      pedir(API + '/checkpoints?page=1&limit=50'),
+      pedir(API + '/projetos-modelo?page=1&limit=50')
+    ]).then(function (respostas) {
+      var pontos = respostas[0];
+      var projetos = respostas[1];
+
+      if (!pontos.ok || !pontos.corpo || !pontos.corpo.data ||
+          !projetos.ok || !projetos.corpo || !projetos.corpo.data) {
+        throw new Error('resposta inesperada da API');
+      }
+
+      var ordens = {};
+      var nomes = {};
+      pontos.corpo.data.forEach(function (ponto) {
+        if (ponto && typeof ponto.codigo === 'string' && typeof ponto.ordem === 'number') {
+          ordens[ponto.codigo] = ponto.ordem;
+          nomes[ponto.codigo] = ponto.nome || ponto.codigo;
+        }
+      });
+
+      // Mais de um projeto cadastrado: a página NÃO escolhe por conta própria
+      // (a API responde projeto-modelo-indeterminado nesse caso). Sem recorte,
+      // com todas as fontes visíveis.
+      var lista = projetos.corpo.data;
+      if (lista.length !== 1) {
+        throw new Error(lista.length + ' projeto(s) cadastrado(s) — recorte indeterminado');
+      }
+      var itens = JSON.parse(lista[0].checklist);
+      if (!itens || !itens.length) {
+        throw new Error('checklist vazia');
+      }
+
+      var mapa = {};
+      itens.forEach(function (item) {
+        if (!item || typeof item.fonteFisica !== 'string') { return; }
+        var registro = mapa[item.fonteFisica] ||
+          { ordem: null, etapaCodigo: null, sempre: false, campos: [] };
+        registro.campos.push(item.campo);
+        var etapa = typeof item.etapa === 'string' ? item.etapa.trim() : '';
+        // Item sem etapa (ou com etapa que não existe como Checkpoint) entra
+        // em qualquer gate — igual à regra do backend.
+        if (!etapa || ordens[etapa] === undefined) {
+          registro.sempre = true;
+        } else if (registro.ordem === null || ordens[etapa] < registro.ordem) {
+          registro.ordem = ordens[etapa];
+          registro.etapaCodigo = etapa;
+        }
+        mapa[item.fonteFisica] = registro;
+      });
+
+      estado.checklist = itens;
+      estado.ordemPorCodigo = ordens;
+      estado.nomePorCodigo = nomes;
+      estado.mapaFontes = mapa;
+      // atualizarTextoEtapa remonta a lista de fotos com o recorte no lugar.
+      atualizarTextoEtapa();
+    }).catch(function (erro) {
+      estado.mapaFontes = null;
+      montarFotos();
+      el('fotos-recorte').textContent =
+        'Não consegui carregar a checklist do projeto (' + erro.message +
+        '): todas as vistas aparecem sem destaque. O upload continua liberado.';
+    });
+  }
+
+  function ordemDaEtapaAtual() {
+    if (!estado.etapa || !estado.ordemPorCodigo) { return undefined; }
+    return estado.ordemPorCodigo[estado.etapa];
+  }
+
+  // Situação de uma fonte física: 'desta-etapa' | 'fora-etapa' | 'sem-etapa'
+  // (etapa não escolhida ou desconhecida) | 'fora-da-checklist' | 'indefinido'
+  // (dados da API ausentes).
+  function situacaoDaFonte(fonte) {
+    if (!estado.mapaFontes) { return { situacao: 'indefinido', campos: [] }; }
+    var registro = estado.mapaFontes[fonte];
+    if (!registro) { return { situacao: 'fora-da-checklist', campos: [] }; }
+    var ordem = ordemDaEtapaAtual();
+    if (ordem === undefined) { return { situacao: 'sem-etapa', campos: registro.campos }; }
+    if (registro.sempre || (registro.ordem !== null && registro.ordem <= ordem)) {
+      return { situacao: 'desta-etapa', campos: registro.campos };
+    }
+    var nome = registro.etapaCodigo && estado.nomePorCodigo
+      ? (estado.nomePorCodigo[registro.etapaCodigo] || registro.etapaCodigo)
+      : null;
+    return { situacao: 'fora-etapa', campos: registro.campos, entraEm: nome };
+  }
+
+  function fontesDesta(situacaoAlvo) {
+    return fontesOrdenadas().filter(function (fonte) {
+      return situacaoDaFonte(fonte).situacao === situacaoAlvo;
+    });
+  }
+
+  // Ordem de exibição: primeiro as vistas que a etapa confere.
+  function fontesOrdenadas() {
+    var lista = FONTES.slice();
+    if (estado.mapaFontes) {
+      Object.keys(estado.mapaFontes).forEach(function (fonte) {
+        if (lista.indexOf(fonte) === -1) { lista.push(fonte); }
+      });
+    }
+    var peso = {
+      'desta-etapa': 0,
+      'sem-etapa': 1,
+      'indefinido': 1,
+      'fora-etapa': 2,
+      'fora-da-checklist': 3
+    };
+    return lista.map(function (fonte, indice) {
+      return { fonte: fonte, indice: indice, peso: peso[situacaoDaFonte(fonte).situacao] };
+    }).sort(function (a, b) {
+      return a.peso === b.peso ? a.indice - b.indice : a.peso - b.peso;
+    }).map(function (item) { return item.fonte; });
+  }
+
+  function atualizarTextoRecorte() {
+    var alvo = el('fotos-recorte');
+    if (!estado.mapaFontes) { return; }
+    if (!estado.etapa) {
+      alvo.textContent = 'Escolha uma etapa no passo 1 para ver quais vistas ela confere. Sem etapa, a conferência cobra a checklist inteira do projeto.';
+      return;
+    }
+    var doGate = fontesDesta('desta-etapa');
+    if (ordemDaEtapaAtual() === undefined) {
+      alvo.textContent = 'A etapa "' + estado.etapa + '" não está cadastrada como checkpoint — sem recorte, todas as vistas aparecem sem destaque.';
+      return;
+    }
+    alvo.textContent = 'Esta etapa confere ' + doGate.length + ' vista(s): ' + doGate.join(', ') +
+      '. A conferência é cumulativa — a etapa confere o que ela e as anteriores gravaram na peça. As demais vistas ainda não existem aqui, mas o upload continua liberado.';
+  }
+
+  // --- C. Passo 1: etapa --------------------------------------------------
+
+  function atualizarTextoEtapa() {
+    var dica = el('etapa-dica');
+    if (!estado.etapa) {
+      dica.textContent = 'Nenhuma etapa escolhida — a conferência será registrada sem etapa, cobrando a checklist inteira.';
+    } else {
+      var nome = estado.nomePorCodigo && estado.nomePorCodigo[estado.etapa]
+        ? estado.nomePorCodigo[estado.etapa]
+        : estado.etapa;
+      dica.textContent = 'Simulando a câmera de: ' + nome + ' (' + estado.etapa + ') — a conferência nasce vinculada a ela.';
+    }
+    atualizarTextoRecorte();
+    montarFotos();
+    atualizarBotaoExtrair();
+  }
+
+  function selecionarEtapa(codigo) {
+    estado.etapa = codigo;
+    Array.prototype.forEach.call(document.querySelectorAll('#grade-etapas .etapa'), function (botao) {
+      botao.setAttribute('aria-pressed', botao.getAttribute('data-codigo') === estado.etapa ? 'true' : 'false');
+    });
+    atualizarTextoEtapa();
+  }
 
   Array.prototype.forEach.call(document.querySelectorAll('#grade-etapas .etapa'), function (botao) {
     botao.addEventListener('click', function () {
       var codigo = botao.getAttribute('data-codigo');
-      var jaEscolhida = estado.etapa === codigo;
-      estado.etapa = jaEscolhida ? null : codigo;
-      Array.prototype.forEach.call(document.querySelectorAll('#grade-etapas .etapa'), function (outro) {
-        outro.setAttribute('aria-pressed', outro.getAttribute('data-codigo') === estado.etapa ? 'true' : 'false');
-      });
-      el('etapa-dica').textContent = estado.etapa
-        ? 'Etapa: ' + estado.etapa + ' — a conferência nasce vinculada a ela.'
-        : 'Nenhuma etapa escolhida — a conferência será registrada sem etapa.';
+      selecionarEtapa(estado.etapa === codigo ? null : codigo);
     });
   });
 
-  // --- C. QR --------------------------------------------------------------
+  // Cada celular abre a URL da SUA etapa (?etapa=serigrafia): é o que, em
+  // produção, virá provisionado na câmera fixa.
+  function aplicarEtapaDaUrl() {
+    var busca = window.location.search || '';
+    var achado = /[?&]etapa=([^&]*)/.exec(busca);
+    if (!achado) { return; }
+    var codigo = decodeURIComponent(achado[1].replace(/\\+/g, ' ')).trim();
+    if (!codigo) { return; }
+    selecionarEtapa(codigo);
+  }
+
+  // --- D. Passo 2: QR -----------------------------------------------------
 
   var suportaQr = 'BarcodeDetector' in window;
   if (!suportaQr) {
     el('btn-camera').hidden = true;
-    aviso('qr-aviso', 'Seu navegador não suporta leitura de QR — use o texto acima.', 'neutro');
+    aviso('qr-aviso', 'Seu navegador não suporta leitura de QR — digite ou cole o conteúdo da etiqueta abaixo.', 'neutro');
   }
 
   function pararCamera() {
@@ -535,19 +814,39 @@ export const PAGINA_DEMO = `<!doctype html>
       })
       .catch(function (erro) {
         pararCamera();
-        aviso('qr-aviso', 'Não foi possível abrir a câmera: ' + erro.message + '. Use o texto acima.', 'erro');
+        aviso('qr-aviso', 'Não foi possível abrir a câmera: ' + erro.message + '. Digite ou cole o conteúdo abaixo.', 'erro');
       });
   });
 
-  // --- D. Fotos -----------------------------------------------------------
+  // --- E. Passo 3: fotos --------------------------------------------------
+
+  function rotuloDaSituacao(info) {
+    if (info.situacao === 'desta-etapa') { return 'desta etapa'; }
+    if (info.situacao === 'fora-etapa') {
+      return info.entraEm ? 'não é desta etapa — entra em ' + info.entraEm : 'não é desta etapa';
+    }
+    if (info.situacao === 'fora-da-checklist') { return 'fora da checklist deste projeto'; }
+    return '';
+  }
 
   function montarFotos() {
-    var html = FONTES.map(function (fonte) {
-      return '<div class="item-foto" data-fonte="' + esc(fonte) + '">' +
-        '<img class="miniatura" alt="" hidden>' +
+    var html = fontesOrdenadas().map(function (fonte) {
+      var info = situacaoDaFonte(fonte);
+      var foto = estado.fotos[fonte];
+      var classe = 'item-foto';
+      if (info.situacao === 'desta-etapa') { classe += ' desta-etapa'; }
+      if (info.situacao === 'fora-etapa') { classe += ' fora-etapa'; }
+      var rotulo = rotuloDaSituacao(info);
+      var campos = info.campos && info.campos.length
+        ? '<span class="estado">confere: ' + esc(info.campos.join(', ')) + '</span>'
+        : '';
+      return '<div class="' + classe + '" data-fonte="' + esc(fonte) + '">' +
+        '<img class="miniatura" alt="" ' + (foto && foto.url ? 'src="' + esc(foto.url) + '"' : 'hidden') + '>' +
         '<span class="nome">' + esc(fonte) +
-        '<span class="estado">sem foto</span></span>' +
-        '<label class="botao-foto">Fotografar' +
+        (rotulo ? '<span class="marca-etapa">' + esc(rotulo) + '</span>' : '') +
+        campos +
+        '<span class="estado envio">' + (foto ? 'enviada' : 'sem foto') + '</span></span>' +
+        '<label class="botao-foto">' + (foto ? 'Refotografar' : 'Fotografar') +
         '<input type="file" accept="image/*" capture="environment" hidden></label>' +
         '</div>';
     }).join('');
@@ -564,9 +863,9 @@ export const PAGINA_DEMO = `<!doctype html>
   }
 
   function enviarFoto(fonte, arquivo, linha) {
-    var estadoTexto = linha.querySelector('.estado');
+    var estadoTexto = linha.querySelector('.envio');
     var miniatura = linha.querySelector('.miniatura');
-    estadoTexto.className = 'estado';
+    estadoTexto.className = 'estado envio';
     estadoTexto.textContent = 'enviando...';
     aviso('fotos-aviso', '');
 
@@ -574,10 +873,10 @@ export const PAGINA_DEMO = `<!doctype html>
     dados.append('file', arquivo);
     dados.append('fonteFisica', fonte);
 
-    pedir(API + '/foto-evidencia/upload', { method: 'POST', body: dados })
+    pedir(API + '/fotos-evidencia/upload', { method: 'POST', body: dados })
       .then(function (resposta) {
         if (!resposta.ok || !resposta.corpo || !resposta.corpo.id) {
-          estadoTexto.className = 'estado falhou';
+          estadoTexto.className = 'estado envio falhou';
           estadoTexto.textContent = 'falhou';
           aviso('fotos-aviso', fonte + ' — ' + mensagemDeErro(resposta.corpo, resposta.status), 'erro');
           return;
@@ -591,25 +890,28 @@ export const PAGINA_DEMO = `<!doctype html>
         atualizarBotaoExtrair();
       })
       .catch(function (erro) {
-        estadoTexto.className = 'estado falhou';
+        estadoTexto.className = 'estado envio falhou';
         estadoTexto.textContent = 'falhou';
         aviso('fotos-aviso', fonte + ' — falha de rede: ' + erro.message, 'erro');
       });
   }
 
   function fotosEnviadas() {
-    return FONTES.filter(function (fonte) { return !!estado.fotos[fonte]; });
+    return fontesOrdenadas().filter(function (fonte) { return !!estado.fotos[fonte]; });
   }
+
+  // --- F. Passo 4: extrair ------------------------------------------------
 
   function atualizarBotaoExtrair() {
     var enviadas = fotosEnviadas();
     el('btn-extrair').disabled = enviadas.length === 0;
     el('extrair-dica').textContent = enviadas.length === 0
-      ? 'Extrair com Textract usa as fotos da seção 4 e a visão real da API — envie ao menos uma foto para liberar. "Conferir agora" usa as leituras digitadas da seção 5.'
-      : 'Extrair com Textract vai enviar ' + enviadas.length + ' foto(s) (' + enviadas.join(', ') + ') ao extrator da API. "Conferir agora" continua usando as leituras digitadas da seção 5.';
+      ? 'Envie ao menos uma foto no passo 3 para liberar a extração.'
+      : 'Vai enviar ' + enviadas.length + ' foto(s) (' + enviadas.join(', ') +
+        ') à visão da API. Uma chamada por foto, sem repetição automática.';
   }
 
-  // --- E. Leituras --------------------------------------------------------
+  // --- G. Modo avançado: leituras digitadas -------------------------------
 
   function montarLeituras() {
     var html = CAMPOS.map(function (item) {
@@ -640,27 +942,43 @@ export const PAGINA_DEMO = `<!doctype html>
       linha.querySelector('.valor').value = valores ? valores[0] : '';
       linha.querySelector('.conf').value = valores ? String(valores[1]) : '';
     });
-    aviso('conferir-aviso', '');
+    aviso('avancado-aviso', '');
   }
 
   el('preset-demo').addEventListener('click', function () { aplicarPreset(PRESET_DEMO); });
   el('preset-correta').addEventListener('click', function () { aplicarPreset(PRESET_CORRETA); });
   el('preset-ruim').addEventListener('click', function () { aplicarPreset(PRESET_RUIM); });
 
+  // Recorte da etapa vindo da checklist da API (mesma regra cumulativa do
+  // backend); a tabela local só entra se a checklist não tiver carregado.
+  function camposDaEtapa(codigo) {
+    var ordemEtapa = estado.ordemPorCodigo ? estado.ordemPorCodigo[codigo] : undefined;
+    if (estado.checklist && ordemEtapa !== undefined) {
+      var permitidos = [];
+      estado.checklist.forEach(function (item) {
+        var etapa = typeof item.etapa === 'string' ? item.etapa.trim() : '';
+        var ordemItem = etapa && estado.ordemPorCodigo ? estado.ordemPorCodigo[etapa] : undefined;
+        if (!etapa || ordemItem === undefined || ordemItem <= ordemEtapa) {
+          permitidos.push(item.campo);
+        }
+      });
+      return permitidos;
+    }
+    return CAMPOS_POR_ETAPA[codigo] || [];
+  }
+
   el('btn-campos-etapa').addEventListener('click', function () {
     if (!estado.etapa) {
-      aviso('conferir-aviso', 'Escolha uma etapa na seção 2 antes de filtrar os campos.', 'erro');
+      aviso('avancado-aviso', 'Escolha uma etapa no passo 1 antes de filtrar os campos.', 'erro');
       return;
     }
-    var permitidos = CAMPOS_POR_ETAPA[estado.etapa] || [];
+    var permitidos = camposDaEtapa(estado.etapa);
     CAMPOS.forEach(function (item) {
       linhaDoCampo(item.campo).querySelector('input[type=checkbox]').checked =
         permitidos.indexOf(item.campo) !== -1;
     });
-    aviso('conferir-aviso', 'Campos ajustados para a etapa ' + estado.etapa + '.', 'neutro');
+    aviso('avancado-aviso', 'Campos ajustados para a etapa ' + estado.etapa + '.', 'neutro');
   });
-
-  // --- F. Conferir --------------------------------------------------------
 
   function coletarLeituras() {
     var leituras = [];
@@ -682,6 +1000,8 @@ export const PAGINA_DEMO = `<!doctype html>
     });
     return leituras;
   }
+
+  // --- H. Passo 5: veredito -----------------------------------------------
 
   function urlDaFonte(fonte) {
     var foto = estado.fotos[fonte];
@@ -749,14 +1069,15 @@ export const PAGINA_DEMO = `<!doctype html>
     html += '<details><summary>Resposta bruta da API</summary><pre>' +
       esc(JSON.stringify(resposta, null, 2)) + '</pre></details>';
 
+    el('veredito-vazio').hidden = true;
     el('resultado').innerHTML = html;
-    el('resultado').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    el('sec-veredito').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  function payloadAtual() {
+  function payloadAtual(avisoId) {
     var payload = el('payload').value.trim();
     if (!payload) {
-      aviso('conferir-aviso', 'A etiqueta (seção 3) está vazia.', 'erro');
+      aviso(avisoId, 'A etiqueta (passo 2) está vazia.', 'erro');
       return null;
     }
     return payload;
@@ -765,10 +1086,12 @@ export const PAGINA_DEMO = `<!doctype html>
   // Uma só rotina de chamada: as duas ações mandam corpos diferentes para
   // rotas diferentes e recebem a MESMA resposta — quem decide o veredito é a
   // API nos dois casos.
-  function chamarConferencia(caminho, corpo, botao, textoAndamento) {
+  function chamarConferencia(caminho, corpo, botao, avisoId, textoAndamento) {
     botao.disabled = true;
-    aviso('conferir-aviso', textoAndamento, 'neutro');
+    aviso(avisoId, textoAndamento, 'neutro');
     el('resultado').innerHTML = '';
+    el('veredito-vazio').hidden = false;
+    el('veredito-vazio').textContent = textoAndamento;
 
     pedir(API + caminho, {
       method: 'POST',
@@ -776,17 +1099,20 @@ export const PAGINA_DEMO = `<!doctype html>
       body: JSON.stringify(corpo)
     }).then(function (resposta) {
       if (!resposta.ok || !resposta.corpo) {
-        aviso('conferir-aviso', mensagemDeErro(resposta.corpo, resposta.status), 'erro');
+        aviso(avisoId, mensagemDeErro(resposta.corpo, resposta.status), 'erro');
+        el('veredito-vazio').textContent = 'A API recusou a conferência (HTTP ' + resposta.status +
+          ') — veja a mensagem no passo 4 e a resposta bruta abaixo.';
         if (resposta.corpo) {
           el('resultado').innerHTML = '<details open><summary>Resposta bruta da API</summary><pre>' +
             esc(JSON.stringify(resposta.corpo, null, 2)) + '</pre></details>';
         }
         return;
       }
-      aviso('conferir-aviso', '');
+      aviso(avisoId, '');
       renderizar(resposta.corpo);
     }).catch(function (erro) {
-      aviso('conferir-aviso', 'Falha de rede: ' + erro.message, 'erro');
+      aviso(avisoId, 'Falha de rede: ' + erro.message, 'erro');
+      el('veredito-vazio').textContent = 'Falha de rede — nada foi conferido.';
     }).then(function () {
       botao.disabled = false;
       atualizarBotaoExtrair();
@@ -796,10 +1122,10 @@ export const PAGINA_DEMO = `<!doctype html>
   el('btn-conferir').addEventListener('click', function () {
     var leituras = coletarLeituras();
     if (!leituras.length) {
-      aviso('conferir-aviso', 'Marque ao menos um campo na seção 5.', 'erro');
+      aviso('avancado-aviso', 'Marque ao menos um campo no modo avançado.', 'erro');
       return;
     }
-    var payload = payloadAtual();
+    var payload = payloadAtual('avancado-aviso');
     if (!payload) { return; }
 
     var corpo = { payloadQr: payload, leituras: leituras };
@@ -807,16 +1133,16 @@ export const PAGINA_DEMO = `<!doctype html>
       corpo.etapaCodigo = estado.etapa;
     }
 
-    chamarConferencia('/conferencia/executar', corpo, el('btn-conferir'), 'Conferindo na API...');
+    chamarConferencia('/conferencias/executar', corpo, el('btn-conferir'), 'avancado-aviso', 'Conferindo na API...');
   });
 
   el('btn-extrair').addEventListener('click', function () {
     var enviadas = fotosEnviadas();
     if (!enviadas.length) {
-      aviso('conferir-aviso', 'Envie ao menos uma foto na seção 4 para extrair.', 'erro');
+      aviso('conferir-aviso', 'Envie ao menos uma foto no passo 3 para extrair.', 'erro');
       return;
     }
-    var payload = payloadAtual();
+    var payload = payloadAtual('conferir-aviso');
     if (!payload) { return; }
 
     var corpo = {
@@ -828,9 +1154,10 @@ export const PAGINA_DEMO = `<!doctype html>
     }
 
     chamarConferencia(
-      '/conferencia/executar-com-fotos',
+      '/conferencias/executar-com-fotos',
       corpo,
       el('btn-extrair'),
+      'conferir-aviso',
       'Lendo as fotos... a visão da API leva alguns segundos por foto.'
     );
   });
@@ -838,8 +1165,11 @@ export const PAGINA_DEMO = `<!doctype html>
   montarFotos();
   montarLeituras();
   aplicarPreset(PRESET_DEMO);
+  aplicarEtapaDaUrl();
+  atualizarTextoEtapa();
   atualizarBotaoExtrair();
   aviso('conferir-aviso', '');
+  aviso('avancado-aviso', '');
 })();
 </script>
 </body>
