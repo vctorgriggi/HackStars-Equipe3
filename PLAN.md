@@ -119,11 +119,13 @@ Depende de: Fase 1 completa.
     chumbada) para cada serviço; timebox de 2h. Incluir no timebox um prompt
     de check qualitativo de layout via Bedrock (marcações presentes e na
     disposição do projeto da demo) — decide se o Could de layout entra.
-  - Bloqueio externo (atualizado 2026-07-25): credenciais entraram e S3 +
-    Textract estão FUNCIONANDO (docs/aws.md, "Estado da conta"). Restam DOIS
-    itens: (1) formulário "Anthropic use case details" no console Bedrock —
-    sem ele todo invoke Claude falha; (2) fotos da peça em arquivo. O
-    executável do spike já existe: `npx ts-node -r tsconfig-paths/register
+  - Bloqueio externo (atualizado 2026-07-25, fim do dia): S3 + Textract
+    FUNCIONANDO; formulário de use case aceito; agreements Opus/Sonnet 5
+    aceitos via CLI. Restam: (1) cotas de inferência Claude zeradas (conta
+    nova) — 4 pedidos PENDING no Service Quotas; (2) invoke dos modelos 5
+    ainda negado (propagação/trava de conta nova — monitor automático
+    acompanhando; Haiku 4.5 já passa em tudo exceto cota); (3) fotos da peça
+    em arquivo. Executável: `npx ts-node -r tsconfig-paths/register
     scripts/spike-extracao.ts <dir-fotos>`. Desvio autorizado: a Fase 3 pode
     iniciar em modo mock (EXTRACTOR_DRIVER=mock) sem esperar este item.
   - Aceitação: escolha registrada como decisão resolvida aqui e no CLAUDE.md;
@@ -269,4 +271,4 @@ demo.
       checklist do banco desde a T1.2; ingestão automática do PDF virou Fase 6
       opcional (2026-07-25).
 
-<!-- rodada: nucleo @ 3472869 -->
+<!-- rodada: extracao @ efc3541 -->

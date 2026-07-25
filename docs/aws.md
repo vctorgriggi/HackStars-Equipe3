@@ -91,6 +91,22 @@ do SPEC já proíbe (visão só sob disparo explícito).
   dá para validar placa/serigrafia hoje; chumbado e layout (papel do Bedrock)
   ficam pendentes da cota. Ao liberar, se o id `anthropic.claude-*` responder
   erro de inference profile, usar prefixo `us.` via env `BEDROCK_MODEL_ID`.
+  Agreements de Opus 5 e Sonnet 5: ACEITOS via CLI
+  (`create-foundation-model-agreement`); o do Opus ficou AVAILABLE em ~30s,
+  mas o invoke ainda nega ("not available for this account") — propagação de
+  entitlement ou trava adicional de conta nova nos modelos de fronteira; se
+  persistir, o texto do erro aponta contato com AWS Sales (mentor/staff do
+  evento resolve mais rápido). Haiku 4.5 está liberado em todas as camadas
+  exceto cota.
+- **Guardrails e Knowledge Bases (Bedrock)**: recomendação registrada — NÃO
+  usar neste caso de uso. Guardrails filtra conteúdo em apps conversacionais;
+  nosso Bedrock faz extração estruturada com parse defensivo e a engine
+  valida tudo. Knowledge Bases é RAG; nossa fonte é a checklist no Postgres.
+  Complexidade sem benefício para a demo.
+- **Custo RDS**: `database-1` é db.r7g.large (~USD 170+/mês on-demand) —
+  para o hackathon, reduzir para db.t4g.micro ou parar quando não estiver em
+  uso. Há ainda uma segunda instância órfã (`database-1-instance-1`, Aurora
+  serverless, parada — sobra de criação) que pode ser deletada.
 - **ALERTA de segurança**: a credencial no .env é do usuário **root** da conta
   (`arn:...:root`) — contra o checklist acima. Criar IAM user com a política
   mínima, trocar a chave no .env e DESATIVAR a chave root. Vazamento da chave
