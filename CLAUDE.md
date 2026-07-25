@@ -10,8 +10,9 @@ escrevemos código aqui**, não documentação. Quando uma convenção for decid
 durante a implementação, registre-a aqui. Contexto detalhado mora em @SPEC.md
 (o quê e por quê) e @PLAN.md (ordem de execução).
 
-**Fase atual = Fase 0 — Fundação.** ERP, câmeras fixas e perfis de usuário não
-pertencem a esta rodada; estão em SPEC.md, seção "Planejado / rodadas futuras".
+**Fase atual = Fase 1 — Núcleo de conformidade (TDD).** ERP, câmeras fixas e
+perfis de usuário não pertencem a esta rodada; estão em SPEC.md, seção
+"Planejado / rodadas futuras".
 
 ## Regra de ouro
 
@@ -39,16 +40,25 @@ não conformidade que chega ao cliente hoje).
 ## Estrutura
 
 ```
-backend/                  # NestJS (base brocoders/nestjs-boilerplate; verificado em T0.1)
+backend/                  # NestJS (base brocoders/nestjs-boilerplate)
   src/
-    transformadores/      # parser do payload do QR; identidade esperada da peça
-    conformidade/         # engine de comparação (pura, sem I/O) + endpoints de conferência
-    extracao/             # ExtractorPort + adapters AWS; único lugar que chama serviço de visão
-    evidencias/           # upload/storage de fotos (S3); FotoEvidencia
-    transito/             # checkpoints e eventos de passagem
+    transformadors/       # CRUD Transformador (gerado); recebe o parser do QR (T1.1)
+    conferencia/          # CRUD Conferencia (gerado); recebe a engine de comparação (T1.2)
+    campo-conferidos/     # CRUD CampoConferido (gerado)
+    foto-evidencia/       # CRUD FotoEvidencia (gerado); recebe upload/S3 (T2.3)
+    checkpoints/          # CRUD Checkpoint (gerado); seed das etapas ordenadas da linha
+    evento-passagems/     # CRUD EventoPassagem (gerado); trânsito (T4.1)
+    extracao/             # (a criar em T2.2) ExtractorPort + adapters AWS
     auth/, files/, i18n/  # herdados do boilerplate; não usados nesta rodada
-frontend/                 # Next.js 16 (verificado em T0.2): leitura QR, fotos, veredito, histórico
+frontend/                 # Next.js 16: leitura QR, fotos, veredito, histórico
 ```
+
+Nomes de pasta seguem a pluralização do gerador (transformadors,
+evento-passagems) — não renomear, os generators dependem disso. O mapa
+conceitual do PLAN: transformadores → `transformadors/`, conformidade →
+`conferencia/` + `campo-conferidos/`, evidencias → `foto-evidencia/`,
+transito → `checkpoints/` + `evento-passagems/`. Entidade ou propriedade nova
+entra pelos generators (recipe em backend/CLAUDE.md), nunca à mão.
 
 Funcionalidade nova entra como módulo novo atrás das mesmas fronteiras
 (auditoria, ERP e câmeras fixas já estão planejadas assim); nada novo entra
@@ -57,10 +67,11 @@ dentro da engine de conformidade.
 ## Como rodar
 
 ```bash
-# válidos após a verificação em T0.1/T0.2 — ajustar aqui se o scaffold mudar
-cd backend && docker compose up -d postgres && npm run start:dev
-cd frontend && npm run dev
+cd backend && docker compose up -d postgres && npm run start:dev  # API em :3001, swagger em /docs
+cd frontend && npm run dev                                        # app em :3000
 cd backend && npm run test    # unit da engine e do parser
+# CRUD gerado exige JWT: login com o admin seed do boilerplate
+# (admin@example.com / secret) em POST /api/v1/auth/email/login
 ```
 
 ## Engine de conformidade

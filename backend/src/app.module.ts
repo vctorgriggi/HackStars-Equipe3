@@ -42,8 +42,26 @@ const infrastructureDatabaseModule = (databaseConfig() as DatabaseConfig)
     });
 // </database-block>
 
+import { TransformadorsModule } from './transformadors/transformadors.module';
+
+import { CheckpointsModule } from './checkpoints/checkpoints.module';
+
+import { FotoEvidenciaModule } from './foto-evidencia/foto-evidencia.module';
+
+import { ConferenciaModule } from './conferencia/conferencia.module';
+
+import { CampoConferidosModule } from './campo-conferidos/campo-conferidos.module';
+
+import { EventoPassagemsModule } from './evento-passagems/evento-passagems.module';
+
 @Module({
   imports: [
+    EventoPassagemsModule,
+    CampoConferidosModule,
+    ConferenciaModule,
+    FotoEvidenciaModule,
+    CheckpointsModule,
+    TransformadorsModule,
     ConfigModule.forRoot({
       isGlobal: true,
       load: [

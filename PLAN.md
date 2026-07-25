@@ -25,23 +25,31 @@ Objetivo: backend e frontend rodando localmente, banco migrado com as
 entidades do SPEC.
 Depende de: nada.
 
-- [ ] T0.1 — Verificar o scaffold NestJS do backend · módulo: backend (raiz)
+- [x] T0.1 — Verificar o scaffold NestJS do backend · módulo: backend (raiz)
   - Desvio: o scaffold já veio do time (commit 485df7a, boilerplate brocoders
     em `backend/`); resta a verificação.
   - Verificação: `npm run start:dev` sobe; healthcheck responde; PostgreSQL via
-    docker compose.
+    docker compose. Feito em 2026-07-25: `GET /` responde 200; migrations e
+    seeds base do boilerplate rodados; login do admin seed funciona.
   - Aceitação: `backend/` rodando limpo, sem código morto de features do
     boilerplate que não usamos (não gastar tempo removendo — apenas não usar).
-- [ ] T0.2 — Verificar o scaffold Next.js do frontend · módulo: frontend
+- [x] T0.2 — Verificar o scaffold Next.js do frontend · módulo: frontend
   - Desvio: substituiu o scaffold Angular do plano original — o time já subiu
     Next.js 16 (commit 239bd53); docs atualizados em 2026-07-25.
   - Verificação: `npm run dev` serve o app no celular da rede local; chamada ao
-    healthcheck do backend funciona.
+    healthcheck do backend funciona. Feito em 2026-07-25: `/conferencia`
+    responde 200 e exibe status da API (CORS ok); URL de rede disponível para
+    o celular.
   - Aceitação: `frontend/` rodando com uma rota placeholder de conferência.
-- [ ] T0.3 — Entidades e migrations · módulo: transformadores (+ conformidade, evidencias, transito)
+- [x] T0.3 — Entidades e migrations · módulo: transformadores (+ conformidade, evidencias, transito)
+  - Desvio: entidades criadas pelos generators do boilerplate (recipe em
+    backend/CLAUDE.md); nomes de pasta ficaram como o gerador pluraliza
+    (transformadors, campo-conferidos, evento-passagems) — não vale brigar
+    com o hygen. Mapa conceito → pasta real no CLAUDE.md raiz.
   - Verificação: migration roda limpa em banco vazio; tabelas Transformador,
     Conferencia, CampoConferido, FotoEvidencia, Checkpoint, EventoPassagem
-    criadas conforme SPEC (Entidades).
+    criadas conforme SPEC (Entidades). Feito em 2026-07-25: 6 tabelas no
+    Postgres; GET /api/v1/checkpoints devolve as etapas seedadas.
   - Aceitação: seed com as etapas reais da linha, ordenadas (adesivação/
     separação da etiqueta, serigrafia, enchimento de óleo e conferência,
     fixação da placa); Checkpoint carrega a posição na sequência desde a
