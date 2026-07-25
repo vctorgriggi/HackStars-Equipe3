@@ -238,9 +238,10 @@ atrás dessas mesmas fronteiras; engine e portas não mudam.
 1. **Prazo** — demo do hackathon em 2026-07-27 (2 dias). Corte de escopo segue
    a ordem MoSCoW invertida: Could cai primeiro, depois Should.
 2. **Série chumbada de baixo contraste** — relevo da mesma cor do tanque; OCR
-   clássico pode falhar. Mitigação: spike Textract vs Bedrock com as fotos
-   reais antes de fechar a escolha; se ilegível, o campo vira `nao_conferivel`
-   com foto para conferência humana, nunca `conforme` silencioso.
+   clássico podia falhar. MEDIDO no spike T2.1 (docs/visao-ocr.md): o Textract
+   lê o relevo com 99,9% de confiança de cima e 85,8% de lado — o risco não se
+   confirmou. Mantida a mitigação: campo ilegível vira `nao_conferivel` com
+   foto para conferência humana, nunca `conforme` silencioso.
 3. **Fonte de imagem variável** — MVP usa fotos de celular; câmeras fixas vêm
    depois. A extração recebe imagens sem saber a origem (mesma porta para
    ambas).

@@ -34,7 +34,7 @@ não conformidade que chega ao cliente hoje).
 | ------- | ---------------------------------------------------------------- |
 | API     | NestJS (base brocoders/nestjs-boilerplate), TypeORM + PostgreSQL |
 | Front   | Next.js 16 (React 19, Tailwind 4), mobile-first                  |
-| Visão   | AWS Textract ou Bedrock — decisão no spike T2.1                  |
+| Visão   | AWS Textract (spike T2.1); Bedrock como reforço opcional         |
 | Storage | AWS S3 (fallback: disco local, se S3 ameaçar o prazo)            |
 
 ## Estrutura
@@ -212,7 +212,8 @@ do hackathon:
       similaridade ≥ N% com revisão humana (afeta T1.2).
 - [ ] **Formato do payload do QR** — campos embutidos ou código de lookup
       (afeta T1.1, T3.1).
-- [ ] **Textract vs Bedrock** — resolver no spike T2.1 com as fotos reais
-      (afeta T2.2).
+- [x] **Textract vs Bedrock** — resolvido: Textract (spike T2.1 com fotos
+      reais, docs/visao-ocr.md). `EXTRACTOR_DRIVER=textract`; Bedrock fica
+      como reforço opcional para foto ruim (2026-07-25).
 - [x] **Framework do front** — resolvido: Next.js 16; scaffold já subido pelo
       time venceu o Angular combinado na entrevista (2026-07-25).

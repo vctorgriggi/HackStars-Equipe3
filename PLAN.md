@@ -114,7 +114,7 @@ Depende de: Fase 0 completa.
 Objetivo: fotos reais → campos com confiança e evidência.
 Depende de: Fase 1 completa.
 
-- [ ] T2.1 — Spike Textract vs Bedrock com as fotos reais · módulo: extracao
+- [x] T2.1 — Spike Textract vs Bedrock com as fotos reais · módulo: extracao
   - Verificação: tabela de acerto por fonte física (placa, serigrafia, série
     chumbada) para cada serviço; timebox de 2h. Incluir no timebox um prompt
     de check qualitativo de layout via Bedrock (marcações presentes e na
@@ -128,9 +128,17 @@ Depende de: Fase 1 completa.
     em arquivo. Executável: `npx ts-node -r tsconfig-paths/register
     scripts/spike-extracao.ts <dir-fotos>`. Desvio autorizado: a Fase 3 pode
     iniciar em modo mock (EXTRACTOR_DRIVER=mock) sem esperar este item.
+  - Feito em 2026-07-25 com as fotos reais da peça (fotos-demo/): TEXTRACT
+    ESCOLHIDO — leu placa 847833 (99,8%), chumbado 847233 (99,9% de cima,
+    85,8% de lado), serigrafia 251328/energisa (97-99%) e a etiqueta (100%).
+    Medição e aprendizados em docs/visao-ocr.md.
+  - Desvio: a constraint 2 do SPEC (relevo derrubaria OCR clássico) NÃO se
+    confirmou — Bedrock deixa de ser pré-requisito e vira reforço opcional
+    para foto ruim; o adapter fica no código (troca por EXTRACTOR_DRIVER).
+    O check qualitativo de layout (Could) segue dependendo do Bedrock, que
+    continua bloqueado por cota/registro da conta AWS.
   - Aceitação: escolha registrada como decisão resolvida aqui e no CLAUDE.md;
-    se render aprendizado caro (prompts, pré-processamento), vira
-    docs/visao-ocr.md.
+    aprendizado caro registrado em docs/visao-ocr.md.
 - [x] T2.2 — ExtractorPort e adapter do serviço escolhido · módulo: extracao
   - Testes (primeiro): consumidores da porta testados com mock; adapter real
     verificado manualmente com as fotos da demo.
@@ -258,8 +266,9 @@ demo.
       similaridade ≥ N% com revisão humana; afeta T1.2.
 - [ ] **Formato do payload do QR** — campos embutidos ou código de lookup;
       afeta T1.1 e T3.1.
-- [ ] **Textract vs Bedrock para extração** — resolver em T2.1 com as fotos
-      reais; afeta T2.2.
+- [x] **Textract vs Bedrock para extração** — resolvido: TEXTRACT, medido com
+      as fotos reais (docs/visao-ocr.md); leu inclusive o relevo chumbado, que
+      era o risco. Bedrock fica como reforço opcional (2026-07-25).
 - [x] **Framework do front** — resolvido: Next.js 16, scaffold já subido pelo
       time venceu o Angular combinado; T0.2 virou verificação e o módulo `web`
       passou a `frontend` (2026-07-25).
