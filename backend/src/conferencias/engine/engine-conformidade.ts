@@ -19,7 +19,7 @@ import {
  * sempre x similaridade >= N% com revisao humana). Enquanto nao houver
  * decisao, so igualdade exata do valor normalizado vira `conforme`.
  */
-function normalizar(valor: string): string {
+export function normalizar(valor: string): string {
   // NFC: 'ô' precomposto e 'o'+combinante são o MESMO texto (equivalência
   // canônica Unicode) — sem isso, QR gerado em iOS/macOS (NFD) divergiria
   // de OCR em NFC. Não é fuzzy: perda de acento continua divergente.
@@ -97,6 +97,24 @@ export function conferir(
           confianca,
           'nao_conferivel',
           'sem-leitura',
+        ),
+      );
+      continue;
+    }
+
+    // (b2) leituras conflitantes: o chamador registrou que outra leitura
+    // valida discordava desta no valor normalizado. Nenhuma das duas e
+    // confiavel — nem a que bate com o esperado (poderia ser a etiqueta
+    // fotografada no lugar da placa). Vai para revisao humana com a foto.
+    if (leitura?.conflitante) {
+      campos.push(
+        montarCampo(
+          item,
+          valorEsperadoBruto,
+          valorLido,
+          confianca,
+          'nao_conferivel',
+          'leituras-conflitantes',
         ),
       );
       continue;

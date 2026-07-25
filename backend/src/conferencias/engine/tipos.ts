@@ -26,6 +26,14 @@ export interface LeituraCampo {
   confianca: number | null; // 0..1
   regiaoLeitura?: string | null;
   fotoEvidenciaId?: string | null;
+  /**
+   * Fato registrado pelo chamador no dedupe: houve OUTRA leitura válida
+   * (com valor e confiança >= limiar) discordando desta no valor
+   * normalizado. A engine rebaixa o campo para `nao_conferivel`
+   * (`leituras-conflitantes`) — escolher uma leitura calada poderia
+   * rebaixar o cenário-âncora a `conforme` (achado ALTA da revisão).
+   */
+  conflitante?: boolean;
 }
 
 export interface OpcoesEngine {
@@ -40,7 +48,7 @@ export interface ResultadoCampo {
   valorLido: string | null;
   confianca: number | null;
   veredito: Veredito;
-  motivo?: string; // ex.: 'sem-leitura', 'confianca-abaixo-do-limiar', 'sem-valor-esperado'
+  motivo?: string; // ex.: 'sem-leitura', 'confianca-abaixo-do-limiar', 'sem-valor-esperado', 'leituras-conflitantes'
 }
 
 export interface ResultadoConferencia {

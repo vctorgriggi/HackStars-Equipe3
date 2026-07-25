@@ -23,7 +23,7 @@ import {
 } from '../transformadores/qr/payload-etiqueta';
 import { parsePayloadEtiqueta } from '../transformadores/qr/qr-payload.parser';
 
-import { conferir } from './engine/engine-conformidade';
+import { conferir, normalizar } from './engine/engine-conformidade';
 import { ItemChecklist, LeituraCampo, ResultadoCampo } from './engine/tipos';
 import { ExecutarConferenciaDto } from './dto/executar-conferencia.dto';
 import { ConferenciaRepository } from './infrastructure/persistence/conferencia.repository';
@@ -160,7 +160,10 @@ function ehViolacaoDeUnique(erro: unknown): boolean {
   );
 }
 
-function ehItemChecklist(valor: unknown): valor is ItemChecklist {
+// Exportado por ser a validação ÚNICA de item de checklist — a versão que
+// vivia duplicada em conferencia-extracao divergia (não validava `etapa`) e
+// deixava checklist ruim pagar visão antes de explodir aqui.
+export function ehItemChecklist(valor: unknown): valor is ItemChecklist {
   const item = valor as Partial<ItemChecklist> | null;
 
   return (
@@ -172,8 +175,10 @@ function ehItemChecklist(valor: unknown): valor is ItemChecklist {
     typeof item.obrigatorio === 'boolean' &&
     // `etapa` e opcional (checklist antiga nao tem), mas quando existe precisa
     // ser string: outro tipo nunca casaria com o `codigo` do Checkpoint e o
-    // item cairia calado no ramo "etapa desconhecida".
-    (item.etapa === undefined || typeof item.etapa === 'string')
+    // item cairia calado no ramo "etapa desconhecida". `null` e aceito como
+    // "sem etapa" (codificacao natural em JSON — achado BAIXA da revisao) e
+    // normalizado para undefined em lerChecklist.
+    (item.etapa == null || typeof item.etapa === 'string')
   );
 }
 
@@ -257,31 +262,23 @@ export class ConferenciaExecucaoService {
       projetoModelo,
     );
 
-    // Dedup por campo (revisão R1): duas fotos da mesma fonte geram duas
-    // leituras do mesmo campo; sem isto, a PRIMEIRA vencia mesmo sendo nula
-    // e a refoto legível era descartada. Fica a melhor: valorLido presente
-    // primeiro, depois maior confiança.
-    const porCampo = new Map<string, LeituraCampo>();
-    for (const leitura of dto.leituras) {
-      const candidata: LeituraCampo = {
+    const limiarConfianca = dto.limiarConfianca ?? LIMIAR_CONFIANCA_PADRAO;
+    const leituras = dedupeLeituras(
+      dto.leituras.map((leitura) => ({
         campo: leitura.campo,
         valorLido: leitura.valorLido ?? null,
         confianca: leitura.confianca ?? null,
         regiaoLeitura: leitura.regiaoLeitura ?? null,
         fotoEvidenciaId: leitura.fotoEvidenciaId ?? null,
-      };
-      const atual = porCampo.get(leitura.campo);
-      if (!atual || melhorLeitura(candidata, atual)) {
-        porCampo.set(leitura.campo, candidata);
-      }
-    }
-    const leituras = [...porCampo.values()];
+      })),
+      limiarConfianca,
+    );
 
     const resultado = conferir(
       checklist,
       montarValoresEsperados(checklist, payload),
       leituras,
-      { limiarConfianca: dto.limiarConfianca ?? LIMIAR_CONFIANCA_PADRAO },
+      { limiarConfianca },
     );
 
     const conferencia = await this.conferenciaRepository.create({
@@ -572,7 +569,9 @@ export class ConferenciaExecucaoService {
       );
     }
 
-    return bruto;
+    // etapa: null (aceito pelo guard) vira undefined — downstream só conhece
+    // "string presente" ou "ausente".
+    return bruto.map((item) => ({ ...item, etapa: item.etapa ?? undefined }));
   }
 }
 
@@ -584,4 +583,59 @@ function melhorLeitura(a: LeituraCampo, b: LeituraCampo): boolean {
     return aTemValor;
   }
   return (a.confianca ?? -1) > (b.confianca ?? -1);
+}
+
+/**
+ * Reconciliação de múltiplas leituras do mesmo campo (dedup da revisão R1 +
+ * achado ALTA da rodada de análise): a refoto legítima (leitura nula + leitura
+ * legível da mesma fonte) fica com a melhor, mas duas leituras VÁLIDAS (valor
+ * presente e confiança >= limiar) que discordam no valor normalizado são um
+ * CONFLITO — escolher uma calada dependeria da ordem do array e poderia
+ * rebaixar o cenário-âncora a `conforme` (a etiqueta fotografada como "placa"
+ * lê melhor que o relevo). Conflito marca a vencedora com `conflitante`; quem
+ * rebaixa o veredito é a engine (`leituras-conflitantes`) — o veredito segue
+ * nascendo em um lugar só.
+ *
+ * Exportada para teste direto (mesmo padrão de `filtrarChecklistPorEtapa`).
+ */
+export function dedupeLeituras(
+  candidatas: LeituraCampo[],
+  limiarConfianca: number,
+): LeituraCampo[] {
+  const porCampo = new Map<string, LeituraCampo>();
+  const valoresValidos = new Map<string, Set<string>>();
+
+  for (const candidata of candidatas) {
+    const atual = porCampo.get(candidata.campo);
+    if (!atual || melhorLeitura(candidata, atual)) {
+      porCampo.set(candidata.campo, { ...candidata });
+    }
+
+    // Só leitura com lastro entra na detecção de conflito: abaixo do limiar
+    // (ou sem confiança) é ruído que a engine já barra sozinha — ruído não
+    // pode vetar uma leitura boa.
+    const valida =
+      candidata.valorLido !== null &&
+      candidata.valorLido.trim().length > 0 &&
+      candidata.confianca !== null &&
+      candidata.confianca > 0 &&
+      candidata.confianca >= limiarConfianca;
+    if (valida) {
+      const conjunto =
+        valoresValidos.get(candidata.campo) ?? new Set<string>();
+      conjunto.add(normalizar(candidata.valorLido as string));
+      valoresValidos.set(candidata.campo, conjunto);
+    }
+  }
+
+  for (const [campo, valores] of valoresValidos) {
+    if (valores.size > 1) {
+      const vencedora = porCampo.get(campo);
+      if (vencedora) {
+        vencedora.conflitante = true;
+      }
+    }
+  }
+
+  return [...porCampo.values()];
 }

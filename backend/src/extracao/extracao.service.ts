@@ -77,7 +77,22 @@ export class ExtracaoService {
         continue;
       }
 
-      const brutas = await this.extractor.extrair(foto, alvos);
+      // Falha de UMA foto (arquivo corrompido, formato recusado, throttle)
+      // não derruba o lote: a foto segue sem leituras e o campo dela vira
+      // `nao_conferivel` na engine — é a filosofia do domínio (foto ruim é
+      // revisão humana, não 500), e preserva as chamadas já pagas.
+      let brutas: LeituraExtraida[];
+      try {
+        brutas = await this.extractor.extrair(foto, alvos);
+      } catch (erro) {
+        this.logger.error(
+          `adapter "${this.extractor.nome}" falhou na foto ` +
+            `${foto.fotoEvidenciaId} (fonte "${foto.fonteFisica}"): ` +
+            `${erro instanceof Error ? erro.message : String(erro)}; ` +
+            `a foto segue sem leituras`,
+        );
+        continue;
+      }
       const campos = new Set(alvos.map((alvo) => alvo.campo));
 
       for (const leitura of brutas) {

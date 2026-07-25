@@ -21,6 +21,7 @@ import { parsePayloadEtiqueta } from '../transformadores/qr/qr-payload.parser';
 
 import {
   ConferenciaExecucaoService,
+  ehItemChecklist,
   ResultadoExecucao,
 } from './conferencia-execucao.service';
 import { ExecutarComFotosDto } from './dto/executar-com-fotos.dto';
@@ -40,19 +41,6 @@ export interface ResumoExtracao {
 export type ResultadoExecucaoComExtracao = ResultadoExecucao & {
   extracao: ResumoExtracao;
 };
-
-function ehItemChecklist(valor: unknown): valor is ItemChecklist {
-  const item = valor as Partial<ItemChecklist> | null;
-
-  return (
-    typeof item === 'object' &&
-    item !== null &&
-    typeof item.campo === 'string' &&
-    item.campo.length > 0 &&
-    typeof item.fonteFisica === 'string' &&
-    typeof item.obrigatorio === 'boolean'
-  );
-}
 
 /**
  * Costura VISAO -> conferencia: ids de fotos ja enviadas viram bytes, os bytes

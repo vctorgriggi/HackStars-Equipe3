@@ -61,7 +61,7 @@ caminho único de escrita de veredito) existe para tornar isso impossível.
 | ------- | ---------------------------------------------------------------- |
 | API     | NestJS (base brocoders/nestjs-boilerplate), TypeORM + PostgreSQL |
 | Front   | Next.js 16 (React 19, Tailwind 4), mobile-first                  |
-| Visão   | AWS Textract e Bedrock (Claude) — escolha pendente do spike T2.1 |
+| Visão   | AWS Textract (escolhido no spike T2.1); Bedrock como reforço opcional |
 | Storage | AWS S3 (fallback: disco local)                                   |
 
 ## Como rodar
@@ -72,7 +72,7 @@ cd backend && sed 's/^DATABASE_HOST=postgres/DATABASE_HOST=localhost/' env-examp
 cd backend && docker compose up -d postgres && npm run migration:run && npm run seed:run:relational
 cd backend && npm run start:dev   # API em :3001, swagger em /docs
 cd frontend && npm run dev        # app em :3000; API derivada do host da página
-cd backend && npm run test        # 96 testes unitários (engine, parser, extração)
+cd backend && npm run test        # 129 testes unitários (engine, parser, extração)
 # CRUD gerado exige JWT: login com o admin seed do boilerplate
 # (admin@example.com / secret) em POST /api/v1/auth/email/login
 ```
@@ -145,20 +145,19 @@ Prazo: demo em 2026-07-27.
 | -------------------------------------- | --------------------------------------------------------- | ----------------------- |
 | 0 — Fundação                           | scaffolds, 7 entidades, migrations, seeds da linha e do modelo | ✅ completa         |
 | 1 — Núcleo de conformidade (TDD)       | parser do QR, engine pura, `POST /conferencias/executar`   | ✅ completa             |
-| 2 — Extração por visão                 | `ExtractorPort` + adapters textract/bedrock/mock, upload S3 | ✅ exceto o spike T2.1  |
+| 2 — Extração por visão                 | `ExtractorPort` + adapters textract/bedrock/mock, upload S3 | ✅ concluída            |
 | 3 — Fluxo ponta a ponta                | QR no celular, captura de fotos, tela de veredito          | a fazer                 |
 | 4 — Trânsito e alerta                  | Passagem, histórico da peça, alerta de divergência         | a fazer                 |
 | 5 (opcional) — Dashboard e indicadores | linha e auditoria por etapa/campo                          | a fazer                 |
 | 6 (opcional) — Ingestão do projeto     | PDF do desenho → checklist via Bedrock → revisão           | a fazer                 |
 
-O único item aberto da Fase 2 é o **spike T2.1** (Textract × Bedrock com as
-fotos reais), bloqueado por fatores externos e documentado em
-[docs/aws.md](docs/aws.md): S3 e Textract funcionam, mas a conta é nova e as
-cotas de inferência Claude no Bedrock estão em 0 (4 pedidos PENDING no Service
-Quotas), e as fotos da peça ainda não estão em arquivo. O sistema não depende
-disso para rodar — o driver `mock` cobre o fluxo, e a escolha do spike vira
-troca de env. O frontend hoje tem apenas a rota placeholder de conferência
-(Fase 3).
+O spike T2.1 foi concluído com as fotos reais da peça: **Textract** leu todas
+as fontes físicas — inclusive o relevo chumbado, que era o risco — e é o
+driver do ambiente no ar (`EXTRACTOR_DRIVER=textract`); medições em
+[docs/visao-ocr.md](docs/visao-ocr.md). Bedrock fica como reforço opcional e
+segue bloqueado pela conta AWS ([docs/aws.md](docs/aws.md)). O sistema roda
+sem AWS com o driver `mock`. O frontend hoje tem apenas a rota placeholder de
+conferência (Fase 3).
 
 ## Documentação
 
