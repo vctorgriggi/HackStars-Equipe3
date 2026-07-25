@@ -53,12 +53,39 @@ token novo (como os de veredito) precisa de valor claro E escuro no mesmo
 lugar. Nunca fixar um hex direto num componente; se a cor não existe como
 token, ela entra em `globals.css` antes de ser usada.
 
-## Convenções de componente (ainda não uma biblioteca)
+## Base UI + Motion
 
-Não estamos criando `components/ui` antecipadamente — três telas não
-justificam isso ainda (ver CLAUDE.md raiz, "não desenhar para requisito
-hipotético"). Os padrões abaixo são para repetir por convenção manual até um
-padrão real emergir na Fase 3:
+`@base-ui/react` e `motion` estão instalados — a partir de agora são a base
+primária de UI, não um extra opcional:
+
+- **Qualquer componente com comportamento** (modal/dialog, dropdown, select,
+  switch, tabs, tooltip, popover, accordion, etc.) parte do primitivo
+  `@base-ui/react` correspondente, nunca reimplementado à mão (foco, teclado,
+  aria já vêm corretos de lá). Base UI é headless — sem estilo próprio — então
+  ele SEMPRE é estilizado com Tailwind + os tokens semânticos deste arquivo
+  (cores de veredito, tipografia, alvo de toque 48px); nunca a aparência
+  default de outra lib de componentes visuais.
+- Elemento puramente estrutural sem estado complexo (texto, layout, botão
+  simples) continua HTML nativo + Tailwind — Base UI entra quando há
+  comportamento que seria caro/arriscado reimplementar, não em tudo por
+  princípio.
+- **`motion`** é a lib de animação: usar em transições que comunicam mudança
+  de estado (veredito aparecendo, alerta de divergência entrando, troca de
+  etapa/tela, expand/collapse de detalhe) — nunca animação decorativa sem
+  propósito. Respeitar `prefers-reduced-motion` para qualquer animação que não
+  seja essencial ao entendimento.
+- Design permanece responsivo (mobile-first, seção acima) e limpo: tokens
+  semânticos em vez de cor ad-hoc, espaçamento generoso, hierarquia
+  tipográfica clara — animação e componente novo nunca competem com isso.
+
+## Convenções de componente
+
+Não estamos criando `components/ui` antecipadamente só por criar — três telas
+não justificam uma biblioteca própria ainda (ver CLAUDE.md raiz, "não
+desenhar para requisito hipotético"). Os padrões abaixo são para repetir por
+convenção manual até um padrão real emergir na Fase 3; quando repetir,
+priorizar compor sobre um primitivo Base UI em vez de HTML cru caso o
+componente ganhe estado (aberto/fechado, foco, seleção):
 
 - **Indicador de status** (como o `apiStatus` em `app/conferencia/page.tsx`):
   texto colorido pelo token semântico correspondente, nunca cor ad-hoc.
