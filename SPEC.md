@@ -41,7 +41,10 @@ linha, dando rastreabilidade de trânsito.
 - **Transformador** — identidade esperada da peça, criada a partir do payload
   do QR: número de série, patrimônio, pedido, seq, cliente, descrição.
 - **Conferencia** — uma execução de verificação de uma peça: referência ao
-  Transformador, conjunto de CampoConferido, veredito geral, timestamp.
+  Transformador, conjunto de CampoConferido, veredito geral, timestamp,
+  opcionalmente vinculada a um Checkpoint. Pode cobrir um subconjunto de
+  campos: no fluxo real da TRAEL a conferência acontece em gates parciais
+  (pós-serigrafia e pós-placa), não de uma vez só.
 - **CampoConferido** — um campo comparado: nome (ex.: serie-placa,
   serie-chumbada-1..3, patrimonio-serigrafia, patrimonio-placa, cliente), valor
   esperado (do QR), valor lido (da visão), score de confiança, veredito
@@ -161,11 +164,18 @@ SDK AWS fora de `extracao`/`evidencias`; veredito calculado no `frontend`.
 
 ### Câmeras fixas na linha
 
-Captura automática em pontos estratégicos substituindo a foto manual. Herda a
-constraint do desafio: peças passam em dupla e nem todas as vistas ficam
-visíveis — exigirá escolha de pontos de captura ou adaptação do fluxo.
-Aceitação futura: peça passando no ponto instrumentado gera conferência sem
-ação do operador, com as mesmas garantias dos critérios 1–4.
+Captura automática em pontos estratégicos substituindo a foto manual. O fluxo
+alvo desenhado pela equipe tem dois gates de conferência, cada um bloqueando o
+avanço até corrigir: a etiqueta (QR) é aplicada logo após a pintura; o gate 1,
+pós-serigrafia, compara a serigrafia com o sistema e devolve a peça para
+correção se divergir; o gate 2, pós-aplicação da placa (última etapa), faz o
+mesmo para a placa antes da finalização. Herda a constraint do desafio: peças
+passam em dupla e nem todas as vistas ficam visíveis — exigirá escolha de
+pontos de captura ou adaptação do fluxo.
+Aceitação futura: peça passando no ponto instrumentado gera conferência
+parcial daquele gate sem ação do operador, com as mesmas garantias dos
+critérios 1–4, e divergência impede o registro de avanço para a etapa
+seguinte.
 
 ### Integração ERP / sistemas de projeto
 
