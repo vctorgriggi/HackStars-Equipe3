@@ -216,3 +216,5 @@ demo.
       ProjetoModelo criada e seedada na Fase 0 (modelo da demo); engine lê a
       checklist do banco desde a T1.2; ingestão automática do PDF virou Fase 6
       opcional (2026-07-25).
+
+<!-- rodada: fundacao @ 117598a -->
