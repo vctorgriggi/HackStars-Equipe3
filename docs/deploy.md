@@ -79,7 +79,7 @@ configuração do App Runner. Diferenças em relação ao ambiente de dev:
 | `DATABASE_HOST` | endpoint do RDS | banco compartilhado |
 | `DATABASE_SSL_ENABLED` | `true` | RDS exige TLS (local, `false`) |
 | `FILE_DRIVER` | `s3` | evidências no bucket |
-| `EXTRACTOR_DRIVER` | `mock` | trocar para `textract`/`bedrock` quando o spike T2.1 decidir |
+| `EXTRACTOR_DRIVER` | `textract` | escolhido no spike T2.1; `mock` continua sendo o default do código |
 | `ACCESS_KEY_ID` / `SECRET_ACCESS_KEY` | **ausentes** | credencial vem da instance role |
 | `NODE_ENV` | `production` | |
 
@@ -94,7 +94,13 @@ health 200, login do admin seed, Swagger em `/docs`, cenário-âncora
 respondendo `divergente` só em `serie-placa` (7 campos no RDS) e upload de
 foto com URL assinada do S3 abrindo no navegador.
 
-## Quatro armadilhas do caminho (custaram 5 tentativas)
+Com `EXTRACTOR_DRIVER=textract` (mesma data), o ciclo completo no ar: upload de
+`PLACA-4.jpg` → `POST /conferencia/executar-com-fotos` → Textract leu `847833`
+com 99,87% de confiança contra o `847233` da etiqueta, veredito `divergente`
+só em `serie-placa` e os campos sem foto em `nao_conferivel`. É o critério de
+aceitação 2 do SPEC passando com visão real, sem leitura digitada.
+
+## Cinco armadilhas do caminho (custaram 6 tentativas)
 
 1. **`env-cmd` sobrescreve a configuração do serviço.** `npm run
    migration:run` carrega o `.env` do diretório e ele VENCE as variáveis de
@@ -112,6 +118,12 @@ foto com URL assinada do S3 abrindo no navegador.
    entram na configuração do serviço. Dívida registrada: para o S3 usar a
    instance role como Textract/Bedrock já usam, é preciso tornar as
    credenciais opcionais no boilerplate (4 arquivos).
+5. **`update-service` redeploya o digest antigo.** Mudar variável de ambiente
+   dispara um deploy, mas ele **reusa a imagem já resolvida** — o serviço
+   volta a `RUNNING` com código velho e sem erro nenhum. Sintoma: a env nova
+   está aplicada e o comportamento não mudou. Correção: `update-service` e
+   `start-deployment` são passos distintos; depois de subir imagem, sempre
+   `start-deployment` (é o único que puxa a tag `:latest` de novo).
 
 ## Verificação pós-deploy
 
