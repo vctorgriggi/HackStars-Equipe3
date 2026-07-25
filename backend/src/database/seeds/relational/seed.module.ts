@@ -12,8 +12,11 @@ import appConfig from '../../../config/app.config';
 
 import { CheckpointSeedModule } from './checkpoint/checkpoint-seed.module';
 
+import { ProjetoModeloSeedModule } from './projeto-modelo/projeto-modelo-seed.module';
+
 @Module({
   imports: [
+    ProjetoModeloSeedModule,
     CheckpointSeedModule,
     RoleSeedModule,
     StatusSeedModule,

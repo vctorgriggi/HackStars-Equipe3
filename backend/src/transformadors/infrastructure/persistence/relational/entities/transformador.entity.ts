@@ -1,9 +1,12 @@
+import { ProjetoModeloEntity } from '../../../../../projeto-modelos/infrastructure/persistence/relational/entities/projeto-modelo.entity';
+
 import {
   CreateDateColumn,
   Entity,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
   Column,
+  ManyToOne,
 } from 'typeorm';
 import { EntityRelationalHelper } from '../../../../../utils/relational-entity-helper';
 
@@ -11,6 +14,9 @@ import { EntityRelationalHelper } from '../../../../../utils/relational-entity-h
   name: 'transformador',
 })
 export class TransformadorEntity extends EntityRelationalHelper {
+  @ManyToOne(() => ProjetoModeloEntity, { eager: true, nullable: true })
+  projetoModelo?: ProjetoModeloEntity | null;
+
   @Column({
     nullable: true,
     type: String,

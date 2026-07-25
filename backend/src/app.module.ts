@@ -38,8 +38,11 @@ import { CampoConferidosModule } from './campo-conferidos/campo-conferidos.modul
 
 import { EventoPassagemsModule } from './evento-passagems/evento-passagems.module';
 
+import { ProjetoModelosModule } from './projeto-modelos/projeto-modelos.module';
+
 @Module({
   imports: [
+    ProjetoModelosModule,
     EventoPassagemsModule,
     CampoConferidosModule,
     ConferenciaModule,

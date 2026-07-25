@@ -73,12 +73,14 @@ Depende de: Fase 0 completa.
     caso da peça de demo (847233 × 847833) acusando só a série da placa.
   - Aceitação: engine é função pura (valores esperados + leituras com
     confiança → vereditos); zero imports de I/O ou SDK. A lista de campos a
-    conferir é parâmetro de entrada, nunca constante — preparação para o
-    projeto de serigrafia por modelo/cliente (SPEC, Planejado).
+    conferir é parâmetro de entrada, nunca constante — o chamador a carrega do
+    ProjetoModelo da peça (seedado com o modelo da demo na Fase 0).
 - [ ] T1.3 — Endpoints de conferência com leituras mockadas · módulo: conformidade
   - Verificação: criar conferência via curl com leituras simuladas e receber
     vereditos campo a campo persistidos.
-  - Aceitação: contrato request/response estável para a Fase 3 consumir.
+  - Aceitação: contrato request/response estável para a Fase 3 consumir;
+    Transformador resolvido por find-or-create com `numeroSerie` como chave
+    (patrimônio não é único entre clientes — SPEC, decisões em aberto).
 
 ## Fase 2 — Extração por visão
 
@@ -155,6 +157,25 @@ Depende de: Fase 4 completa; pode ser pulada.
   - Verificação manual: contagem de divergências por etapa e por campo bate
     com o banco em um cenário montado à mão.
 
+## Fase 6 (opcional) — Ingestão do projeto
+
+Objetivo: o Could de ingestão do SPEC — subir um PDF de projeto e sair com um
+ProjetoModelo aprovado, sem transcrição manual.
+Depende de: Fase 3 completa (adapter Bedrock existente); pode ser pulada;
+concorre com a Fase 5 pelo tempo restante — priorizar a que render mais na
+demo.
+
+- [ ] T6.1 — Upload do PDF e extração da checklist via Bedrock · módulo: extracao (+ projeto-modelos)
+  - Verificação manual: subir o EPT-163-PI-676 e comparar a checklist extraída
+    com a seedada na Fase 0 (gabarito conhecido).
+  - Aceitação: proposta de checklist com campo, fonte física e obrigatoriedade;
+    nunca cria ProjetoModelo direto — sempre passa pela revisão (T6.2).
+- [ ] T6.2 — Tela de revisão e aprovação da checklist · módulo: frontend (+ projeto-modelos)
+  - Verificação manual: editar um item extraído errado e aprovar; ProjetoModelo
+    criado reflete a edição.
+  - Aceitação: aprovação é por modelo (uma vez), não por peça — checklist
+    errada aprovada às cegas corromperia todas as conferências do modelo.
+
 ## Riscos e dependências
 
 - **Série chumbada ilegível para OCR** (SPEC, constraint 2) → T2.1 decide o
@@ -182,3 +203,7 @@ Depende de: Fase 4 completa; pode ser pulada.
 - [x] **Prioridade do alerta de divergência** — resolvido: T5.2 promovida a
       T4.3 (Could → Should); divergência para a produção até correção
       (2026-07-25).
+- [x] **Checklist hardcoded × projeto como dado** — resolvido: entidade
+      ProjetoModelo criada e seedada na Fase 0 (modelo da demo); engine lê a
+      checklist do banco desde a T1.2; ingestão automática do PDF virou Fase 6
+      opcional (2026-07-25).

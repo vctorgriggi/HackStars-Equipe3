@@ -1,10 +1,19 @@
 import { Transformador } from '../../../../domain/transformador';
+import { ProjetoModeloMapper } from '../../../../../projeto-modelos/infrastructure/persistence/relational/mappers/projeto-modelo.mapper';
 
 import { TransformadorEntity } from '../entities/transformador.entity';
 
 export class TransformadorMapper {
   static toDomain(raw: TransformadorEntity): Transformador {
     const domainEntity = new Transformador();
+    if (raw.projetoModelo) {
+      domainEntity.projetoModelo = ProjetoModeloMapper.toDomain(
+        raw.projetoModelo,
+      );
+    } else if (raw.projetoModelo === null) {
+      domainEntity.projetoModelo = null;
+    }
+
     domainEntity.descricao = raw.descricao;
 
     domainEntity.cliente = raw.cliente;
@@ -26,6 +35,14 @@ export class TransformadorMapper {
 
   static toPersistence(domainEntity: Transformador): TransformadorEntity {
     const persistenceEntity = new TransformadorEntity();
+    if (domainEntity.projetoModelo) {
+      persistenceEntity.projetoModelo = ProjetoModeloMapper.toPersistence(
+        domainEntity.projetoModelo,
+      );
+    } else if (domainEntity.projetoModelo === null) {
+      persistenceEntity.projetoModelo = null;
+    }
+
     persistenceEntity.descricao = domainEntity.descricao;
 
     persistenceEntity.cliente = domainEntity.cliente;

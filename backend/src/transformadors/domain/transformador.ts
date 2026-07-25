@@ -1,6 +1,14 @@
+import { ProjetoModelo } from '../../projeto-modelos/domain/projeto-modelo';
+
 import { ApiProperty } from '@nestjs/swagger';
 
 export class Transformador {
+  @ApiProperty({
+    type: () => ProjetoModelo,
+    nullable: true,
+  })
+  projetoModelo?: ProjetoModelo | null;
+
   @ApiProperty({
     type: () => String,
     nullable: true,
