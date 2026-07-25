@@ -81,6 +81,15 @@ export class ExtracaoService {
       // não derruba o lote: a foto segue sem leituras e o campo dela vira
       // `nao_conferivel` na engine — é a filosofia do domínio (foto ruim é
       // revisão humana, não 500), e preserva as chamadas já pagas.
+      // Uma linha por chamada PAGA: e assim que se conta, no log, quanto uma
+      // execucao custou (SPEC, constraint 4) e que um 422 barato nao gastou
+      // nada.
+      this.logger.debug(
+        `chamada-de-visao: adapter "${this.extractor.nome}", foto ` +
+          `${foto.fotoEvidenciaId}, fonte "${foto.fonteFisica}", ` +
+          `${alvos.length} campo(s)`,
+      );
+
       let brutas: LeituraExtraida[];
       try {
         brutas = await this.extractor.extrair(foto, alvos);

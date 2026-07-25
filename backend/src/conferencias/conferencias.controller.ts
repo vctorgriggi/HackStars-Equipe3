@@ -67,8 +67,9 @@ export class ConferenciasController {
   })
   @ApiUnprocessableEntityResponse({
     description:
-      'payloadQr ilegivel/somente-codigo, etapa-desconhecida ou ' +
-      'projeto-modelo-indeterminado.',
+      'payloadQr ilegivel/somente-codigo, etapa-desconhecida, ' +
+      'projeto-modelo-indeterminado ou etapa-sem-campos-conferiveis. ' +
+      'Todos saem antes da primeira escrita: 422 nunca deixa peca orfa.',
   })
   executar(@Body() executarConferenciaDto: ExecutarConferenciaDto) {
     return this.conferenciaExecucaoService.executar(executarConferenciaDto);
@@ -79,15 +80,19 @@ export class ConferenciasController {
   @ApiCreatedResponse({
     description:
       'Mesma conferencia do POST /executar, mas as leituras vem da VISAO: ' +
-      'cada FotoEvidencia informada e lida do storage e enviada uma unica ' +
-      'vez ao extrator ativo (EXTRACTOR_DRIVER). A resposta acrescenta ' +
-      '`extracao` (driver, fotos, leiturasProduzidas); o veredito continua ' +
-      'nascendo na engine.',
+      'so as fotos cuja fonte fisica tem campo no recorte da etapa sao lidas ' +
+      'do storage e enviadas uma unica vez ao extrator ativo ' +
+      '(EXTRACTOR_DRIVER). A resposta acrescenta `extracao` (driver, fotos, ' +
+      'leiturasProduzidas, fotosForaDoRecorte); as fotos usadas ficam ' +
+      'vinculadas a conferencia criada, e o veredito continua nascendo na ' +
+      'engine.',
   })
   @ApiUnprocessableEntityResponse({
     description:
       'payloadQr ilegivel/somente-codigo, etapa-desconhecida, ' +
-      'projeto-modelo-indeterminado ou foto-evidencia-inexistente.',
+      'projeto-modelo-indeterminado, etapa-sem-campos-conferiveis, ' +
+      'foto-evidencia-inexistente ou foto-evidencia-de-outra-conferencia. ' +
+      'Todos sao avaliados ANTES de qualquer chamada paga de visao.',
   })
   executarComFotos(@Body() executarComFotosDto: ExecutarComFotosDto) {
     return this.conferenciaExtracaoService.executarComFotos(

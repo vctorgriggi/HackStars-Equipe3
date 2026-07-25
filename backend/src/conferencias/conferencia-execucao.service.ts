@@ -69,6 +69,29 @@ export interface ResultadoExecucao {
   campos: CampoExecutado[];
 }
 
+/**
+ * Tudo que a execução consegue resolver SEM escrever nada e SEM pagar visão:
+ * QR, etapa, projeto/checklist e o recorte da etapa. Existe para ser
+ * compartilhado — o fluxo com fotos (`ConferenciaExtracaoService`) prepara uma
+ * vez, filtra as fotos por este mesmo recorte e devolve o contexto ao
+ * `executar`, em vez de resolver projeto por regra própria (achado 12 da
+ * revisão) e descobrir o 422 de etapa só depois de N chamadas de Textract
+ * (achado 4).
+ */
+export interface ContextoExecucao {
+  payload: PayloadEtiqueta;
+  /** Etapa do request já resolvida; null quando a request não fixa etapa. */
+  checkpoint: Checkpoint | null;
+  projetoModelo: ProjetoModelo;
+  /** Checklist do projeto JÁ recortada pela etapa; nunca vazia. */
+  checklist: ItemChecklist[];
+  /**
+   * Peça já cadastrada — find SEM create (leitura pura). `null` significa
+   * "ainda não existe"; quem cria é o `executar`, depois de todos os 422.
+   */
+  transformadorExistente: Transformador | null;
+}
+
 /** O que o filtro por etapa devolve: o recorte + o que precisou ser relevado. */
 export interface RecorteDaEtapa {
   itens: ItemChecklist[];
@@ -226,29 +249,33 @@ export class ConferenciaExecucaoService {
   ) {}
 
   /**
-   * Costura da conferencia: QR -> peca -> projeto/checklist -> engine ->
-   * persistencia. O veredito nasce aqui dentro (engine) e so daqui vai para o
-   * banco; nenhuma borda HTTP consegue escreve-lo.
+   * Resolve, sem escrever nada, tudo que pode devolver 422: QR, etapa, projeto
+   * e recorte da checklist. É a ÚNICA regra de resolução de ProjetoModelo do
+   * sistema (achado 12) e o único lugar que decide o recorte da etapa —
+   * `executarComFotos` chama isto antes de mandar qualquer byte para a visão.
+   *
+   * Nenhuma escrita aqui, nem o find-or-create da peça: um 422 de recorte
+   * vazio deixava transformador criado no banco (achado 8), contradizendo a
+   * promessa de "etapa resolvida antes de qualquer escrita". O vínculo peça →
+   * projeto entra na cascata como LEITURA (find sem create).
    */
-  async executar(dto: ExecutarConferenciaDto): Promise<ResultadoExecucao> {
+  async prepararExecucao(dto: {
+    payloadQr: string;
+    etapaCodigo?: string;
+  }): Promise<ContextoExecucao> {
     const payload = this.lerPayload(dto.payloadQr);
 
     // Etapa e resolvida antes de qualquer escrita: codigo desconhecido nao
     // pode deixar transformador orfao no banco.
     const checkpoint = await this.resolverCheckpoint(dto.etapaCodigo);
 
-    const transformador = await this.buscarOuCriarTransformador(payload);
+    const transformadorExistente =
+      await this.transformadorService.findByNumeroSerie(payload.numeroSerie);
+
     const projetoModelo = await this.resolverProjetoModelo(
       payload,
-      transformador,
+      transformadorExistente,
     );
-
-    if (!transformador.projetoModelo) {
-      await this.transformadorService.update(transformador.id, {
-        projetoModelo: { id: projetoModelo.id },
-      });
-      transformador.projetoModelo = projetoModelo;
-    }
 
     const checklistCompleta = this.lerChecklist(projetoModelo);
     // Conferencia PARCIAL por etapa: no gate da adesivacao a placa ainda nem
@@ -261,6 +288,45 @@ export class ConferenciaExecucaoService {
       checkpoint,
       projetoModelo,
     );
+
+    return {
+      payload,
+      checkpoint,
+      projetoModelo,
+      checklist,
+      transformadorExistente,
+    };
+  }
+
+  /**
+   * Costura da conferencia: QR -> peca -> projeto/checklist -> engine ->
+   * persistencia. O veredito nasce aqui dentro (engine) e so daqui vai para o
+   * banco; nenhuma borda HTTP consegue escreve-lo.
+   *
+   * `contexto` só é passado por quem JÁ chamou `prepararExecucao` com o MESMO
+   * `payloadQr`/`etapaCodigo` (hoje, o fluxo com fotos): reaproveitar evita a
+   * dupla leitura de projeto/checklist e garante que a visão leu exatamente a
+   * checklist que a engine vai avaliar.
+   */
+  async executar(
+    dto: ExecutarConferenciaDto,
+    contexto?: ContextoExecucao,
+  ): Promise<ResultadoExecucao> {
+    const preparado = contexto ?? (await this.prepararExecucao(dto));
+    const { payload, checkpoint, projetoModelo, checklist } = preparado;
+
+    // Primeira escrita do fluxo: daqui para baixo, nenhum 422.
+    const transformador = await this.buscarOuCriarTransformador(
+      payload,
+      preparado.transformadorExistente,
+    );
+
+    if (!transformador.projetoModelo) {
+      await this.transformadorService.update(transformador.id, {
+        projetoModelo: { id: projetoModelo.id },
+      });
+      transformador.projetoModelo = projetoModelo;
+    }
 
     const limiarConfianca = dto.limiarConfianca ?? LIMIAR_CONFIANCA_PADRAO;
     const leituras = dedupeLeituras(
@@ -451,12 +517,15 @@ export class ConferenciaExecucaoService {
     return checkpoint;
   }
 
+  /**
+   * `existente` chega resolvido do `prepararExecucao` (find sem create) — a
+   * criação só acontece aqui, depois de todos os 422 (achado 8). Corrida no
+   * meio do caminho continua coberta pelo retry de unique violation abaixo.
+   */
   private async buscarOuCriarTransformador(
     payload: PayloadEtiqueta,
+    existente: Transformador | null,
   ): Promise<Transformador> {
-    const existente = await this.transformadorService.findByNumeroSerie(
-      payload.numeroSerie,
-    );
     if (existente) {
       // QR é a fonte da verdade (SPEC, constraint 5): se a etiqueta traz
       // dado diferente do registro, o registro é atualizado — antes disso a
@@ -511,10 +580,16 @@ export class ConferenciaExecucaoService {
    * Ordem: codigo do projeto no QR -> vinculo ja existente na peca -> unico
    * projeto cadastrado. Codigo do QR sem cadastro correspondente nao e erro:
    * cai para os proximos criterios.
+   *
+   * `transformador` é `null` quando a peça ainda não existe (primeiro scan) —
+   * a cascata simplesmente pula o critério do vínculo. É a REGRA ÚNICA do
+   * sistema: antes, `executarComFotos` tinha uma cópia sem o critério do
+   * vínculo, e com 2 projetos cadastrados os dois endpoints discordavam
+   * (achado 12).
    */
   private async resolverProjetoModelo(
     payload: PayloadEtiqueta,
-    transformador: Transformador,
+    transformador: Transformador | null,
   ): Promise<ProjetoModelo> {
     if (payload.codigoProjeto) {
       const porCodigo = await this.projetoModeloService.findByCodigo(
@@ -525,7 +600,7 @@ export class ConferenciaExecucaoService {
       }
     }
 
-    if (transformador.projetoModelo) {
+    if (transformador?.projetoModelo) {
       return transformador.projetoModelo;
     }
 
@@ -621,8 +696,7 @@ export function dedupeLeituras(
       candidata.confianca > 0 &&
       candidata.confianca >= limiarConfianca;
     if (valida) {
-      const conjunto =
-        valoresValidos.get(candidata.campo) ?? new Set<string>();
+      const conjunto = valoresValidos.get(candidata.campo) ?? new Set<string>();
       conjunto.add(normalizar(candidata.valorLido as string));
       valoresValidos.set(candidata.campo, conjunto);
     }

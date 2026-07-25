@@ -19,9 +19,12 @@ function leitura(
 }
 
 describe('dedupeLeituras', () => {
-  it('refoto legítima: leitura nula + leitura legível ficam com a legível, sem conflito', () => {
+  it('should refoto legítima: leitura nula + leitura legível ficam com a legível, sem conflito', () => {
     const resultado = dedupeLeituras(
-      [leitura('serie-placa', null, null), leitura('serie-placa', '847833', 0.99)],
+      [
+        leitura('serie-placa', null, null),
+        leitura('serie-placa', '847833', 0.99),
+      ],
       LIMIAR,
     );
 
@@ -30,7 +33,7 @@ describe('dedupeLeituras', () => {
     expect(resultado[0].conflitante).toBeUndefined();
   });
 
-  it('cenário-âncora envenenado: placa real 847833 + etiqueta 847233 lida como placa => conflito', () => {
+  it('should cenário-âncora envenenado: placa real 847833 + etiqueta 847233 lida como placa => conflito', () => {
     const resultado = dedupeLeituras(
       [
         leitura('serie-placa', '847833', 0.998),
@@ -43,7 +46,7 @@ describe('dedupeLeituras', () => {
     expect(resultado[0].conflitante).toBe(true);
   });
 
-  it('empate exato de confiança com valores diferentes é conflito nas DUAS ordens (independe do array)', () => {
+  it('should empate exato de confiança com valores diferentes é conflito nas DUAS ordens (independe do array)', () => {
     const a = [
       leitura('serie-placa', '847233', 0.99),
       leitura('serie-placa', '847833', 0.99),
@@ -56,7 +59,7 @@ describe('dedupeLeituras', () => {
     }
   });
 
-  it('mesmo valor com caixa/espaço diferentes NÃO é conflito (normalização da engine)', () => {
+  it('should mesmo valor com caixa/espaço diferentes NÃO é conflito (normalização da engine)', () => {
     const resultado = dedupeLeituras(
       [
         leitura('cliente-serigrafia', 'ENERGISA', 0.97),
@@ -68,7 +71,7 @@ describe('dedupeLeituras', () => {
     expect(resultado[0].conflitante).toBeUndefined();
   });
 
-  it('leitura abaixo do limiar discordando é ruído: não veta a leitura válida', () => {
+  it('should leitura abaixo do limiar discordando é ruído: não veta a leitura válida', () => {
     const resultado = dedupeLeituras(
       [
         leitura('serie-chumbada-1', '847233', 0.999),
@@ -81,7 +84,7 @@ describe('dedupeLeituras', () => {
     expect(resultado[0].conflitante).toBeUndefined();
   });
 
-  it('conflito em um campo não contamina os demais', () => {
+  it('should conflito em um campo não contamina os demais', () => {
     const resultado = dedupeLeituras(
       [
         leitura('serie-placa', '847833', 0.998),
@@ -103,7 +106,7 @@ describe('engine com leitura conflitante', () => {
     obrigatorio: true,
   };
 
-  it('rebaixa para nao_conferivel MESMO quando a vencedora bate com o esperado', () => {
+  it('should rebaixa para nao_conferivel MESMO quando a vencedora bate com o esperado', () => {
     const resultado = conferir(
       [item],
       { 'serie-placa': '847233' },
@@ -116,7 +119,7 @@ describe('engine com leitura conflitante', () => {
     expect(resultado.vereditoGeral).toBe('nao_conferivel');
   });
 
-  it('ponta a ponta: dedupe envenenado + engine => nunca conforme', () => {
+  it('should ponta a ponta: dedupe envenenado + engine => nunca conforme', () => {
     const leituras = dedupeLeituras(
       [
         leitura('serie-placa', '847833', 0.998),
@@ -124,12 +127,9 @@ describe('engine com leitura conflitante', () => {
       ],
       LIMIAR,
     );
-    const resultado = conferir(
-      [item],
-      { 'serie-placa': '847233' },
-      leituras,
-      { limiarConfianca: LIMIAR },
-    );
+    const resultado = conferir([item], { 'serie-placa': '847233' }, leituras, {
+      limiarConfianca: LIMIAR,
+    });
 
     expect(resultado.campos[0].veredito).toBe('nao_conferivel');
     expect(resultado.vereditoGeral).not.toBe('conforme');

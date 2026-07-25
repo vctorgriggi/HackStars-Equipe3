@@ -1,4 +1,4 @@
-import { UnprocessableEntityException } from '@nestjs/common';
+import { HttpStatus, UnprocessableEntityException } from '@nestjs/common';
 
 import { criarExtractor } from '../extracao/adapters/extractor.factory';
 import {
@@ -13,30 +13,39 @@ import {
   LeituraExtraida,
 } from '../extracao/ports/extractor.port';
 import { FileDriver } from '../files/config/file-config.type';
+import { FotoEvidencia } from '../fotos-evidencia/domain/foto-evidencia';
 import {
   ConteudoEvidencia,
   ehCaminhoDeDisco,
   FotosEvidenciaService,
 } from '../fotos-evidencia/fotos-evidencia.service';
 import { ProjetoModelo } from '../projetos-modelo/domain/projeto-modelo';
-import { ProjetosModeloService } from '../projetos-modelo/projetos-modelo.service';
 
 import {
   ConferenciaExecucaoService,
+  ContextoExecucao,
   ResultadoExecucao,
 } from './conferencia-execucao.service';
 import { ConferenciaExtracaoService } from './conferencia-extracao.service';
+import { ConferenciasService } from './conferencias.service';
+import { Conferencia } from './domain/conferencia';
 import { ExecutarConferenciaDto } from './dto/executar-conferencia.dto';
+import { ItemChecklist } from './engine/tipos';
 
 // Nota de lint: a regra `no-restricted-syntax` do projeto exige que todo `it`
 // comece com "should"; o restante da frase segue o vocabulario de dominio.
 //
 // Nenhum teste desta suite toca AWS, disco ou banco: FotosEvidenciaService,
-// ProjetosModeloService e ConferenciaExecucaoService entram dublados, e a
-// visao roda pelo MockExtractor (driver default do projeto).
+// ConferenciasService e ConferenciaExecucaoService entram dublados, e a visao
+// roda pelo MockExtractor (driver default do projeto).
+//
+// O que esta suite protege: a ORDEM do fluxo com fotos. Todo 422 barato
+// (payload, etapa, projeto, recorte, lote de evidencias) tem de acontecer
+// ANTES de qualquer chamada paga de visao, e a evidencia usada tem de acabar
+// amarrada a conferencia que ela lastreia.
 
 /** Checklist do desenho da peca de demo (EPT-163-PI-676), como no seed. */
-const CHECKLIST = [
+const CHECKLIST: ItemChecklist[] = [
   { campo: 'serie-chumbada-1', fonteFisica: 'chumbado-1', obrigatorio: true },
   { campo: 'serie-chumbada-2', fonteFisica: 'chumbado-2', obrigatorio: true },
   { campo: 'serie-chumbada-3', fonteFisica: 'chumbado-3', obrigatorio: true },
@@ -49,6 +58,11 @@ const CHECKLIST = [
   },
   { campo: 'cliente-serigrafia', fonteFisica: 'serigrafia', obrigatorio: true },
 ];
+
+/** Recorte do gate da adesivacao: so as series chumbadas existem na peca. */
+const RECORTE_ADESIVACAO = CHECKLIST.filter((item) =>
+  item.fonteFisica.startsWith('chumbado'),
+);
 
 const PROJETO_MODELO: ProjetoModelo = {
   id: 'projeto-1',
@@ -69,6 +83,9 @@ const PAYLOAD_QR = JSON.stringify({
 
 const ID_PLACA = '11111111-1111-4111-8111-111111111111';
 const ID_SERIGRAFIA = '22222222-2222-4222-8222-222222222222';
+const ID_CHUMBADO = '44444444-4444-4444-8444-444444444444';
+
+const CONFERENCIA_CRIADA = { id: 'conferencia-1' } as Conferencia;
 
 interface Chamada {
   fonteFisica: string;
@@ -99,35 +116,107 @@ class ExtractorEspiao extends ExtractorPort {
   }
 }
 
-function conteudo(fonteFisica: string): ConteudoEvidencia {
+function foto(
+  id: string,
+  fonteFisica: string,
+  conferencia: Conferencia | null = null,
+): FotoEvidencia {
   return {
-    buffer: Buffer.from(`bytes-${fonteFisica}`),
-    mimeType: 'image/jpeg',
+    id,
+    url: `${id}.jpg`,
     fonteFisica,
+    conferencia,
+    createdAt: new Date(),
+    updatedAt: new Date(),
   };
 }
+
+const EVIDENCIAS_PADRAO: Record<string, FotoEvidencia | null> = {
+  [ID_PLACA]: foto(ID_PLACA, 'placa'),
+  [ID_SERIGRAFIA]: foto(ID_SERIGRAFIA, 'serigrafia'),
+};
 
 interface Bancada {
   service: ConferenciaExtracaoService;
   espiao: ExtractorEspiao;
-  executar: jest.Mock<Promise<ResultadoExecucao>, [ExecutarConferenciaDto]>;
-  lerConteudo: jest.Mock<Promise<ConteudoEvidencia | null>, [string]>;
+  prepararExecucao: jest.Mock<Promise<ContextoExecucao>, [unknown]>;
+  executar: jest.Mock<
+    Promise<ResultadoExecucao>,
+    [ExecutarConferenciaDto, ContextoExecucao?]
+  >;
+  findById: jest.Mock<Promise<FotoEvidencia | null>, [string]>;
+  lerConteudoDe: jest.Mock<Promise<ConteudoEvidencia>, [FotoEvidencia]>;
+  vincularAConferencia: jest.Mock<Promise<number>, [string[], Conferencia]>;
+  /** Ordem global das operacoes observaveis, para asserir "antes da visao". */
+  trilha: string[];
 }
 
 function montarBancada(
-  evidencias: Record<string, ConteudoEvidencia | null> = {
-    [ID_PLACA]: conteudo('placa'),
-    [ID_SERIGRAFIA]: conteudo('serigrafia'),
-  },
-  extractor: ExtractorPort = new ExtractorEspiao(),
+  opcoes: {
+    evidencias?: Record<string, FotoEvidencia | null>;
+    extractor?: ExtractorPort;
+    checklist?: ItemChecklist[];
+    checkpointCodigo?: string;
+    erroNaPreparacao?: unknown;
+  } = {},
 ): Bancada {
-  const lerConteudo = jest.fn((id: string) =>
+  const evidencias = opcoes.evidencias ?? EVIDENCIAS_PADRAO;
+  const extractor = opcoes.extractor ?? new ExtractorEspiao();
+  const trilha: string[] = [];
+
+  const findById = jest.fn((id: string) =>
     Promise.resolve(evidencias[id] ?? null),
   );
 
+  const lerConteudoDe = jest.fn((registro: FotoEvidencia) => {
+    trilha.push(`bytes:${registro.fonteFisica}`);
+    return Promise.resolve({
+      buffer: Buffer.from(`bytes-${registro.fonteFisica}`),
+      mimeType: 'image/jpeg',
+      fonteFisica: registro.fonteFisica,
+    });
+  });
+
+  const vincularAConferencia = jest.fn<
+    Promise<number>,
+    [string[], Conferencia]
+  >((ids) => {
+    trilha.push(`vinculo:${ids.length}`);
+    return Promise.resolve(ids.length);
+  });
+
+  const contexto: ContextoExecucao = {
+    payload: {
+      numeroSerie: '847233',
+      patrimonio: '251328',
+      cliente: 'Energisa',
+    } as ContextoExecucao['payload'],
+    checkpoint: opcoes.checkpointCodigo
+      ? {
+          id: 'checkpoint-1',
+          codigo: opcoes.checkpointCodigo,
+          nome: opcoes.checkpointCodigo,
+          ordem: 1,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }
+      : null,
+    projetoModelo: PROJETO_MODELO,
+    checklist: opcoes.checklist ?? CHECKLIST,
+    transformadorExistente: null,
+  };
+
+  const prepararExecucao = jest.fn<Promise<ContextoExecucao>, [unknown]>(() => {
+    trilha.push('preparacao');
+    if (opcoes.erroNaPreparacao) {
+      return Promise.reject(opcoes.erroNaPreparacao);
+    }
+    return Promise.resolve(contexto);
+  });
+
   const resultadoExecucao: ResultadoExecucao = {
     conferencia: {
-      id: 'conferencia-1',
+      id: CONFERENCIA_CRIADA.id,
       vereditoGeral: 'divergente',
       createdAt: new Date(),
       checkpoint: null,
@@ -140,40 +229,57 @@ function montarBancada(
       projetoModeloCodigo: 'EPT-163-PI-676',
     },
     etapaAvaliada: null,
-    camposAvaliados: CHECKLIST.length,
+    camposAvaliados: contexto.checklist.length,
     campos: [],
   };
 
   const executar = jest.fn<
     Promise<ResultadoExecucao>,
-    [ExecutarConferenciaDto]
-  >(() => Promise.resolve(resultadoExecucao));
-
-  const projetoModeloService = {
-    findByCodigo: jest.fn(() => Promise.resolve(PROJETO_MODELO)),
-    findAll: jest.fn(() => Promise.resolve([PROJETO_MODELO])),
-  } as unknown as ProjetosModeloService;
+    [ExecutarConferenciaDto, ContextoExecucao?]
+  >(() => {
+    trilha.push('executar');
+    return Promise.resolve(resultadoExecucao);
+  });
 
   const service = new ConferenciaExtracaoService(
-    { lerConteudo } as unknown as FotosEvidenciaService,
-    projetoModeloService,
+    {
+      findById,
+      lerConteudoDe,
+      vincularAConferencia,
+    } as unknown as FotosEvidenciaService,
+    {
+      findById: jest.fn(() => Promise.resolve(CONFERENCIA_CRIADA)),
+    } as unknown as ConferenciasService,
     new ExtracaoService(extractor),
-    { executar } as unknown as ConferenciaExecucaoService,
+    { prepararExecucao, executar } as unknown as ConferenciaExecucaoService,
   );
+
+  const espiao = extractor as ExtractorEspiao;
+  const registrarChamada = espiao.extrair.bind(espiao);
+  espiao.extrair = (fonte: FonteImagem, alvos: CampoAlvo[]) => {
+    trilha.push(`visao:${fonte.fonteFisica}`);
+    return registrarChamada(fonte, alvos);
+  };
 
   return {
     service,
-    espiao: extractor as ExtractorEspiao,
+    espiao,
+    prepararExecucao,
     executar,
-    lerConteudo,
+    findById,
+    lerConteudoDe,
+    vincularAConferencia,
+    trilha,
   };
 }
 
 describe('ConferenciaExtracaoService — visao plugada no fluxo', () => {
   it('should recusar com 422 quando a foto informada nao existe', async () => {
     const { service, espiao, executar } = montarBancada({
-      [ID_PLACA]: conteudo('placa'),
-      [ID_SERIGRAFIA]: null,
+      evidencias: {
+        [ID_PLACA]: foto(ID_PLACA, 'placa'),
+        [ID_SERIGRAFIA]: null,
+      },
     });
 
     await expect(
@@ -189,7 +295,7 @@ describe('ConferenciaExtracaoService — visao plugada no fluxo', () => {
   });
 
   it('should apontar no erro qual foto nao existe', async () => {
-    const { service } = montarBancada({ [ID_PLACA]: null });
+    const { service } = montarBancada({ evidencias: { [ID_PLACA]: null } });
 
     await expect(
       service.executarComFotos({
@@ -224,14 +330,14 @@ describe('ConferenciaExtracaoService — visao plugada no fluxo', () => {
   });
 
   it('should chamar a visao uma vez so quando o mesmo id vem repetido', async () => {
-    const { service, espiao, lerConteudo } = montarBancada();
+    const { service, espiao, findById } = montarBancada();
 
     await service.executarComFotos({
       payloadQr: PAYLOAD_QR,
       fotoEvidenciaIds: [ID_PLACA, ID_PLACA],
     });
 
-    expect(lerConteudo).toHaveBeenCalledTimes(1);
+    expect(findById).toHaveBeenCalledTimes(1);
     expect(espiao.chamadas).toHaveLength(1);
   });
 
@@ -284,6 +390,7 @@ describe('ConferenciaExtracaoService — visao plugada no fluxo', () => {
       driver: 'mock',
       fotos: 2,
       leiturasProduzidas: 4,
+      fotosForaDoRecorte: 0,
     });
   });
 
@@ -294,13 +401,9 @@ describe('ConferenciaExtracaoService — visao plugada no fluxo', () => {
     delete process.env.EXTRACTOR_DRIVER;
 
     try {
-      const { service, executar } = montarBancada(
-        {
-          [ID_PLACA]: conteudo('placa'),
-          [ID_SERIGRAFIA]: conteudo('serigrafia'),
-        },
-        criarExtractor(),
-      );
+      const { service, executar } = montarBancada({
+        extractor: criarExtractor(),
+      });
 
       const resultado = await service.executarComFotos({
         payloadQr: PAYLOAD_QR,
@@ -332,7 +435,7 @@ describe('ConferenciaExtracaoService — visao plugada no fluxo', () => {
     // continua e a engine devolve nao_conferivel — nunca conforme.
     const ID_GERAL = '33333333-3333-4333-8333-333333333333';
     const { service, espiao, executar } = montarBancada({
-      [ID_GERAL]: conteudo('geral'),
+      evidencias: { [ID_GERAL]: foto(ID_GERAL, 'geral') },
     });
 
     await service.executarComFotos({
@@ -344,50 +447,252 @@ describe('ConferenciaExtracaoService — visao plugada no fluxo', () => {
     expect(executar).toHaveBeenCalledTimes(1);
     expect(executar.mock.calls[0][0].leituras).toEqual([]);
   });
+});
 
-  it('should recusar com 422 payload de QR ilegivel antes de chamar a visao', async () => {
-    const { service, espiao, lerConteudo } = montarBancada();
+describe('ConferenciaExtracaoService — 422 barato antes da visao (achado 4)', () => {
+  it('should recusar etapa invalida sem ler bytes nem chamar o extractor', async () => {
+    // '?etapa=Serigrafia' com S maiusculo: antes da correcao, as N chamadas de
+    // Textract eram pagas e so entao vinha o 422.
+    const { service, espiao, findById, lerConteudoDe, executar } =
+      montarBancada({
+        erroNaPreparacao: new UnprocessableEntityException({
+          status: HttpStatus.UNPROCESSABLE_ENTITY,
+          errors: { etapaCodigo: 'etapa-desconhecida: Serigrafia' },
+        }),
+      });
 
     await expect(
       service.executarComFotos({
-        payloadQr: '   ',
-        fotoEvidenciaIds: [ID_PLACA],
+        payloadQr: PAYLOAD_QR,
+        etapaCodigo: 'Serigrafia',
+        fotoEvidenciaIds: [ID_PLACA, ID_SERIGRAFIA],
       }),
-    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    ).rejects.toMatchObject({
+      response: { errors: { etapaCodigo: 'etapa-desconhecida: Serigrafia' } },
+    });
 
-    expect(lerConteudo).not.toHaveBeenCalled();
+    expect(findById).not.toHaveBeenCalled();
+    expect(lerConteudoDe).not.toHaveBeenCalled();
     expect(espiao.chamadas).toHaveLength(0);
+    expect(executar).not.toHaveBeenCalled();
   });
 
-  it('should recusar com 422 payload que so traz codigo de lookup', async () => {
-    const { service, espiao } = montarBancada();
+  it('should recusar recorte vazio sem chamar o extractor', async () => {
+    const { service, espiao, executar } = montarBancada({
+      erroNaPreparacao: new UnprocessableEntityException({
+        status: HttpStatus.UNPROCESSABLE_ENTITY,
+        errors: {
+          etapaCodigo: 'etapa-sem-campos-conferiveis: nenhum item da checklist',
+        },
+      }),
+    });
 
     await expect(
       service.executarComFotos({
-        payloadQr: 'TPD-408136',
+        payloadQr: PAYLOAD_QR,
+        etapaCodigo: 'adesivacao',
         fotoEvidenciaIds: [ID_PLACA],
       }),
     ).rejects.toMatchObject({
       response: {
         errors: {
-          payloadQr:
-            'payload-somente-codigo: lookup nao suportado nesta rodada',
+          etapaCodigo: expect.stringContaining('etapa-sem-campos-conferiveis'),
         },
       },
     });
 
     expect(espiao.chamadas).toHaveLength(0);
+    expect(executar).not.toHaveBeenCalled();
+  });
+
+  it('should preparar a conferencia antes de ler o primeiro byte', async () => {
+    const { service, trilha } = montarBancada();
+
+    await service.executarComFotos({
+      payloadQr: PAYLOAD_QR,
+      fotoEvidenciaIds: [ID_PLACA],
+    });
+
+    expect(trilha).toEqual([
+      'preparacao',
+      'bytes:placa',
+      'visao:placa',
+      'executar',
+      'vinculo:1',
+    ]);
+  });
+
+  it('should reutilizar no executar o MESMO contexto que guiou a visao', async () => {
+    // Achado 12: a extracao lia a checklist por regra propria e a engine
+    // avaliava outra resolucao de projeto. Agora e um contexto so.
+    const { service, prepararExecucao, executar } = montarBancada();
+
+    await service.executarComFotos({
+      payloadQr: PAYLOAD_QR,
+      etapaCodigo: 'fixacao-placa',
+      fotoEvidenciaIds: [ID_PLACA],
+    });
+
+    expect(prepararExecucao).toHaveBeenCalledTimes(1);
+    expect(prepararExecucao).toHaveBeenCalledWith({
+      payloadQr: PAYLOAD_QR,
+      etapaCodigo: 'fixacao-placa',
+    });
+
+    const contextoPreparado = await prepararExecucao.mock.results[0].value;
+    expect(executar.mock.calls[0][1]).toBe(contextoPreparado);
+  });
+});
+
+describe('ConferenciaExtracaoService — recorte da etapa filtra as fotos (achado 5)', () => {
+  it('should nao pagar visao por foto cuja fonte esta fora do recorte', async () => {
+    // Gate da adesivacao: so as series chumbadas existem na peca. A foto da
+    // placa nao vira chamada — a engine descartaria a leitura de qualquer jeito.
+    const { service, espiao, lerConteudoDe } = montarBancada({
+      evidencias: {
+        [ID_CHUMBADO]: foto(ID_CHUMBADO, 'chumbado-1'),
+        [ID_PLACA]: foto(ID_PLACA, 'placa'),
+      },
+      checklist: RECORTE_ADESIVACAO,
+      checkpointCodigo: 'adesivacao',
+    });
+
+    await service.executarComFotos({
+      payloadQr: PAYLOAD_QR,
+      etapaCodigo: 'adesivacao',
+      fotoEvidenciaIds: [ID_CHUMBADO, ID_PLACA],
+    });
+
+    expect(espiao.chamadas.map((chamada) => chamada.fonteFisica)).toEqual([
+      'chumbado-1',
+    ]);
+    // Byte de foto fora do recorte nem sai do storage.
+    expect(lerConteudoDe).toHaveBeenCalledTimes(1);
+  });
+
+  it('should contar no resumo so o que foi de fato enviado a visao', async () => {
+    const { service } = montarBancada({
+      evidencias: {
+        [ID_CHUMBADO]: foto(ID_CHUMBADO, 'chumbado-1'),
+        [ID_PLACA]: foto(ID_PLACA, 'placa'),
+        [ID_SERIGRAFIA]: foto(ID_SERIGRAFIA, 'serigrafia'),
+      },
+      checklist: RECORTE_ADESIVACAO,
+      checkpointCodigo: 'adesivacao',
+    });
+
+    const resultado = await service.executarComFotos({
+      payloadQr: PAYLOAD_QR,
+      etapaCodigo: 'adesivacao',
+      fotoEvidenciaIds: [ID_CHUMBADO, ID_PLACA, ID_SERIGRAFIA],
+    });
+
+    expect(resultado.extracao.fotos).toBe(1);
+    expect(resultado.extracao.fotosForaDoRecorte).toBe(2);
+  });
+});
+
+describe('ConferenciaExtracaoService — evidencia amarrada a conferencia (achado 6)', () => {
+  it('should recusar foto que ja pertence a OUTRA conferencia, antes da visao', async () => {
+    const { service, espiao, lerConteudoDe, executar } = montarBancada({
+      evidencias: {
+        [ID_PLACA]: foto(ID_PLACA, 'placa', {
+          id: 'conferencia-de-outra-peca',
+        } as Conferencia),
+      },
+    });
+
+    await expect(
+      service.executarComFotos({
+        payloadQr: PAYLOAD_QR,
+        fotoEvidenciaIds: [ID_PLACA],
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        errors: {
+          fotoEvidenciaIds: `foto-evidencia-de-outra-conferencia: ${ID_PLACA}`,
+        },
+      },
+    });
+
+    expect(lerConteudoDe).not.toHaveBeenCalled();
+    expect(espiao.chamadas).toHaveLength(0);
+    expect(executar).not.toHaveBeenCalled();
+  });
+
+  it('should vincular a conferencia criada as fotos usadas', async () => {
+    const { service, vincularAConferencia } = montarBancada();
+
+    await service.executarComFotos({
+      payloadQr: PAYLOAD_QR,
+      fotoEvidenciaIds: [ID_PLACA, ID_SERIGRAFIA],
+    });
+
+    expect(vincularAConferencia).toHaveBeenCalledTimes(1);
+    expect(vincularAConferencia.mock.calls[0][0]).toEqual([
+      ID_PLACA,
+      ID_SERIGRAFIA,
+    ]);
+    expect(vincularAConferencia.mock.calls[0][1]).toBe(CONFERENCIA_CRIADA);
+  });
+
+  it('should vincular so o que lastreou campo, deixando solta a foto fora do recorte', async () => {
+    // A foto da placa segue reutilizavel no gate em que a placa passa a
+    // existir na peca — ela nao lastreou campo nenhum aqui.
+    const { service, vincularAConferencia } = montarBancada({
+      evidencias: {
+        [ID_CHUMBADO]: foto(ID_CHUMBADO, 'chumbado-1'),
+        [ID_PLACA]: foto(ID_PLACA, 'placa'),
+      },
+      checklist: RECORTE_ADESIVACAO,
+      checkpointCodigo: 'adesivacao',
+    });
+
+    await service.executarComFotos({
+      payloadQr: PAYLOAD_QR,
+      etapaCodigo: 'adesivacao',
+      fotoEvidenciaIds: [ID_CHUMBADO, ID_PLACA],
+    });
+
+    expect(vincularAConferencia.mock.calls[0][0]).toEqual([ID_CHUMBADO]);
+  });
+
+  it('should vincular so DEPOIS de a conferencia existir', async () => {
+    const { service, trilha } = montarBancada();
+
+    await service.executarComFotos({
+      payloadQr: PAYLOAD_QR,
+      fotoEvidenciaIds: [ID_PLACA],
+    });
+
+    expect(trilha.indexOf('vinculo:1')).toBeGreaterThan(
+      trilha.indexOf('executar'),
+    );
+  });
+
+  it('should devolver o veredito mesmo se o vinculo da evidencia falhar', async () => {
+    // O veredito ja esta gravado e e o produto do endpoint: derrubar a
+    // resposta aqui perderia o resultado de uma visao ja paga.
+    const { service, vincularAConferencia } = montarBancada();
+    vincularAConferencia.mockRejectedValueOnce(new Error('banco fora do ar'));
+
+    const resultado = await service.executarComFotos({
+      payloadQr: PAYLOAD_QR,
+      fotoEvidenciaIds: [ID_PLACA],
+    });
+
+    expect(resultado.conferencia.id).toBe('conferencia-1');
   });
 });
 
 // Vive nesta suite (e nao numa de fotos-evidencia) porque so existe para servir
 // a extracao: e o que decide de onde vem o byte que a visao vai ler.
 describe('ehCaminhoDeDisco — origem dos bytes da evidencia', () => {
-  it('should ler do disco tudo enquanto o driver for local', () => {
+  it('should ler do disco o caminho servido pelo modulo de files', () => {
     expect(ehCaminhoDeDisco('/api/v1/files/abc.jpg', FileDriver.LOCAL)).toBe(
       true,
     );
-    expect(ehCaminhoDeDisco('c3ff4dbbf11b.jpg', FileDriver.LOCAL)).toBe(true);
+    expect(ehCaminhoDeDisco('files/abc.jpg', FileDriver.LOCAL)).toBe(true);
   });
 
   it('should ler do disco a evidencia anterior a virada para s3', () => {
@@ -406,5 +711,22 @@ describe('ehCaminhoDeDisco — origem dos bytes da evidencia', () => {
     expect(
       ehCaminhoDeDisco('c3ff4dbbf11b6d84e39.jpg', FileDriver.S3_PRESIGNED),
     ).toBe(false);
+  });
+
+  it('should tratar key de bucket como s3 mesmo sob FILE_DRIVER=local', () => {
+    // Achado 13: dev local apontando para o RDS (cenario documentado) tem o
+    // banco cheio de key S3; mandar hash chapado para o readFile e 500 certo.
+    expect(ehCaminhoDeDisco('c3ff4dbbf11b.jpg', FileDriver.LOCAL)).toBe(false);
+  });
+
+  it('should deixar o driver desempatar so a forma ambigua de verdade', () => {
+    // Caminho com diretorio que NAO e a pasta servida pelo modulo de files:
+    // key com prefixo (s3) x caminho customizado (disco).
+    expect(ehCaminhoDeDisco('evidencias/2026/abc.jpg', FileDriver.LOCAL)).toBe(
+      true,
+    );
+    expect(ehCaminhoDeDisco('evidencias/2026/abc.jpg', FileDriver.S3)).toBe(
+      false,
+    );
   });
 });

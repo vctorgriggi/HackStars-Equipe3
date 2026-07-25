@@ -101,16 +101,26 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
   (valores/confiança/foto) de um veredito já emitido falsificaria a trilha de
   auditoria (revisão R1). Comparação usa Unicode NFC; confiança <= 0 nunca é
   lastro, mesmo com limiar 0.
-- Fluxo do endpoint `POST /conferencias/executar`: parse do QR → find-or-create
-  por numeroSerie → ProjetoModelo (codigoProjeto do QR → vínculo da peça →
-  único do banco) → checklist → engine → persistência. Checkpoint resolve
-  ANTES de qualquer escrita. Com `etapaCodigo`, a checklist é recortada por
-  etapa (semântica CUMULATIVA: a etapa N confere o que ela e as anteriores
-  gravaram); recorte vazio → 422 `etapa-sem-campos-conferiveis`.
-- `POST /conferencias/executar-com-fotos` é a variante com visão real: lê os
-  bytes das FotoEvidencia (S3 ou disco), chama o ExtractorPort e delega o
-  veredito ao MESMO `executar()` — nunca duplique a orquestração; a extração
-  só produz leituras, quem compara continua sendo a engine.
+- Fluxo do endpoint `POST /conferencias/executar`: `prepararExecucao()` (parse
+  do QR → checkpoint → ProjetoModelo → checklist → recorte da etapa) e SÓ
+  DEPOIS find-or-create por numeroSerie → engine → persistência. Toda a fase
+  barata é read-only: nenhum 422 (etapa desconhecida, projeto indeterminado,
+  recorte vazio) pode deixar peça órfã no banco. Com `etapaCodigo`, a checklist
+  é recortada por etapa (semântica CUMULATIVA: a etapa N confere o que ela e as
+  anteriores gravaram); recorte vazio → 422 `etapa-sem-campos-conferiveis`.
+- `ConferenciaExecucaoService.prepararExecucao` é a resolução ÚNICA de
+  ProjetoModelo (codigoProjeto do QR → vínculo da peça → único do banco) e do
+  recorte por etapa. Quem precisar da checklist antes do veredito chama ela e
+  passa o `ContextoExecucao` de volta ao `executar()` — duas resoluções
+  independentes já divergiram (a extração lia a checklist de um projeto e a
+  engine avaliava outro).
+- `POST /conferencias/executar-com-fotos` é a variante com visão real: prepara
+  primeiro (todo 422 antes de gastar), manda ao ExtractorPort só as fotos cuja
+  `fonteFisica` tem campo NO RECORTE da etapa, e delega o veredito ao MESMO
+  `executar()` — nunca duplique a orquestração; a extração só produz leituras,
+  quem compara continua sendo a engine. As fotos efetivamente usadas ficam
+  vinculadas à conferência depois que ela é criada (foto já presa a outra
+  conferência → 422 `foto-evidencia-de-outra-conferencia`, antes da visão).
 - A lista de campos a conferir também é parâmetro — o chamador a carrega da
   checklist do ProjetoModelo da peça (seed da demo: EPT-163-PI-676). Serigrafia
   varia por cliente/modelo; lista hardcoded geraria falso conforme para outros
@@ -231,6 +241,21 @@ do hackathon:
 13. Página `/demo` (src/demo) é ferramenta temporária de inspeção servida pela
     API, com credenciais do admin seed pré-preenchidas — remover antes de
     qualquer uso fora do hackathon.
+14. Conferência parcial persiste `vereditoGeral` sem marca de cobertura: a
+    resposta diz `etapaAvaliada`/`camposAvaliados`, mas a linha gravada em
+    `conferencia` não distingue "conforme na peça inteira" de "conforme no
+    gate da adesivação" (3 chumbados, placa jamais conferida). Consequência:
+    "última conferência conforme" NÃO é atestado de peça completa — T4.3
+    (alerta) e T5.1 (dashboard) precisam ler a etapa junto do veredito.
+    Persistir a cobertura (flag de conferência completa, ou contagem de campos
+    do recorte × total da checklist) fica para a Fase 4.
+15. `Checkpoint.ordem` sem unique e editável pelo CRUD — e a semântica
+    cumulativa do recorte depende inteiramente dela: remanejar a ordem
+    reescreve, retroativamente, o que cada gate confere (e duas etapas com a
+    mesma ordem tornam o recorte ambíguo). Paliativo: as ordens vêm de seed
+    fixo e a UI não expõe edição de checkpoint. Unique em `ordem` + política de
+    reordenação (renumerar em transação, ou ordem imutável com posição
+    derivada) ficam para a rodada de produção.
 
 ## Decisões em aberto
 

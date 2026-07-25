@@ -2,31 +2,23 @@ import {
   // common
   HttpStatus,
   Injectable,
-  InternalServerErrorException,
   Logger,
   UnprocessableEntityException,
 } from '@nestjs/common';
 
 import { ExtracaoService } from '../extracao/extracao.service';
 import { FonteImagem, LeituraExtraida } from '../extracao/ports/extractor.port';
+import { FotoEvidencia } from '../fotos-evidencia/domain/foto-evidencia';
 import { FotosEvidenciaService } from '../fotos-evidencia/fotos-evidencia.service';
-import { ProjetoModelo } from '../projetos-modelo/domain/projeto-modelo';
-import { ProjetosModeloService } from '../projetos-modelo/projetos-modelo.service';
-
-import {
-  PayloadInvalidoError,
-  ResultadoParse,
-} from '../transformadores/qr/payload-etiqueta';
-import { parsePayloadEtiqueta } from '../transformadores/qr/qr-payload.parser';
 
 import {
   ConferenciaExecucaoService,
-  ehItemChecklist,
+  ContextoExecucao,
   ResultadoExecucao,
 } from './conferencia-execucao.service';
+import { ConferenciasService } from './conferencias.service';
 import { ExecutarComFotosDto } from './dto/executar-com-fotos.dto';
 import { LeituraCampoDto } from './dto/executar-conferencia.dto';
-import { ItemChecklist } from './engine/tipos';
 
 /** O que a visao efetivamente fez nesta execucao (transparencia de custo). */
 export interface ResumoExtracao {
@@ -36,6 +28,13 @@ export interface ResumoExtracao {
   fotos: number;
   /** Leituras que a visao produziu, antes da engine julgar qualquer uma. */
   leiturasProduzidas: number;
+  /**
+   * Fotos informadas que NAO foram enviadas: nenhum campo do recorte desta
+   * etapa sai da fonte fisica delas (a foto 'geral' e o caso classico, e no
+   * gate da adesivacao a foto da placa tambem). Nao e erro — e o custo que
+   * deixou de ser pago, explicito para quem le a resposta.
+   */
+  fotosForaDoRecorte: number;
 }
 
 export type ResultadoExecucaoComExtracao = ResultadoExecucao & {
@@ -47,10 +46,15 @@ export type ResultadoExecucaoComExtracao = ResultadoExecucao & {
  * viram leituras com confianca e evidencia, e as leituras entram no MESMO
  * `executar` que o endpoint de leituras digitadas usa.
  *
+ * Ordem inegociavel do metodo: TUDO que e barato e pode dar 422 acontece antes
+ * do primeiro byte ir para a visao (SPEC, constraint 4) — parse do QR, etapa,
+ * projeto/checklist, recorte da etapa e validacao do lote de evidencias.
+ *
  * O que este servico deliberadamente NAO faz: comparar campo, calcular
- * veredito ou gravar CampoConferido. Existe UM caminho de escrita de veredito
- * (`ConferenciaExecucaoService.executar` -> engine -> `criarComVeredito`) e
- * duplica-lo aqui quebraria a regra de ouro do projeto.
+ * veredito, gravar CampoConferido ou resolver ProjetoModelo por regra propria.
+ * Existe UM caminho de escrita de veredito (`ConferenciaExecucaoService.
+ * executar` -> engine -> `criarComVeredito`) e UMA resolucao de projeto
+ * (`prepararExecucao`); duplicar qualquer um deles quebraria a regra de ouro.
  */
 @Injectable()
 export class ConferenciaExtracaoService {
@@ -59,7 +63,7 @@ export class ConferenciaExtracaoService {
   constructor(
     private readonly fotosEvidenciaService: FotosEvidenciaService,
 
-    private readonly projetoModeloService: ProjetosModeloService,
+    private readonly conferenciasService: ConferenciasService,
 
     private readonly extracaoService: ExtracaoService,
 
@@ -69,26 +73,29 @@ export class ConferenciaExtracaoService {
   async executarComFotos(
     dto: ExecutarComFotosDto,
   ): Promise<ResultadoExecucaoComExtracao> {
-    // QR primeiro: payload ilegivel vira 422 ANTES de qualquer chamada paga
-    // de visao (SPEC, constraint 4). O `executar` reparseia o mesmo payload —
-    // barato, e mantem o parser como detalhe privado dele.
-    const codigoProjeto = this.lerCodigoProjeto(dto.payloadQr);
+    // Barato primeiro, e sem escrever nada: payload ilegivel, etapa
+    // inexistente ('Serigrafia' com S maiusculo vindo de ?etapa=), projeto
+    // indeterminado e recorte vazio saem como 422 ANTES de qualquer chamada
+    // paga. O contexto volta com a MESMA checklist que a engine vai avaliar.
+    const contexto = await this.conferenciaExecucaoService.prepararExecucao({
+      payloadQr: dto.payloadQr,
+      etapaCodigo: dto.etapaCodigo,
+    });
 
-    const projetoModelo = await this.resolverProjetoModelo(codigoProjeto);
-    const checklist = this.lerChecklist(projetoModelo);
+    const registros = await this.carregarRegistros(dto.fotoEvidenciaIds);
 
-    const fotos = await this.carregarFotos(dto.fotoEvidenciaIds);
+    const { usadas, foraDoRecorte } = this.filtrarPeloRecorte(
+      registros,
+      contexto,
+    );
 
-    // Checklist INTEIRA de proposito, mesmo quando o request fixa etapa: o
-    // recorte por etapa e politica de veredito e mora no `executar`. Aqui ele
-    // nao economizaria nada — o custo e UMA chamada por foto, nao por campo —
-    // e so faria a visao ignorar marcacao que ja esta na peca.
-    //
+    const fotos = await this.lerBytes(usadas);
+
     // UMA chamada de visao por foto, sem retry e sem laco: a politica mora no
     // ExtracaoService e nao se reimplementa aqui.
     const leituras = await this.extracaoService.extrairDeFotos(
       fotos,
-      checklist,
+      contexto.checklist,
     );
 
     if (leituras.length === 0) {
@@ -101,12 +108,17 @@ export class ConferenciaExtracaoService {
       );
     }
 
-    const resultado = await this.conferenciaExecucaoService.executar({
-      payloadQr: dto.payloadQr,
-      etapaCodigo: dto.etapaCodigo,
-      limiarConfianca: dto.limiarConfianca,
-      leituras: leituras.map(paraLeituraDto),
-    });
+    const resultado = await this.conferenciaExecucaoService.executar(
+      {
+        payloadQr: dto.payloadQr,
+        etapaCodigo: dto.etapaCodigo,
+        limiarConfianca: dto.limiarConfianca,
+        leituras: leituras.map(paraLeituraDto),
+      },
+      contexto,
+    );
+
+    await this.vincularEvidencias(usadas, resultado.conferencia.id);
 
     return {
       ...resultado,
@@ -114,118 +126,30 @@ export class ConferenciaExtracaoService {
         driver: this.extracaoService.adapterAtivo,
         fotos: fotos.length,
         leiturasProduzidas: leituras.length,
+        fotosForaDoRecorte: foraDoRecorte.length,
       },
     };
   }
 
   /**
-   * So o `codigoProjeto` interessa aqui: o resto do payload e assunto do
-   * `executar`. Os 422 repetem a mensagem dele de proposito — o cliente ve o
-   * mesmo erro nos dois endpoints.
+   * Ids -> registros de FotoEvidencia, com as duas recusas baratas: id
+   * deduplicado (id repetido no request pagaria a mesma foto duas vezes,
+   * constraint 4), foto inexistente e foto que JA pertence a outra
+   * conferencia.
+   *
+   * As tres derrubam o lote inteiro ANTES de qualquer chamada de visao:
+   * conferencia parcial silenciosa e pior que erro explicito, e evidencia
+   * emprestada de outra conferencia falsificaria a trilha de auditoria
+   * (a mesma guarda que `criarComVeredito` faz no fim da linha — aqui ela
+   * chega antes de gastar dinheiro).
    */
-  private lerCodigoProjeto(payloadQr: string): string | null {
-    let resultado: ResultadoParse;
+  private async carregarRegistros(ids: string[]): Promise<FotoEvidencia[]> {
+    const registros: FotoEvidencia[] = [];
 
-    try {
-      resultado = parsePayloadEtiqueta(payloadQr);
-    } catch (erro) {
-      if (erro instanceof PayloadInvalidoError) {
-        throw new UnprocessableEntityException({
-          status: HttpStatus.UNPROCESSABLE_ENTITY,
-          errors: {
-            payloadQr: erro.motivo,
-          },
-        });
-      }
-      throw erro;
-    }
+    for (const id of new Set(ids)) {
+      const fotoEvidencia = await this.fotosEvidenciaService.findById(id);
 
-    if (resultado.tipo === 'codigo') {
-      throw new UnprocessableEntityException({
-        status: HttpStatus.UNPROCESSABLE_ENTITY,
-        errors: {
-          payloadQr:
-            'payload-somente-codigo: lookup nao suportado nesta rodada',
-        },
-      });
-    }
-
-    return resultado.dados.codigoProjeto;
-  }
-
-  /**
-   * Codigo do projeto no QR -> unico projeto cadastrado. Nao consulta o
-   * vinculo da peca (como o `executar` faz) porque aqui a peca ainda nem foi
-   * resolvida: a checklist so precisa dizer QUAIS campos ler de QUAL fonte
-   * fisica, e o `executar` refaz a resolucao completa antes de comparar.
-   */
-  private async resolverProjetoModelo(
-    codigoProjeto: string | null,
-  ): Promise<ProjetoModelo> {
-    if (codigoProjeto) {
-      const porCodigo =
-        await this.projetoModeloService.findByCodigo(codigoProjeto);
-      if (porCodigo) {
-        return porCodigo;
-      }
-    }
-
-    const todos = await this.projetoModeloService.findAll();
-    if (todos.length === 1) {
-      return todos[0];
-    }
-
-    throw new UnprocessableEntityException({
-      status: HttpStatus.UNPROCESSABLE_ENTITY,
-      errors: {
-        projetoModelo: 'projeto-modelo-indeterminado',
-      },
-    });
-  }
-
-  /**
-   * Mesma validacao do `executar`: checklist e texto JSON na coluna, e JSON
-   * quebrado e dado corrompido (500), nao erro do cliente.
-   */
-  private lerChecklist(projetoModelo: ProjetoModelo): ItemChecklist[] {
-    let bruto: unknown;
-
-    try {
-      bruto = JSON.parse(projetoModelo.checklist);
-    } catch {
-      throw new InternalServerErrorException(
-        `checklist-invalido: JSON malformado no ProjetoModelo ${projetoModelo.codigo}`,
-      );
-    }
-
-    if (!Array.isArray(bruto) || bruto.length === 0) {
-      throw new InternalServerErrorException(
-        `checklist-invalido: esperado array nao vazio no ProjetoModelo ${projetoModelo.codigo}`,
-      );
-    }
-
-    if (!bruto.every(ehItemChecklist)) {
-      throw new InternalServerErrorException(
-        `checklist-invalido: item fora do formato { campo, fonteFisica, obrigatorio } no ProjetoModelo ${projetoModelo.codigo}`,
-      );
-    }
-
-    return bruto;
-  }
-
-  /**
-   * Ids -> bytes. Sequencial e com ids deduplicados: id repetido no request
-   * pagaria a mesma foto duas vezes (constraint 4). Foto inexistente derruba
-   * o lote inteiro ANTES de qualquer chamada de visao — conferencia parcial
-   * silenciosa e pior que erro explicito.
-   */
-  private async carregarFotos(ids: string[]): Promise<FonteImagem[]> {
-    const fotos: FonteImagem[] = [];
-
-    for (const id of [...new Set(ids)]) {
-      const conteudo = await this.fotosEvidenciaService.lerConteudo(id);
-
-      if (!conteudo) {
+      if (!fotoEvidencia) {
         throw new UnprocessableEntityException({
           status: HttpStatus.UNPROCESSABLE_ENTITY,
           errors: {
@@ -234,8 +158,67 @@ export class ConferenciaExtracaoService {
         });
       }
 
+      if (fotoEvidencia.conferencia) {
+        throw new UnprocessableEntityException({
+          status: HttpStatus.UNPROCESSABLE_ENTITY,
+          errors: {
+            fotoEvidenciaIds: `foto-evidencia-de-outra-conferencia: ${id}`,
+          },
+        });
+      }
+
+      registros.push(fotoEvidencia);
+    }
+
+    return registros;
+  }
+
+  /**
+   * Foto so vai para a visao se algum campo do RECORTE desta etapa sai da
+   * fonte fisica dela. Sem isso, o gate da adesivacao (so series chumbadas)
+   * pagava a leitura da placa para a engine descartar o resultado logo em
+   * seguida — dinheiro queimado por definicao (SPEC, constraint 4).
+   */
+  private filtrarPeloRecorte(
+    registros: FotoEvidencia[],
+    contexto: ContextoExecucao,
+  ): { usadas: FotoEvidencia[]; foraDoRecorte: FotoEvidencia[] } {
+    const fontesDoRecorte = new Set(
+      contexto.checklist.map((item) => item.fonteFisica),
+    );
+
+    const usadas: FotoEvidencia[] = [];
+    const foraDoRecorte: FotoEvidencia[] = [];
+
+    for (const registro of registros) {
+      if (fontesDoRecorte.has(registro.fonteFisica)) {
+        usadas.push(registro);
+      } else {
+        foraDoRecorte.push(registro);
+      }
+    }
+
+    for (const ignorada of foraDoRecorte) {
+      this.logger.debug(
+        `foto ${ignorada.id} (fonte "${ignorada.fonteFisica}") fora do ` +
+          `recorte da etapa ` +
+          `"${contexto.checkpoint?.codigo ?? 'checklist-inteira'}": ` +
+          `nao sera enviada a visao`,
+      );
+    }
+
+    return { usadas, foraDoRecorte };
+  }
+
+  /** Registros -> bytes. Sequencial: um lote paralelo e pico sem ganho. */
+  private async lerBytes(registros: FotoEvidencia[]): Promise<FonteImagem[]> {
+    const fotos: FonteImagem[] = [];
+
+    for (const registro of registros) {
+      const conteudo = await this.fotosEvidenciaService.lerConteudoDe(registro);
+
       fotos.push({
-        fotoEvidenciaId: id,
+        fotoEvidenciaId: registro.id,
         fonteFisica: conteudo.fonteFisica,
         imagem: conteudo.buffer,
         mimeType: conteudo.mimeType,
@@ -243,6 +226,45 @@ export class ConferenciaExtracaoService {
     }
 
     return fotos;
+  }
+
+  /**
+   * Amarra a conferencia recem-criada as evidencias que a lastreiam (achado 6:
+   * sem isso a relacao nascia sempre vazia e a mesma foto podia lastrear
+   * conferencias de pecas diferentes). So as fotos EFETIVAMENTE enviadas a
+   * visao: as fora do recorte nao lastreiam campo nenhum e seguem soltas,
+   * reutilizaveis no gate em que a marcacao delas passa a existir.
+   *
+   * Best-effort de proposito: o veredito ja esta gravado e e o produto do
+   * endpoint — derrubar a resposta aqui perderia o resultado de uma visao ja
+   * paga. Falha vira log de erro (mesma janela nao-transacional do gap 9).
+   */
+  private async vincularEvidencias(
+    usadas: FotoEvidencia[],
+    conferenciaId: string,
+  ): Promise<void> {
+    if (usadas.length === 0) {
+      return;
+    }
+
+    try {
+      const conferencia =
+        await this.conferenciasService.findById(conferenciaId);
+      if (!conferencia) {
+        throw new Error(`conferencia ${conferenciaId} nao encontrada`);
+      }
+
+      await this.fotosEvidenciaService.vincularAConferencia(
+        usadas.map((foto) => foto.id),
+        conferencia,
+      );
+    } catch (erro) {
+      this.logger.error(
+        `falha-ao-vincular-evidencia: conferencia ${conferenciaId} ficou sem ` +
+          `o vinculo de ${usadas.length} foto(s) — ` +
+          `${erro instanceof Error ? erro.message : String(erro)}`,
+      );
+    }
   }
 }
 

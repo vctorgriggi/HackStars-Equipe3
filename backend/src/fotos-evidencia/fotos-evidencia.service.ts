@@ -50,21 +50,37 @@ const MIME_GENERICO = 'application/octet-stream';
 // (files/infrastructure/uploader/local/files.module.ts: destination './files').
 const PASTA_ARQUIVOS_LOCAL = 'files';
 
-// Caminho servido pelo módulo de files ('/api/v1/files/<hash>.<ext>').
+// Caminho servido pelo módulo de files ('/api/v1/files/<hash>.<ext>'); casa
+// também com a forma relativa 'files/<hash>.<ext>'.
 const REGEX_CAMINHO_LOCAL = /(^|\/)files\/[^/]+$/;
 
 /**
  * De onde vêm os bytes de uma evidência já gravada.
  *
  * O `url` guarda caminho ou key conforme o FILE_DRIVER vigente NO UPLOAD — e o
- * driver mudou no meio da Fase 2 (local → s3). Decidir só pelo driver atual
- * quebra toda evidência anterior à virada com 500, e são justamente as fotos
- * de serigrafia e chumbado da peça de demo. Por isso a origem sai da FORMA do
- * valor, com o driver como desempate: caminho '.../files/<hash>.<ext>' está no
- * disco; key de bucket gerada pelo multer-s3 é hash chapado, sem barra.
+ * driver mudou no meio da Fase 2 (local → s3). A FORMA do valor sobrevive à
+ * troca de driver; o driver, não. Por isso ela decide primeiro (achado 13 da
+ * revisão: `driver === LOCAL` curto-circuitava a forma e mandava key de bucket
+ * para o `readFile`, um 500 garantido no cenário documentado de dev local
+ * apontando para o RDS de produção, cujas fotos estão no S3):
+ *
+ * 1. `.../files/<nome>` (ou `files/<nome>`) — é o caminho que o
+ *    FilesLocalService persiste; está no disco;
+ * 2. qualquer outro separador de diretório — forma ambígua de verdade (key com
+ *    prefixo × caminho customizado): aí, e só aí, o driver desempata;
+ * 3. nome chapado, sem barra — é exatamente como o multer-s3 nomeia a key; vale
+ *    mesmo sob FILE_DRIVER=local.
  */
 export function ehCaminhoDeDisco(url: string, driver: FileDriver): boolean {
-  return driver === FileDriver.LOCAL || REGEX_CAMINHO_LOCAL.test(url);
+  if (REGEX_CAMINHO_LOCAL.test(url)) {
+    return true;
+  }
+
+  if (url.includes('/') || url.includes('\\')) {
+    return driver === FileDriver.LOCAL;
+  }
+
+  return false;
 }
 
 function mimeTypeDe(url: string): string {
@@ -135,6 +151,18 @@ export class FotosEvidenciaService {
       return null;
     }
 
+    return this.lerConteudoDe(fotoEvidencia);
+  }
+
+  /**
+   * Mesmo storage do `lerConteudo`, para quem JÁ tem o registro em mãos —
+   * quem valida o lote de evidências antes de pagar visão precisa da
+   * `fonteFisica` e do vínculo ANTES de decidir se vale ler os bytes, e
+   * relê-los por id custaria uma consulta por foto sem nenhum ganho.
+   */
+  async lerConteudoDe(
+    fotoEvidencia: FotoEvidencia,
+  ): Promise<ConteudoEvidencia> {
     const config = fileConfig() as FileConfig;
 
     try {
@@ -150,12 +178,46 @@ export class FotosEvidenciaService {
     } catch (erro) {
       const motivo = erro instanceof Error ? erro.message : String(erro);
       this.logger.error(
-        `falha-ao-ler-evidencia: ${id} (driver ${config.driver}, ` +
+        `falha-ao-ler-evidencia: ${fotoEvidencia.id} (driver ${config.driver}, ` +
           `url "${fotoEvidencia.url}") — ${motivo}`,
       );
 
-      throw new InternalServerErrorException(`falha-ao-ler-evidencia: ${id}`);
+      throw new InternalServerErrorException(
+        `falha-ao-ler-evidencia: ${fotoEvidencia.id}`,
+      );
     }
+  }
+
+  /**
+   * Amarra à conferência as evidências que a lastreiam e ainda estavam soltas
+   * (achado 6 da revisão: sem isso a relação CONFERENCIA ||--o{ FOTO_EVIDENCIA
+   * nascia sempre vazia e a mesma foto podia lastrear conferências de peças
+   * diferentes).
+   *
+   * Só toca em foto SEM conferência: evidência já presa a outra conferência
+   * não é re-apontada aqui — reescrever esse vínculo falsificaria a trilha de
+   * auditoria de um veredito já emitido. Quem recusa esse caso é o chamador,
+   * ANTES da visão.
+   *
+   * Devolve quantas foram vinculadas.
+   */
+  async vincularAConferencia(
+    ids: FotoEvidencia['id'][],
+    conferencia: Conferencia,
+  ): Promise<number> {
+    let vinculadas = 0;
+
+    for (const id of new Set(ids)) {
+      const fotoEvidencia = await this.fotoEvidenciaRepository.findById(id);
+      if (!fotoEvidencia || fotoEvidencia.conferencia) {
+        continue;
+      }
+
+      await this.fotoEvidenciaRepository.update(id, { conferencia });
+      vinculadas += 1;
+    }
+
+    return vinculadas;
   }
 
   // Upload da foto + registro da evidência em uma chamada: o arquivo vai pelo
