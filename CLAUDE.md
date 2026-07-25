@@ -49,7 +49,8 @@ backend/                  # NestJS (base brocoders/nestjs-boilerplate)
     foto-evidencia/       # CRUD FotoEvidencia (gerado); recebe upload/S3 (T2.3)
     checkpoints/          # CRUD Checkpoint (gerado); seed das etapas ordenadas da linha
     evento-passagems/     # CRUD EventoPassagem (gerado); trânsito (T4.1)
-    extracao/             # (a criar em T2.2) ExtractorPort + adapters AWS
+    extracao/             # ExtractorPort + adapters textract|bedrock|mock;
+                          #   driver por env EXTRACTOR_DRIVER (mock default)
     auth/, files/, i18n/  # herdados do boilerplate; não usados nesta rodada
 frontend/                 # Next.js 16: leitura QR, fotos, veredito, histórico
 ```
@@ -108,6 +109,13 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
 - Serviços, modelos (IDs Bedrock), custos e checklist de setup AWS:
   docs/aws.md — o setup (model access, IAM, bucket) precisa acontecer antes da
   Fase 2.
+- Spike T2.1 executável: `npx ts-node -r tsconfig-paths/register
+  scripts/spike-extracao.ts <dir-fotos>` (fotos nomeadas pela fonte:
+  placa.jpg, chumbado-1.jpg…). Sem credencial, falha com mensagem apontando
+  docs/aws.md.
+- Fonte única em código dos valores de `fonteFisica`: união literal
+  `FonteFisica` em extracao/ports/extractor.port.ts; foto-evidencia deriva
+  dela com `satisfies` (divergência quebra a compilação).
 - Nenhuma chamada de visão fora de ação explícita do operador — créditos AWS
   são finitos (SPEC, constraint 4); sem reprocessamento em loop.
 - Leitura retornada pelo adapter sempre carrega: valor, confiança, tipo da

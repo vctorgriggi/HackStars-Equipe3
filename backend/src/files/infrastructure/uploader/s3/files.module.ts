@@ -76,6 +76,8 @@ const infrastructurePersistenceModule = RelationalFilePersistenceModule;
   ],
   controllers: [FilesS3Controller],
   providers: [FilesS3Service],
-  exports: [FilesS3Service],
+  // MulterModule é reexportado para que outros módulos (ex.: foto-evidencia)
+  // usem o FileInterceptor com o storage deste driver, sem duplicar config.
+  exports: [FilesS3Service, MulterModule],
 })
 export class FilesS3Module {}

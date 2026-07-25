@@ -19,5 +19,10 @@
     "noFallthroughCasesInSwitch": false,
     "esModuleInterop": true
   },
-  "include": ["src/**/*", "test/**/*", ".install-scripts/**/*"]
+  "include": [
+    "src/**/*",
+    "test/**/*",
+    "scripts/**/*",
+    ".install-scripts/**/*"
+  ]
 }

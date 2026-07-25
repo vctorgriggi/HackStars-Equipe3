@@ -8,12 +8,22 @@ import {
   Delete,
   UseGuards,
   Query,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { FotoEvidenciaService } from './foto-evidencia.service';
 import { CreateFotoEvidenciaDto } from './dto/create-foto-evidencia.dto';
 import { UpdateFotoEvidenciaDto } from './dto/update-foto-evidencia.dto';
+import { UploadFotoEvidenciaDto } from './dto/upload-foto-evidencia.dto';
+import { UploadFotoEvidenciaResponseDto } from './dto/upload-foto-evidencia-response.dto';
+import { FonteFisicaEnum } from './fonte-fisica.enum';
+import { imagemFileFilter } from './infrastructure/uploader/imagem-file-filter';
+import { LimparUploadOrfaoInterceptor } from './infrastructure/uploader/limpar-upload-orfao.interceptor';
 import {
   ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
   ApiCreatedResponse,
   ApiOkResponse,
   ApiParam,
@@ -44,6 +54,48 @@ export class FotoEvidenciaController {
   })
   create(@Body() createFotoEvidenciaDto: CreateFotoEvidenciaDto) {
     return this.fotoEvidenciaService.create(createFotoEvidenciaDto);
+  }
+
+  // Upload da foto + criação da evidência em uma chamada (multipart).
+  // Só o fileFilter é local; storage e tamanho máximo vêm do MulterModule do
+  // driver ativo (FILE_DRIVER), reexportado pelo módulo de files.
+  @Post('upload')
+  @ApiCreatedResponse({
+    type: UploadFotoEvidenciaResponseDto,
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file', 'fonteFisica'],
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+        fonteFisica: {
+          type: 'string',
+          enum: Object.values(FonteFisicaEnum),
+        },
+        conferenciaId: {
+          type: 'string',
+          format: 'uuid',
+        },
+      },
+    },
+  })
+  @UseInterceptors(
+    LimparUploadOrfaoInterceptor,
+    FileInterceptor('file', { fileFilter: imagemFileFilter }),
+  )
+  uploadFoto(
+    @UploadedFile() file: Express.Multer.File,
+    @Body() uploadFotoEvidenciaDto: UploadFotoEvidenciaDto,
+  ): Promise<UploadFotoEvidenciaResponseDto> {
+    return this.fotoEvidenciaService.createFromUpload(
+      file,
+      uploadFotoEvidenciaDto,
+    );
   }
 
   @Get()

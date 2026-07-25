@@ -12,15 +12,62 @@ import { UpdateFotoEvidenciaDto } from './dto/update-foto-evidencia.dto';
 import { FotoEvidenciaRepository } from './infrastructure/persistence/foto-evidencia.repository';
 import { IPaginationOptions } from '../utils/types/pagination-options';
 import { FotoEvidencia } from './domain/foto-evidencia';
+import { UploadFotoEvidenciaDto } from './dto/upload-foto-evidencia.dto';
+import { UploadFotoEvidenciaResponseDto } from './dto/upload-foto-evidencia-response.dto';
+import { EvidenciaUploader } from './infrastructure/uploader/evidencia-uploader';
+import { FonteFisicaEnum } from './fonte-fisica.enum';
 
 @Injectable()
 export class FotoEvidenciaService {
   constructor(
     private readonly conferenciaService: ConferenciaService,
 
+    private readonly evidenciaUploader: EvidenciaUploader,
+
     // Dependencies here
     private readonly fotoEvidenciaRepository: FotoEvidenciaRepository,
   ) {}
+
+  // Upload da foto + registro da evidência em uma chamada: o arquivo vai pelo
+  // uploader do boilerplate (driver do FILE_DRIVER) e a url persistida é a que
+  // o próprio módulo de files devolve.
+  async createFromUpload(
+    file: Express.Multer.File,
+    uploadFotoEvidenciaDto: UploadFotoEvidenciaDto,
+  ): Promise<UploadFotoEvidenciaResponseDto> {
+    // Conferência inexistente é 422 antes de gravar o arquivo.
+    if (uploadFotoEvidenciaDto.conferenciaId) {
+      const conferenciaObject = await this.conferenciaService.findById(
+        uploadFotoEvidenciaDto.conferenciaId,
+      );
+      if (!conferenciaObject) {
+        throw new UnprocessableEntityException({
+          status: HttpStatus.UNPROCESSABLE_ENTITY,
+          errors: {
+            conferenciaId: 'notExists',
+          },
+        });
+      }
+    }
+
+    // Arquivo ausente é 422 ('selectFile') — mesma checagem do files.service.
+    const uploaded = await this.evidenciaUploader.create(file);
+
+    const fotoEvidencia = await this.create({
+      url: uploaded.file.path,
+      fonteFisica: uploadFotoEvidenciaDto.fonteFisica,
+      conferencia: uploadFotoEvidenciaDto.conferenciaId
+        ? { id: uploadFotoEvidenciaDto.conferenciaId }
+        : null,
+    });
+
+    return {
+      id: fotoEvidencia.id,
+      url: fotoEvidencia.url,
+      fonteFisica: fotoEvidencia.fonteFisica as FonteFisicaEnum,
+      conferenciaId: fotoEvidencia.conferencia?.id ?? null,
+    };
+  }
 
   async create(createFotoEvidenciaDto: CreateFotoEvidenciaDto) {
     // Do not remove comment below.

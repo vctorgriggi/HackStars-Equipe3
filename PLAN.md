@@ -119,17 +119,44 @@ Depende de: Fase 1 completa.
     chumbada) para cada serviço; timebox de 2h. Incluir no timebox um prompt
     de check qualitativo de layout via Bedrock (marcações presentes e na
     disposição do projeto da demo) — decide se o Could de layout entra.
+  - Bloqueio externo (2026-07-25): aguarda credenciais AWS no backend/.env
+    (checklist em docs/aws.md) e fotos da peça em arquivo. O executável do
+    spike já existe: `npx ts-node -r tsconfig-paths/register
+    scripts/spike-extracao.ts <dir-fotos>` — roda os dois adapters e imprime
+    o placar de acerto. Desvio autorizado: a Fase 3 pode iniciar em modo mock
+    (EXTRACTOR_DRIVER=mock) sem esperar este item — bloqueio é externo ao
+    time e o mock espelha o cenário-âncora da demo.
   - Aceitação: escolha registrada como decisão resolvida aqui e no CLAUDE.md;
     se render aprendizado caro (prompts, pré-processamento), vira
     docs/visao-ocr.md.
-- [ ] T2.2 — ExtractorPort e adapter do serviço escolhido · módulo: extracao
+- [x] T2.2 — ExtractorPort e adapter do serviço escolhido · módulo: extracao
   - Testes (primeiro): consumidores da porta testados com mock; adapter real
     verificado manualmente com as fotos da demo.
+  - Feito em 2026-07-25 (agente Opus): módulo `extracao/` com ExtractorPort,
+    adapters textract/bedrock/mock e factory por env EXTRACTOR_DRIVER (mock
+    default — sistema funcional sem AWS); 31 testes novos (96 no total).
+    Verificação com fotos reais fica no T2.1 (bloqueado externamente).
+  - Desvios: os DOIS adapters foram implementados (a escolha do spike vira
+    troca de env, não código novo); heurística do Textract extraída como
+    função pura testável (`interpretarBlocos`); ambiguidade numérica (série ×
+    patrimônio sem rótulo) devolve null em vez de chutar — preferir
+    nao_conferivel a divergente falso; Bedrock com thinking desligado e
+    instrução anti-vazamento de tags (max_tokens 1024 limitaria
+    thinking+resposta); mock default espelha a peça de demo (chumbadas
+    847233, placa 847833).
   - Aceitação: entrada imagem + tipo de fonte física → saída lista de campos
     com valor, confiança, bounding box (`regiaoLeitura`, quando o serviço
     fornecer) e vínculo à foto; nenhuma chamada AWS fora do adapter.
-- [ ] T2.3 — Upload de fotos e storage S3 · módulo: evidencias
+- [x] T2.3 — Upload de fotos e storage S3 · módulo: evidencias
   - Verificação: foto sobe pelo endpoint, URL (assinada) abre no navegador.
+    Feito em 2026-07-25 (agente Opus): POST /foto-evidencia/upload multipart
+    com fonteFisica validada por whitelist canônica (422 fora dela), url
+    fetchável sem auth via rota de files do boilerplate, vínculo opcional a
+    conferência validado; driver local ativo, S3 = troca de FILE_DRIVER.
+  - Desvios: interceptor limpa arquivo órfão quando a validação falha após o
+    multer gravar; filtro por mimetype (não extensão) para aceitar HEIC de
+    iPhone; fonte única dos valores de fonteFisica reconciliada na união
+    literal de extracao/ports (satisfies quebra o build se divergir).
   - Aceitação: FotoEvidencia persistida e vinculável a CampoConferido; plano B
     registrado: storage em disco local se S3 atrasar a demo (constraint 1).
 

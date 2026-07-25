@@ -40,8 +40,12 @@ import { EventoPassagemsModule } from './evento-passagems/evento-passagems.modul
 
 import { ProjetoModelosModule } from './projeto-modelos/projeto-modelos.module';
 
+import { ExtracaoModule } from './extracao/extracao.module';
+
 @Module({
   imports: [
+    ExtracaoModule,
+
     ProjetoModelosModule,
     EventoPassagemsModule,
     CampoConferidosModule,
