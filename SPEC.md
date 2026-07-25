@@ -308,7 +308,11 @@ câmera é provisionada amarrada ao `codigo` de um Checkpoint.
 
 1. Engenharia sobe o PDF do projeto do modelo → IA (Bedrock) extrai marcações,
    posições e obrigatoriedade → engenharia revisa e aprova → vira
-   ProjetoModelo estruturado (a checklist que a engine consome).
+   ProjetoModelo estruturado (a checklist que a engine consome). Upload é
+   único por modelo: todas as peças daquele modelo reutilizam o registro, e o
+   PDF nunca é lido em runtime. O desenho real tem revisões (00/01/02…):
+   quando a ingestão existir, ProjetoModelo ganha versionamento por revisão —
+   conferências antigas continuam apontando para a revisão vigente à época.
 2. Pedido entra (futuro: ERP) → transformador cadastrado, etiqueta QR impressa
    → adesivação na etapa 1 (o QR nasce com a peça, não é conferido — é a
    referência).
@@ -384,8 +388,12 @@ consegue criar Conferencia.
       (`nao_conferivel`) ou aceitar similaridade ≥ N% com marcação para revisão
       humana? Afeta a engine de comparação (PLAN T1.2).
 - [ ] **Formato do payload do QR** — decodificar uma etiqueta real para saber
-      se o QR carrega os campos ou só um código de lookup. Se for só código, o
-      MVP precisa de fallback de digitação manual. Afeta T1.1 e T3.1.
+      se o QR carrega os campos ou só um código de lookup, e se referencia o
+      projeto/modelo (a etiqueta impressa traz o código TPD-408136, então o
+      vínculo peça → ProjetoModelo provavelmente viaja no próprio QR; sem
+      isso, fallback: operador escolhe o modelo no primeiro scan). Se for só
+      código, o MVP precisa de fallback de digitação manual. Afeta T1.1 e
+      T3.1.
 - [ ] **Unicidade do patrimônio entre clientes** — padrão do setor: série do
       fabricante é única, patrimônio é numeração do cliente (único por
       cliente). Confirmar com a TRAEL. Consequência já adotada: find-or-create
