@@ -306,7 +306,14 @@ aprovar a extração do projeto (uma vez por modelo), corrigir a peça física
 quando um gate acusa, e registrar exceção deliberada (observacao na
 conferência divergente, que libera o avanço com o aceite gravado; com perfis,
 exigirá papel autorizado). A identidade da etapa vem do dispositivo: cada
-câmera é provisionada amarrada ao `codigo` de um Checkpoint.
+câmera é provisionada amarrada ao `codigo` de um Checkpoint E às fontes
+físicas que o seu ponto de vista enxerga (câmera do topo → `chumbado-1`) — o
+rótulo que o operador dá por foto no MVP vira dado de provisionamento; a
+identificação é a geometria da instalação, nunca análise em runtime. Modelo
+com menos marcações passa no mesmo gate sem reconfigurar câmera: quadro cuja
+fonte não tem campo na checklist do modelo é descartado sem custo (mesma
+regra da foto `geral` hoje), e cada gate cobra a interseção "recorte da
+etapa ∩ fontes cobertas pelas câmeras dele".
 
 1. Engenharia sobe o PDF do projeto do modelo → IA (Bedrock) extrai marcações,
    posições e obrigatoriedade → engenharia revisa e aprova → vira
@@ -403,6 +410,18 @@ consegue criar Conferencia.
       quebraria a resolução (422 projeto-modelo-indeterminado). Confirmar com
       a TRAEL qual número identifica o projeto e alinhar seed + cascata.
       Afeta T2.1/T6.1 (achado da revisão R2, rodada revisao).
+- [ ] **Origem e cardinalidade do chumbado (3×)** — o desenho PDF é o projeto
+      de SERIGRAFIA e não cobre chumbado nem placa; o "série chumbada em 3
+      posições" veio do doc do desafio e da peça física, e hoje vive só no
+      seed. Confirmar com a TRAEL se o 3× é padrão de fábrica (vira esqueleto
+      fixo de checklist) ou varia por modelo (segue dado por modelo — a
+      checklist suporta os dois). Consequência na T6.1: a ingestão do PDF só
+      produz os itens de serigrafia; placa e chumbados entram pré-populados
+      como esqueleto padrão na tela de revisão (T6.2). Evolução conexa: o
+      Textract devolve um bounding box por ocorrência (`regiaoLeitura`, já
+      persistido) — N caixas distintas no MESMO quadro provam N posições, o
+      que habilita foto panorâmica satisfazendo mais de um chumbado sem
+      rótulo fino por posição.
 - [ ] **Unicidade do patrimônio entre clientes** — padrão do setor: série do
       fabricante é única, patrimônio é numeração do cliente (único por
       cliente). Confirmar com a TRAEL. Consequência já adotada: find-or-create

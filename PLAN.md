@@ -258,6 +258,11 @@ demo.
     com a seedada na Fase 0 (gabarito conhecido).
   - Aceitação: proposta de checklist com campo, fonte física e obrigatoriedade;
     nunca cria ProjetoModelo direto — sempre passa pela revisão (T6.2).
+  - Nota (rodada de análise, 2026-07-25): o PDF é só o projeto de SERIGRAFIA —
+    placa e chumbados não nascem dele. A proposta deve vir pré-populada com o
+    esqueleto padrão (serie-chumbada-1..3, serie-placa, patrimonio-placa) e o
+    PDF contribui os itens de serigrafia; origem do 3× é decisão em aberto no
+    SPEC (padrão de fábrica × por modelo).
 - [ ] T6.2 — Tela de revisão e aprovação da checklist · módulo: frontend (+ projetos-modelo)
   - Verificação manual: editar um item extraído errado e aprovar; ProjetoModelo
     criado reflete a edição.
