@@ -1,4 +1,3 @@
-import { Exclude } from 'class-transformer';
 import { Checkpoint } from '../../checkpoints/domain/checkpoint';
 
 import { Transformador } from '../../transformadors/domain/transformador';
@@ -6,7 +5,11 @@ import { Transformador } from '../../transformadors/domain/transformador';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class Conferencia {
-  @Exclude({ toPlainOnly: true })
+  // Gravado só pela engine (nunca via DTO); legível em toda resposta.
+  @ApiProperty({
+    type: () => String,
+    nullable: true,
+  })
   vereditoGeral?: string | null;
 
   @ApiProperty({

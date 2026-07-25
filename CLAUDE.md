@@ -68,9 +68,12 @@ dentro da engine de conformidade.
 ## Como rodar
 
 ```bash
-cd backend && docker compose up -d postgres && npm run start:dev  # API em :3001, swagger em /docs
-cd frontend && npm run dev                                        # app em :3000
-cd backend && npm run test    # unit da engine e do parser
+# 1ª vez: criar o env (APP_PORT=3001 vive só aí; sem ele a API sobe em :3000)
+cd backend && sed 's/^DATABASE_HOST=postgres/DATABASE_HOST=localhost/' env-example-relational > .env
+cd backend && docker compose up -d postgres && npm run migration:run && npm run seed:run:relational
+cd backend && npm run start:dev   # API em :3001, swagger em /docs
+cd frontend && npm run dev        # app em :3000; API derivada do host da página
+cd backend && npm run test        # unit da engine e do parser (existem a partir da T1.2)
 # CRUD gerado exige JWT: login com o admin seed do boilerplate
 # (admin@example.com / secret) em POST /api/v1/auth/email/login
 ```
@@ -121,6 +124,11 @@ cd backend && npm run test    # unit da engine e do parser
   bordas (visão, S3, UI) verificam-se manualmente com roteiro do PLAN.
 - Segredos: credenciais AWS só em `backend/.env` (fora do git); nada de
   segredo em variável `NEXT_PUBLIC_*` — todo acesso AWS passa pela API.
+- Valores canônicos de `fonteFisica`: `placa`, `serigrafia`, `chumbado-1..3`.
+  A fonte única é a checklist do ProjetoModelo; FotoEvidencia e extração usam
+  as mesmas strings (grafia divergente quebra o pareamento campo ↔ evidência).
+- Identificadores estáveis: gates e regras casam por `codigo` (Checkpoint,
+  ProjetoModelo), nunca por nome exibido nem por `ordem` — nome e ordem mudam.
 - Boilerplate traz auth/i18n que não usamos nesta rodada: não gastar tempo
   removendo, apenas não usar.
 
@@ -139,6 +147,33 @@ cd backend && npm run test    # unit da engine e do parser
   Textract ↔ Bedrock e os testes com mock dependem dessa fronteira.
 - Nunca inventar valor esperado que não veio do payload do QR — fonte da
   verdade única nesta rodada (SPEC, constraint 5).
+
+## Gaps conhecidos
+
+Dívidas deliberadas confirmadas na auditoria de 2026-07-25, aceitas pelo prazo
+do hackathon:
+
+1. CRUD do domínio sem RolesGuard — qualquer JWT edita/deleta; paliativo:
+   ambiente de demo com admin seed único. Revisar antes de expor fora da rede
+   local.
+2. Hard delete com FKs `NO ACTION` — deletar pai com filhos estoura 500;
+   paliativo: a UI não expõe delete. Trilha de auditoria pedirá soft delete na
+   rodada de produção.
+3. Eager loading em cascata nas relações geradas — payloads grandes e joins
+   duplicados; aceitável no volume da demo, e os endpoints das Fases 3–4
+   selecionam o que expõem.
+4. Listagens sem filtro por relação (só paginação global) — os endpoints de
+   consulta reais (veredito por conferência, histórico por peça) entram nas
+   Fases 3–4.
+5. `checklist` como varchar validado só por `@IsString` — vira jsonb com
+   validação estruturada quando a ingestão de projeto (Fase 6) existir; até
+   lá, a única escrita é o seed.
+6. `Record not found` genérico vira 500 nos updates (default do boilerplate) —
+   tratar quando os endpoints de domínio forem escritos (T1.3+).
+7. Paginação (page/limit/teto 50) literal e duplicada nos 7 controllers —
+   default do gerador; unificar só se doer.
+8. `cliente` como string livre — decisão em aberto no SPEC (vira entidade na
+   rodada ERP).
 
 ## Decisões em aberto
 

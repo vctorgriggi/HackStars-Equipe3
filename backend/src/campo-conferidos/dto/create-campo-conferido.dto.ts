@@ -41,7 +41,7 @@ export class CreateCampoConferidoDto {
   @IsNotEmptyObject()
   fotoEvidencia?: FotoEvidenciaDto | null;
 
-  veredito?: string | null;
+  // veredito fica fora do DTO de propósito: só a engine grava veredito.
 
   @ApiProperty({
     required: false,

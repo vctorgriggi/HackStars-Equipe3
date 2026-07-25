@@ -11,9 +11,9 @@ export class FotoEvidencia {
 
   @ApiProperty({
     type: () => String,
-    nullable: true,
+    nullable: false,
   })
-  fonteFisica?: string | null;
+  fonteFisica: string;
 
   @ApiProperty({
     type: () => String,

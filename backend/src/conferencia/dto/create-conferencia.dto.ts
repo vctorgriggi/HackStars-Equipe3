@@ -21,7 +21,7 @@ import {
 } from '@nestjs/swagger';
 
 export class CreateConferenciaDto {
-  vereditoGeral?: string | null;
+  // vereditoGeral fica fora do DTO de propósito: só a engine grava veredito.
 
   @ApiProperty({
     required: false,

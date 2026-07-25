@@ -31,12 +31,11 @@ export class CreateFotoEvidenciaDto {
   conferencia?: ConferenciaDto | null;
 
   @ApiProperty({
-    required: false,
+    required: true,
     type: () => String,
   })
-  @IsOptional()
   @IsString()
-  fonteFisica?: string | null;
+  fonteFisica: string;
 
   @ApiProperty({
     required: true,

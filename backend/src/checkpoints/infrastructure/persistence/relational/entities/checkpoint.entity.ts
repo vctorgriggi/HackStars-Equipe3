@@ -11,6 +11,15 @@ import { EntityRelationalHelper } from '../../../../../utils/relational-entity-h
   name: 'checkpoint',
 })
 export class CheckpointEntity extends EntityRelationalHelper {
+  // Slug estável de máquina (ex.: serigrafia): regras de gate casam por ele,
+  // nunca por nome exibido nem por ordem.
+  @Column({
+    nullable: false,
+    type: String,
+    unique: true,
+  })
+  codigo: string;
+
   @Column({
     nullable: false,
     type: Number,

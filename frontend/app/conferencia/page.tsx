@@ -2,7 +2,15 @@
 
 import { useEffect, useState } from "react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+// No celular da rede local, "localhost" apontaria para o próprio celular:
+// sem env definida, deriva a API do host que serviu a página.
+function apiUrl(): string {
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  if (typeof window !== "undefined") {
+    return `http://${window.location.hostname}:3001`;
+  }
+  return "http://localhost:3001";
+}
 
 export default function ConferenciaPage() {
   const [apiStatus, setApiStatus] = useState<"verificando" | "online" | "offline">(
@@ -10,9 +18,16 @@ export default function ConferenciaPage() {
   );
 
   useEffect(() => {
-    fetch(`${API_URL}/`)
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    fetch(`${apiUrl()}/`, { signal: controller.signal })
       .then((res) => setApiStatus(res.ok ? "online" : "offline"))
-      .catch(() => setApiStatus("offline"));
+      .catch(() => setApiStatus("offline"))
+      .finally(() => clearTimeout(timeout));
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
   }, []);
 
   return (

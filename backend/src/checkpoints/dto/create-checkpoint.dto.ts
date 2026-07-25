@@ -13,6 +13,13 @@ import {
 export class CreateCheckpointDto {
   @ApiProperty({
     required: true,
+    type: () => String,
+  })
+  @IsString()
+  codigo: string;
+
+  @ApiProperty({
+    required: true,
     type: () => Number,
   })
   @IsNumber()

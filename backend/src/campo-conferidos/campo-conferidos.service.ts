@@ -70,7 +70,7 @@ export class CampoConferidosService {
 
       fotoEvidencia,
 
-      veredito: createCampoConferidoDto.veredito,
+      // veredito nunca vem do DTO: so a engine grava (regra de ouro).
 
       confianca: createCampoConferidoDto.confianca,
 
@@ -156,7 +156,7 @@ export class CampoConferidosService {
 
       fotoEvidencia,
 
-      veredito: updateCampoConferidoDto.veredito,
+      // veredito nunca vem do DTO: so a engine grava (regra de ouro).
 
       confianca: updateCampoConferidoDto.confianca,
 

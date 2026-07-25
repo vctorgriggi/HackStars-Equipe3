@@ -5,6 +5,8 @@ import { CheckpointEntity } from '../entities/checkpoint.entity';
 export class CheckpointMapper {
   static toDomain(raw: CheckpointEntity): Checkpoint {
     const domainEntity = new Checkpoint();
+    domainEntity.codigo = raw.codigo;
+
     domainEntity.ordem = raw.ordem;
 
     domainEntity.nome = raw.nome;
@@ -18,6 +20,8 @@ export class CheckpointMapper {
 
   static toPersistence(domainEntity: Checkpoint): CheckpointEntity {
     const persistenceEntity = new CheckpointEntity();
+    persistenceEntity.codigo = domainEntity.codigo;
+
     persistenceEntity.ordem = domainEntity.ordem;
 
     persistenceEntity.nome = domainEntity.nome;

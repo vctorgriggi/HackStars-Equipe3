@@ -17,11 +17,12 @@ export class FotoEvidenciaEntity extends EntityRelationalHelper {
   @ManyToOne(() => ConferenciaEntity, { eager: true, nullable: true })
   conferencia?: ConferenciaEntity | null;
 
+  // Sem fonte física a foto não pareia com campo algum — obrigatória.
   @Column({
-    nullable: true,
+    nullable: false,
     type: String,
   })
-  fonteFisica?: string | null;
+  fonteFisica: string;
 
   @Column({
     nullable: false,

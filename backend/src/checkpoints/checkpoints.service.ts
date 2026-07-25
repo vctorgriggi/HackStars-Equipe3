@@ -22,6 +22,8 @@ export class CheckpointsService {
     return this.checkpointRepository.create({
       // Do not remove comment below.
       // <creating-property-payload />
+      codigo: createCheckpointDto.codigo,
+
       ordem: createCheckpointDto.ordem,
 
       nome: createCheckpointDto.nome,
@@ -60,6 +62,8 @@ export class CheckpointsService {
     return this.checkpointRepository.update(id, {
       // Do not remove comment below.
       // <updating-property-payload />
+      codigo: updateCheckpointDto.codigo,
+
       ordem: updateCheckpointDto.ordem,
 
       nome: updateCheckpointDto.nome,

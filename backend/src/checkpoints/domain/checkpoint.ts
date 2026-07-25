@@ -2,6 +2,12 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class Checkpoint {
   @ApiProperty({
+    type: () => String,
+    nullable: false,
+  })
+  codigo: string;
+
+  @ApiProperty({
     type: () => Number,
     nullable: false,
   })

@@ -46,10 +46,15 @@ Depende de: nada.
     backend/CLAUDE.md); nomes de pasta ficaram como o gerador pluraliza
     (transformadors, campo-conferidos, evento-passagems) — não vale brigar
     com o hygen. Mapa conceito → pasta real no CLAUDE.md raiz.
-  - Verificação: migration roda limpa em banco vazio; tabelas Transformador,
-    Conferencia, CampoConferido, FotoEvidencia, Checkpoint, EventoPassagem
-    criadas conforme SPEC (Entidades). Feito em 2026-07-25: 6 tabelas no
-    Postgres; GET /api/v1/checkpoints devolve as etapas seedadas.
+  - Verificação: migration roda limpa em banco vazio; tabelas conforme SPEC
+    (Entidades). Feito em 2026-07-25: 7 tabelas no Postgres (incl.
+    projeto_modelo); GET /api/v1/checkpoints (com JWT do admin seed) devolve
+    as etapas seedadas.
+  - Desvio (auditoria 2026-07-25, agentes Opus): vereditos ficaram legíveis
+    nas respostas (o @Exclude gerado os escondia) e fora dos DTOs de escrita;
+    unique em numeroSerie/codigo; confianca virou double precision; Checkpoint
+    ganhou codigo (slug de gate); seeds viraram upsert por codigo; checklist
+    do seed alinhada ao critério 1 (migration AjustesAuditoria).
   - Aceitação: seed com as etapas reais da linha, ordenadas (adesivação/
     separação da etiqueta, serigrafia, enchimento de óleo e conferência,
     fixação da placa); Checkpoint carrega a posição na sequência desde a

@@ -1,5 +1,4 @@
 import { FotoEvidencia } from '../../foto-evidencia/domain/foto-evidencia';
-import { Exclude } from 'class-transformer';
 import { Conferencia } from '../../conferencia/domain/conferencia';
 
 import { ApiProperty } from '@nestjs/swagger';
@@ -17,7 +16,11 @@ export class CampoConferido {
   })
   fotoEvidencia?: FotoEvidencia | null;
 
-  @Exclude({ toPlainOnly: true })
+  // Gravado só pela engine (nunca via DTO); legível em toda resposta.
+  @ApiProperty({
+    type: () => String,
+    nullable: true,
+  })
   veredito?: string | null;
 
   @ApiProperty({

@@ -47,9 +47,11 @@ export class TransformadorEntity extends EntityRelationalHelper {
   })
   patrimonio: string;
 
+  // Chave de negócio (única do fabricante): find-or-create usa ela.
   @Column({
     nullable: false,
     type: String,
+    unique: true,
   })
   numeroSerie: string;
 

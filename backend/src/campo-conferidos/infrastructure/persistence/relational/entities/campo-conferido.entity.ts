@@ -31,9 +31,10 @@ export class CampoConferidoEntity extends EntityRelationalHelper {
   })
   veredito?: string | null;
 
+  // Score 0..1 da extração: precisa ser fracionário (integer truncaria tudo).
   @Column({
     nullable: true,
-    type: Number,
+    type: 'double precision',
   })
   confianca?: number | null;
 

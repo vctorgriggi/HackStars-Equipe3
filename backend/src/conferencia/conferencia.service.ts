@@ -66,7 +66,7 @@ export class ConferenciaService {
     return this.conferenciaRepository.create({
       // Do not remove comment below.
       // <creating-property-payload />
-      vereditoGeral: createConferenciaDto.vereditoGeral,
+      // vereditoGeral nunca vem do DTO: so a engine grava (regra de ouro).
 
       checkpoint,
 
@@ -142,7 +142,7 @@ export class ConferenciaService {
     return this.conferenciaRepository.update(id, {
       // Do not remove comment below.
       // <updating-property-payload />
-      vereditoGeral: updateConferenciaDto.vereditoGeral,
+      // vereditoGeral nunca vem do DTO: so a engine grava (regra de ouro).
 
       checkpoint,
 

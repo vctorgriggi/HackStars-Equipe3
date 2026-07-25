@@ -23,9 +23,11 @@ export class ProjetoModeloEntity extends EntityRelationalHelper {
   })
   descricao?: string | null;
 
+  // Código do desenho (ex.: EPT-163-PI-676): identificador natural do projeto.
   @Column({
     nullable: false,
     type: String,
+    unique: true,
   })
   codigo: string;
 

@@ -65,10 +65,11 @@ linha, dando rastreabilidade de trânsito.
 - **FotoEvidencia** — foto enviada pelo operador, armazenada com URL e vínculo
   aos campos extraídos dela.
 - **Checkpoint** — etapa ordenada da linha de produção, com posição na
-  sequência. Etapas reais informadas pelo time: adesivação/separação da
-  etiqueta → serigrafia → enchimento de óleo e conferência → fixação da placa
-  de metal (última). Seed do MVP com essas etapas; nomes ajustáveis com a
-  TRAEL.
+  sequência e `codigo` estável de máquina (slug único, ex.: `serigrafia`):
+  regras de gate casam por ele, nunca por nome exibido nem por ordem. Etapas
+  reais informadas pelo time: adesivação/separação da etiqueta → serigrafia →
+  enchimento de óleo e conferência → fixação da placa de identificação
+  (última). Seed do MVP com essas etapas; nomes ajustáveis com a TRAEL.
 - **EventoPassagem** — registro peça × checkpoint × timestamp, criado por scan
   do QR no checkpoint, com `observacao` opcional (ex.: "parou por erro aceito
   pelo time — motivo"). A posição atual da peça na linha é derivada (último
@@ -76,7 +77,7 @@ linha, dando rastreabilidade de trânsito.
 
 ```mermaid
 erDiagram
-    PROJETO_MODELO ||--o{ TRANSFORMADOR : "define a checklist de"
+    PROJETO_MODELO |o--o{ TRANSFORMADOR : "define a checklist de"
     TRANSFORMADOR ||--o{ CONFERENCIA : "e conferido em"
     TRANSFORMADOR ||--o{ EVENTO_PASSAGEM : "passa por"
     CHECKPOINT ||--o{ EVENTO_PASSAGEM : "registra"
@@ -103,6 +104,7 @@ erDiagram
     }
     CHECKPOINT {
         uuid id PK
+        string codigo "slug unico de maquina; gates casam por ele"
         string nome
         number ordem "posicao na sequencia da linha"
     }
@@ -115,10 +117,10 @@ erDiagram
     CAMPO_CONFERIDO {
         uuid id PK
         uuid conferenciaId FK
-        string nomeCampo "serie-placa, serie-chumbada-1..3, patrimonio-serigrafia, cliente"
+        string nomeCampo "serie-placa, serie-chumbada-1..3, patrimonio-placa, patrimonio-serigrafia, cliente-serigrafia"
         string valorEsperado "do QR"
         string valorLido "da visao; null se ilegivel"
-        number confianca "score da extracao"
+        number confianca "score 0..1 (double precision)"
         string veredito "conforme | divergente | nao_conferivel; so a engine grava"
         string regiaoLeitura "opcional: bounding box da leitura na foto"
         uuid fotoEvidenciaId FK "opcional"
@@ -126,7 +128,7 @@ erDiagram
     FOTO_EVIDENCIA {
         uuid id PK
         string url
-        string fonteFisica "placa | serigrafia | chumbado-1..3"
+        string fonteFisica "obrigatoria: placa | serigrafia | chumbado-1..3"
         uuid conferenciaId FK "opcional"
     }
     EVENTO_PASSAGEM {
