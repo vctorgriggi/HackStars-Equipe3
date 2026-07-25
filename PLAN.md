@@ -104,7 +104,10 @@ Depende de: Fase 0 completa.
     não deixa transformador órfão); codigoProjeto do QR sem cadastro não é
     erro — cai para vínculo da peça → projeto único do banco; escrita de
     veredito só por `CampoConferidosService.criarComVeredito` (server-side,
-    sem rota HTTP); `forwardRef` nos módulos conferencia ↔ campo-conferidos.
+    sem rota HTTP); `forwardRef` nos módulos conferencia ↔ campo-conferidos;
+    colunas NOT NULL recebem `''` quando o valor não existe (valorEsperado de
+    campo sem esperado; cliente de etiqueta sem cliente) — sentinela a revisar
+    se algum dia virar filtro de consulta.
 
 ## Fase 2 — Extração por visão
 
@@ -236,4 +239,4 @@ demo.
       checklist do banco desde a T1.2; ingestão automática do PDF virou Fase 6
       opcional (2026-07-25).
 
-<!-- rodada: fundacao @ 117598a -->
+<!-- rodada: nucleo @ 3472869 -->
