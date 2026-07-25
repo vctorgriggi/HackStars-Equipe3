@@ -96,6 +96,9 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
 - Toda borda externa entra atrás de porta mockável: `ExtractorPort` em
   `extracao`, storage em `evidencias`. Consumidores testam com mock; o adapter
   real se verifica manualmente com as fotos da demo.
+- Serviços, modelos (IDs Bedrock), custos e checklist de setup AWS:
+  docs/aws.md — o setup (model access, IAM, bucket) precisa acontecer antes da
+  Fase 2.
 - Nenhuma chamada de visão fora de ação explícita do operador — créditos AWS
   são finitos (SPEC, constraint 4); sem reprocessamento em loop.
 - Leitura retornada pelo adapter sempre carrega: valor, confiança, tipo da
