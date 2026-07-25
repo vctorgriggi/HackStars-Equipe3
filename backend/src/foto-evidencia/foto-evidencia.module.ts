@@ -1,6 +1,7 @@
 import { ConferenciaModule } from '../conferencia/conferencia.module';
 import {
   // do not remove this comment
+  forwardRef,
   Module,
 } from '@nestjs/common';
 import { FotoEvidenciaService } from './foto-evidencia.service';
@@ -27,7 +28,10 @@ const infrastructureUploaderModule = isLocalDriver
 
 @Module({
   imports: [
-    ConferenciaModule,
+    // forwardRef nos dois lados: ConferenciaModule passou a importar este
+    // modulo (a extracao le os bytes da evidencia pelo FotoEvidenciaService)
+    // e este ja importava aquele (evidencia aponta para conferencia).
+    forwardRef(() => ConferenciaModule),
 
     // do not remove this comment
     RelationalFotoEvidenciaPersistenceModule,

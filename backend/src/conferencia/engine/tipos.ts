@@ -7,6 +7,17 @@ export interface ItemChecklist {
   campo: string; // ex.: 'serie-placa'
   fonteFisica: string; // ex.: 'placa'
   obrigatorio: boolean;
+  /**
+   * `codigo` do Checkpoint em que a marcação passa a existir fisicamente na
+   * peça — a partir dele o campo é conferível. Usado FORA da engine, pelo
+   * chamador, para recortar a checklist por etapa (conferência parcial); a
+   * engine só compara o que recebe e ignora este dado.
+   *
+   * Opcional de propósito: item SEM `etapa` é sempre avaliado, em qualquer
+   * gate — é o que mantém compatível a checklist antiga (sem o campo) e a de
+   * modelos cujo fluxo ainda não foi mapeado.
+   */
+  etapa?: string;
 }
 
 export interface LeituraCampo {

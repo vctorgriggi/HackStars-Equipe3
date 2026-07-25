@@ -95,6 +95,22 @@ export const PAGINA_DEMO = `<!doctype html>
     letter-spacing: .06em;
     text-transform: uppercase;
   }
+  button.principal.alternativa { background: var(--aco); border-color: var(--aco); font-size: 17px; }
+  .faixa-extracao {
+    font-size: 14px; padding: 10px 12px; margin-bottom: 10px;
+    border: 1px solid var(--borda); border-radius: 4px;
+    background: #eef1f4; color: var(--tinta-fraca);
+  }
+  .faixa-extracao.vazia {
+    background: var(--ambar-fundo); border-color: var(--ambar); color: var(--ambar); font-weight: 600;
+  }
+  .bloco-bruto { margin-top: 10px; }
+  .bloco-bruto .titulo-bruto { font-size: 13px; color: var(--tinta-fraca); margin-bottom: 4px; }
+  .bloco-bruto pre {
+    white-space: pre-wrap; word-break: break-word; user-select: all;
+    border-radius: 4px; font-size: 13px;
+  }
+  .bloco-bruto[hidden] { display: none; }
   .linha-botoes { display: flex; flex-wrap: wrap; gap: 8px; }
   .linha-botoes > * { flex: 1 1 160px; }
   .grade-etapas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -229,6 +245,13 @@ export const PAGINA_DEMO = `<!doctype html>
         <button id="btn-parar-camera" class="secundario">Parar câmera</button>
       </div>
     </div>
+    <div id="qr-bruto" class="bloco-bruto" hidden>
+      <p class="titulo-bruto">Conteúdo bruto lido do QR (texto exato da etiqueta)</p>
+      <pre id="qr-bruto-texto"></pre>
+      <div class="linha-botoes" style="margin-top:8px">
+        <button id="btn-copiar-qr" class="secundario">Copiar</button>
+      </div>
+    </div>
   </section>
 
   <section id="sec-fotos" data-bloqueado="1">
@@ -248,13 +271,17 @@ export const PAGINA_DEMO = `<!doctype html>
     <div class="linha-botoes" style="margin:0 0 10px">
       <button class="secundario" id="btn-campos-etapa">Só os campos desta etapa</button>
     </div>
-    <p class="dica">A API sempre avalia a checklist inteira do modelo: campo desmarcado aqui chega sem leitura e sai como nao_conferivel — é assim que um gate parcial se comporta.</p>
+    <p class="dica">A etapa escolhida define quais campos são cobrados — os que ainda não existem na peça (ex.: placa na adesivação) ficam de fora do recorte.</p>
     <div id="lista-leituras"></div>
   </section>
 
   <section id="sec-conferir" data-bloqueado="1">
     <h2>6. Conferência</h2>
-    <button id="btn-conferir" class="principal largo">CONFERIR AGORA</button>
+    <div class="linha-botoes">
+      <button id="btn-extrair" class="principal" disabled>EXTRAIR COM TEXTRACT</button>
+      <button id="btn-conferir" class="principal alternativa">CONFERIR AGORA</button>
+    </div>
+    <p class="dica" id="extrair-dica">Extrair com Textract usa as fotos da seção 4 e a visão real da API — envie ao menos uma foto para liberar. "Conferir agora" usa as leituras digitadas da seção 5.</p>
     <div id="conferir-aviso" class="aviso neutro" hidden></div>
     <div id="resultado"></div>
   </section>
@@ -454,6 +481,26 @@ export const PAGINA_DEMO = `<!doctype html>
     aviso('qr-aviso', 'Câmera desligada.', 'neutro');
   });
 
+  el('btn-copiar-qr').addEventListener('click', function () {
+    var texto = el('qr-bruto-texto').textContent || '';
+    var pronto = function () { aviso('qr-aviso', 'Conteúdo bruto copiado.', 'ok'); };
+    var falhou = function () { aviso('qr-aviso', 'Não consegui copiar — selecione o texto à mão.', 'erro'); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(texto).then(pronto, falhou);
+      return;
+    }
+    try {
+      var faixa = document.createRange();
+      faixa.selectNodeContents(el('qr-bruto-texto'));
+      var selecao = window.getSelection();
+      selecao.removeAllRanges();
+      selecao.addRange(faixa);
+      document.execCommand('copy') ? pronto() : falhou();
+    } catch (erro) {
+      falhou();
+    }
+  });
+
   el('btn-camera').addEventListener('click', function () {
     if (!suportaQr) { return; }
     aviso('qr-aviso', 'Abrindo a câmera...', 'neutro');
@@ -470,9 +517,12 @@ export const PAGINA_DEMO = `<!doctype html>
             if (!estado.camera) { return; }
             detector.detect(video).then(function (codigos) {
               if (codigos && codigos.length && codigos[0].rawValue) {
-                el('payload').value = codigos[0].rawValue;
+                var bruto = codigos[0].rawValue;
+                el('payload').value = bruto;
+                el('qr-bruto-texto').textContent = bruto;
+                el('qr-bruto').hidden = false;
                 pararCamera();
-                aviso('qr-aviso', 'QR lido — confira o conteúdo no campo acima.', 'ok');
+                aviso('qr-aviso', 'QR lido — o conteúdo bruto está abaixo, exatamente como veio da etiqueta.', 'ok');
                 return;
               }
               window.setTimeout(procurar, 300);
@@ -538,12 +588,25 @@ export const PAGINA_DEMO = `<!doctype html>
           miniatura.src = resposta.corpo.url;
           miniatura.hidden = false;
         }
+        atualizarBotaoExtrair();
       })
       .catch(function (erro) {
         estadoTexto.className = 'estado falhou';
         estadoTexto.textContent = 'falhou';
         aviso('fotos-aviso', fonte + ' — falha de rede: ' + erro.message, 'erro');
       });
+  }
+
+  function fotosEnviadas() {
+    return FONTES.filter(function (fonte) { return !!estado.fotos[fonte]; });
+  }
+
+  function atualizarBotaoExtrair() {
+    var enviadas = fotosEnviadas();
+    el('btn-extrair').disabled = enviadas.length === 0;
+    el('extrair-dica').textContent = enviadas.length === 0
+      ? 'Extrair com Textract usa as fotos da seção 4 e a visão real da API — envie ao menos uma foto para liberar. "Conferir agora" usa as leituras digitadas da seção 5.'
+      : 'Extrair com Textract vai enviar ' + enviadas.length + ' foto(s) (' + enviadas.join(', ') + ') ao extrator da API. "Conferir agora" continua usando as leituras digitadas da seção 5.';
   }
 
   // --- E. Leituras --------------------------------------------------------
@@ -630,18 +693,37 @@ export const PAGINA_DEMO = `<!doctype html>
     return Number(valor).toFixed(3);
   }
 
+  function linhaDaEtapa(resposta) {
+    var quantos = typeof resposta.camposAvaliados === 'number' ? resposta.camposAvaliados : (resposta.campos || []).length;
+    if (resposta.etapaAvaliada) {
+      return 'Etapa: ' + resposta.etapaAvaliada.nome + ' · ' + quantos + ' campos conferíveis nesta etapa';
+    }
+    return 'Conferência completa · ' + quantos + ' campos';
+  }
+
+  function faixaDaExtracao(extracao) {
+    if (!extracao) { return ''; }
+    if (extracao.leiturasProduzidas === 0) {
+      return '<div class="faixa-extracao vazia">Extração: driver ' + esc(extracao.driver) +
+        ' · ' + esc(extracao.fotos) + ' foto(s) · 0 leitura(s) — nenhuma leitura extraída: ' +
+        'verifique enquadramento e iluminação.</div>';
+    }
+    return '<div class="faixa-extracao">Extração: driver ' + esc(extracao.driver) +
+      ' · ' + esc(extracao.fotos) + ' foto(s) · ' + esc(extracao.leiturasProduzidas) + ' leitura(s)</div>';
+  }
+
   function renderizar(resposta) {
     var geral = resposta.conferencia ? resposta.conferencia.vereditoGeral : 'nao_conferivel';
     var textos = TEXTO_VEREDITO[geral] || [String(geral).toUpperCase(), ''];
-    var etapa = resposta.conferencia && resposta.conferencia.checkpoint
-      ? resposta.conferencia.checkpoint.nome
-      : 'sem etapa';
     var peca = resposta.transformador || {};
 
-    var html = '<div class="veredito-geral v-' + esc(geral) + '">' +
+    var html = faixaDaExtracao(resposta.extracao);
+
+    html += '<div class="veredito-geral v-' + esc(geral) + '">' +
       '<div class="titulo">' + esc(textos[0]) + '</div>' +
       '<div class="sub">' + esc(textos[1]) + '</div>' +
-      '<div class="sub">Peça ' + esc(peca.numeroSerie || '?') + ' — etapa: ' + esc(etapa) + '</div>' +
+      '<div class="sub">Peça ' + esc(peca.numeroSerie || '?') + '</div>' +
+      '<div class="sub">' + esc(linhaDaEtapa(resposta)) + '</div>' +
       '</div>';
 
     html += (resposta.campos || []).map(function (campo) {
@@ -671,29 +753,24 @@ export const PAGINA_DEMO = `<!doctype html>
     el('resultado').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  el('btn-conferir').addEventListener('click', function () {
-    var leituras = coletarLeituras();
-    if (!leituras.length) {
-      aviso('conferir-aviso', 'Marque ao menos um campo na seção 5.', 'erro');
-      return;
-    }
+  function payloadAtual() {
     var payload = el('payload').value.trim();
     if (!payload) {
       aviso('conferir-aviso', 'A etiqueta (seção 3) está vazia.', 'erro');
-      return;
+      return null;
     }
+    return payload;
+  }
 
-    var corpo = { payloadQr: payload, leituras: leituras };
-    if (estado.etapa) {
-      corpo.etapaCodigo = estado.etapa;
-    }
-
-    var botao = el('btn-conferir');
+  // Uma só rotina de chamada: as duas ações mandam corpos diferentes para
+  // rotas diferentes e recebem a MESMA resposta — quem decide o veredito é a
+  // API nos dois casos.
+  function chamarConferencia(caminho, corpo, botao, textoAndamento) {
     botao.disabled = true;
-    aviso('conferir-aviso', 'Conferindo na API...', 'neutro');
+    aviso('conferir-aviso', textoAndamento, 'neutro');
     el('resultado').innerHTML = '';
 
-    pedir(API + '/conferencia/executar', {
+    pedir(API + caminho, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(corpo)
@@ -712,12 +789,56 @@ export const PAGINA_DEMO = `<!doctype html>
       aviso('conferir-aviso', 'Falha de rede: ' + erro.message, 'erro');
     }).then(function () {
       botao.disabled = false;
+      atualizarBotaoExtrair();
     });
+  }
+
+  el('btn-conferir').addEventListener('click', function () {
+    var leituras = coletarLeituras();
+    if (!leituras.length) {
+      aviso('conferir-aviso', 'Marque ao menos um campo na seção 5.', 'erro');
+      return;
+    }
+    var payload = payloadAtual();
+    if (!payload) { return; }
+
+    var corpo = { payloadQr: payload, leituras: leituras };
+    if (estado.etapa) {
+      corpo.etapaCodigo = estado.etapa;
+    }
+
+    chamarConferencia('/conferencia/executar', corpo, el('btn-conferir'), 'Conferindo na API...');
+  });
+
+  el('btn-extrair').addEventListener('click', function () {
+    var enviadas = fotosEnviadas();
+    if (!enviadas.length) {
+      aviso('conferir-aviso', 'Envie ao menos uma foto na seção 4 para extrair.', 'erro');
+      return;
+    }
+    var payload = payloadAtual();
+    if (!payload) { return; }
+
+    var corpo = {
+      payloadQr: payload,
+      fotoEvidenciaIds: enviadas.map(function (fonte) { return estado.fotos[fonte].id; })
+    };
+    if (estado.etapa) {
+      corpo.etapaCodigo = estado.etapa;
+    }
+
+    chamarConferencia(
+      '/conferencia/executar-com-fotos',
+      corpo,
+      el('btn-extrair'),
+      'Lendo as fotos... a visão da API leva alguns segundos por foto.'
+    );
   });
 
   montarFotos();
   montarLeituras();
   aplicarPreset(PRESET_DEMO);
+  atualizarBotaoExtrair();
   aviso('conferir-aviso', '');
 })();
 </script>

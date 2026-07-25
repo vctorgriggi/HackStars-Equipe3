@@ -3,6 +3,7 @@ import {
   HttpStatus,
   Injectable,
   InternalServerErrorException,
+  Logger,
   UnprocessableEntityException,
 } from '@nestjs/common';
 
@@ -54,7 +55,78 @@ export interface ResultadoExecucao {
     cliente: string;
     projetoModeloCodigo: string;
   };
+  /**
+   * Etapa que definiu o RECORTE da checklist (null = checklist inteira). O
+   * chamador precisa dela para exibir "conferência parcial da etapa X" em vez
+   * de dar a conferência como completa.
+   */
+  etapaAvaliada: { codigo: string; nome: string; ordem: number } | null;
+  /**
+   * Quantos itens da checklist entraram no recorte. Pode ser MAIOR que
+   * `campos.length`: item opcional sem valor esperado é omitido pela engine.
+   */
+  camposAvaliados: number;
   campos: CampoExecutado[];
+}
+
+/** O que o filtro por etapa devolve: o recorte + o que precisou ser relevado. */
+export interface RecorteDaEtapa {
+  itens: ItemChecklist[];
+  /** Etapas citadas por itens que não existem como Checkpoint no banco. */
+  etapasDesconhecidas: string[];
+}
+
+/**
+ * Recorta a checklist para a etapa da conferência. Função pura: recebe a
+ * ordem da etapa do request e um mapa `codigo do checkpoint -> ordem`; não
+ * toca banco.
+ *
+ * Regra (CUMULATIVA, de propósito):
+ * - `ordemDaEtapa === null` (request sem `etapaCodigo`) → checklist inteira,
+ *   o comportamento histórico do endpoint;
+ * - item SEM `etapa` → sempre incluído (checklist antiga continua valendo);
+ * - item com `etapa` conhecida → incluído quando a ordem dela é MENOR OU
+ *   IGUAL à ordem da etapa do request: a marcação já existe na peça naquele
+ *   ponto do fluxo. O gate da placa reconfere o chumbado e a serigrafia — é
+ *   assim que se detecta troca de peça entre etapas;
+ * - item com `etapa` desconhecida (não há Checkpoint com aquele `codigo`) →
+ *   incluído, e o código volta em `etapasDesconhecidas` para o chamador
+ *   logar. Checklist inconsistente não pode derrubar a conferência, e
+ *   silenciar o item seria pior: campo obrigatório sumindo do gate é
+ *   exatamente o falso OK que a regra de ouro proíbe.
+ */
+export function filtrarChecklistPorEtapa(
+  checklist: ItemChecklist[],
+  ordemDaEtapa: number | null,
+  ordensPorCodigo: Map<string, number>,
+): RecorteDaEtapa {
+  if (ordemDaEtapa === null) {
+    return { itens: [...checklist], etapasDesconhecidas: [] };
+  }
+
+  const itens: ItemChecklist[] = [];
+  const desconhecidas = new Set<string>();
+
+  for (const item of checklist) {
+    const etapa = item.etapa?.trim();
+    if (etapa === undefined || etapa.length === 0) {
+      itens.push(item);
+      continue;
+    }
+
+    const ordemDoItem = ordensPorCodigo.get(etapa);
+    if (ordemDoItem === undefined) {
+      desconhecidas.add(etapa);
+      itens.push(item);
+      continue;
+    }
+
+    if (ordemDoItem <= ordemDaEtapa) {
+      itens.push(item);
+    }
+  }
+
+  return { itens, etapasDesconhecidas: [...desconhecidas] };
 }
 
 /**
@@ -97,7 +169,11 @@ function ehItemChecklist(valor: unknown): valor is ItemChecklist {
     typeof item.campo === 'string' &&
     item.campo.length > 0 &&
     typeof item.fonteFisica === 'string' &&
-    typeof item.obrigatorio === 'boolean'
+    typeof item.obrigatorio === 'boolean' &&
+    // `etapa` e opcional (checklist antiga nao tem), mas quando existe precisa
+    // ser string: outro tipo nunca casaria com o `codigo` do Checkpoint e o
+    // item cairia calado no ramo "etapa desconhecida".
+    (item.etapa === undefined || typeof item.etapa === 'string')
   );
 }
 
@@ -130,6 +206,8 @@ function montarValoresEsperados(
 
 @Injectable()
 export class ConferenciaExecucaoService {
+  private readonly logger = new Logger(ConferenciaExecucaoService.name);
+
   constructor(
     private readonly transformadorService: TransformadorsService,
 
@@ -167,7 +245,18 @@ export class ConferenciaExecucaoService {
       transformador.projetoModelo = projetoModelo;
     }
 
-    const checklist = this.lerChecklist(projetoModelo);
+    const checklistCompleta = this.lerChecklist(projetoModelo);
+    // Conferencia PARCIAL por etapa: no gate da adesivacao a placa ainda nem
+    // foi fixada — cobra-la devolveria `nao_conferivel` por marcacao
+    // inexistente, ruido que some o veredito real. O recorte e cumulativo
+    // (ordem do item <= ordem do gate); a regra completa esta em
+    // `filtrarChecklistPorEtapa`.
+    const checklist = await this.recortarChecklistPorEtapa(
+      checklistCompleta,
+      checkpoint,
+      projetoModelo,
+    );
+
     // Dedup por campo (revisão R1): duas fotos da mesma fonte geram duas
     // leituras do mesmo campo; sem isto, a PRIMEIRA vencia mesmo sendo nula
     // e a refoto legível era descartada. Fica a melhor: valorLido presente
@@ -239,8 +328,79 @@ export class ConferenciaExecucaoService {
         cliente: transformador.cliente,
         projetoModeloCodigo: projetoModelo.codigo,
       },
+      etapaAvaliada:
+        checkpoint === null
+          ? null
+          : {
+              codigo: checkpoint.codigo,
+              nome: checkpoint.nome,
+              ordem: checkpoint.ordem,
+            },
+      camposAvaliados: checklist.length,
       campos,
     };
+  }
+
+  /**
+   * Resolve as ordens das etapas citadas pela checklist e aplica o recorte.
+   * As buscas ficam num Map local (uma consulta por `codigo` distinto, nao
+   * uma por item); a etapa do proprio request ja vem resolvida e entra no
+   * cache sem ida ao banco.
+   */
+  private async recortarChecklistPorEtapa(
+    checklist: ItemChecklist[],
+    checkpoint: Checkpoint | null,
+    projetoModelo: ProjetoModelo,
+  ): Promise<ItemChecklist[]> {
+    if (checkpoint === null) {
+      return checklist;
+    }
+
+    const ordensPorCodigo = new Map<string, number>([
+      [checkpoint.codigo, checkpoint.ordem],
+    ]);
+
+    for (const item of checklist) {
+      const etapa = item.etapa?.trim();
+      if (
+        etapa === undefined ||
+        etapa.length === 0 ||
+        ordensPorCodigo.has(etapa)
+      ) {
+        continue;
+      }
+
+      const doItem = await this.checkpointService.findByCodigo(etapa);
+      if (doItem) {
+        ordensPorCodigo.set(doItem.codigo, doItem.ordem);
+      }
+    }
+
+    const recorte = filtrarChecklistPorEtapa(
+      checklist,
+      checkpoint.ordem,
+      ordensPorCodigo,
+    );
+
+    for (const desconhecida of recorte.etapasDesconhecidas) {
+      this.logger.warn(
+        `checklist-etapa-desconhecida: ProjetoModelo ${projetoModelo.codigo} referencia a etapa '${desconhecida}', que nao existe como Checkpoint; itens dessa etapa foram avaliados assim mesmo`,
+      );
+    }
+
+    // Recorte vazio jamais vira resposta: a engine devolveria `conforme` com
+    // zero campos — o falso OK que a regra de ouro proibe. So acontece com
+    // checklist mal configurada (nenhum item conferivel ate esta etapa).
+    if (recorte.itens.length === 0) {
+      throw new UnprocessableEntityException({
+        status: HttpStatus.UNPROCESSABLE_ENTITY,
+        errors: {
+          etapaCodigo: `etapa-sem-campos-conferiveis: nenhum item da checklist do ProjetoModelo ${projetoModelo.codigo} e conferivel ate a etapa '${checkpoint.codigo}'`,
+        },
+      });
+    }
+
+    return recorte.itens;
   }
 
   private lerPayload(payloadQr: string): PayloadEtiqueta {
