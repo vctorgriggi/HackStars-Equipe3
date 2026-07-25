@@ -20,6 +20,12 @@ export class ConferenciaEntity extends EntityRelationalHelper {
     nullable: true,
     type: String,
   })
+  observacao?: string | null;
+
+  @Column({
+    nullable: true,
+    type: String,
+  })
   vereditoGeral?: string | null;
 
   @ManyToOne(() => CheckpointEntity, { eager: true, nullable: true })

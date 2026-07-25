@@ -120,11 +120,15 @@ Depende de: Fase 2 completa.
   - Verificação manual: ler a etiqueta real da peça de demo no celular;
     payload decodificado aparece como valores esperados.
   - Aceitação: falha de leitura tem caminho de recuperação (reler ou digitar,
-    conforme T1.1).
+    conforme T1.1). A tela aceita `?etapa=<codigo>` na URL: cada celular
+    simula a câmera de uma etapa (SPEC, Must).
 - [ ] T3.2 — Captura/upload de fotos e disparo da conferência · módulo: frontend
   - Verificação manual: fotografar as fontes físicas, enviar, conferência
-    criada na API (chamadas de visão só neste disparo — constraint 4).
-  - Aceitação: operador consegue completar o fluxo sem instrução externa.
+    criada na API (chamadas de visão só neste disparo — constraint 4); com
+    dois celulares em URLs de etapas diferentes, cada conferência nasce
+    vinculada à etapa certa.
+  - Aceitação: operador consegue completar o fluxo sem instrução externa;
+    conferência herda o checkpoint da URL quando presente.
 - [ ] T3.3 — Tela de veredito campo a campo com evidências · módulo: frontend
   - Verificação manual: roteiro dos critérios 1, 2, 3 e 4 do SPEC executado com
     a peça de demo, na sequência, sem intervenção no banco.

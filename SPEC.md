@@ -52,8 +52,10 @@ linha, dando rastreabilidade de trânsito.
   (Could).
 - **Conferencia** — uma execução de verificação de uma peça: referência ao
   Transformador, conjunto de CampoConferido, veredito geral, timestamp,
-  opcionalmente vinculada a um Checkpoint — quando presente, o vínculo
-  registra em qual etapa da linha o erro foi acusado. Pode cobrir um
+  `observacao` opcional (exceção aceita pelo time é anotada aqui, na
+  conferência divergente — auditável; com perfis, o aceite exigirá papel
+  autorizado), e opcionalmente vinculada a um Checkpoint — quando presente, o
+  vínculo registra em qual etapa da linha o erro foi acusado. Pode cobrir um
   subconjunto de campos: no fluxo real da TRAEL a conferência acontece em
   gates parciais (pós-serigrafia e pós-placa), não de uma vez só.
 - **CampoConferido** — um campo comparado: nome (ex.: serie-placa,
@@ -113,6 +115,7 @@ erDiagram
         uuid transformadorId FK
         uuid checkpointId FK "opcional: etapa onde o veredito saiu"
         string vereditoGeral "so a engine grava; nunca via DTO"
+        string observacao "opcional: excecao aceita, justificada"
     }
     CAMPO_CONFERIDO {
         uuid id PK
@@ -159,6 +162,11 @@ erDiagram
   `nao_conferivel` se qualquer campo for ilegível; `conforme` somente com todos
   os campos conformes.
 - Tela de veredito campo a campo com a foto-evidência de cada valor lido.
+- Fluxo de conferência abre fixado em uma etapa via URL
+  (`?etapa=<codigo do checkpoint>`): cada celular simula a câmera daquela
+  etapa, e conferências/eventos criados por ele herdam a etapa
+  automaticamente — em produção, cada câmera fixa é provisionada amarrada ao
+  mesmo `codigo`.
 
 ### Should
 
@@ -293,7 +301,10 @@ origem de cada valor esperado (QR ou ERP) e acusa divergência entre origens.
 
 Do upload do projeto até a expedição, com humano apenas em três pontos:
 aprovar a extração do projeto (uma vez por modelo), corrigir a peça física
-quando um gate acusa, e registrar exceção deliberada (observacao no evento).
+quando um gate acusa, e registrar exceção deliberada (observacao na
+conferência divergente, que libera o avanço com o aceite gravado; com perfis,
+exigirá papel autorizado). A identidade da etapa vem do dispositivo: cada
+câmera é provisionada amarrada ao `codigo` de um Checkpoint.
 
 1. Engenharia sobe o PDF do projeto do modelo → IA (Bedrock) extrai marcações,
    posições e obrigatoriedade → engenharia revisa e aprova → vira

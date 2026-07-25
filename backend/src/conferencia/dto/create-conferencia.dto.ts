@@ -13,6 +13,7 @@ import {
   ValidateNested,
   IsNotEmptyObject,
   IsOptional,
+  IsString,
 } from 'class-validator';
 
 import {
@@ -21,6 +22,14 @@ import {
 } from '@nestjs/swagger';
 
 export class CreateConferenciaDto {
+  @ApiProperty({
+    required: false,
+    type: () => String,
+  })
+  @IsOptional()
+  @IsString()
+  observacao?: string | null;
+
   // vereditoGeral fica fora do DTO de propósito: só a engine grava veredito.
 
   @ApiProperty({

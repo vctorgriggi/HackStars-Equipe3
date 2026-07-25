@@ -9,6 +9,8 @@ import { ConferenciaEntity } from '../entities/conferencia.entity';
 export class ConferenciaMapper {
   static toDomain(raw: ConferenciaEntity): Conferencia {
     const domainEntity = new Conferencia();
+    domainEntity.observacao = raw.observacao;
+
     domainEntity.vereditoGeral = raw.vereditoGeral;
 
     if (raw.checkpoint) {
@@ -32,6 +34,8 @@ export class ConferenciaMapper {
 
   static toPersistence(domainEntity: Conferencia): ConferenciaEntity {
     const persistenceEntity = new ConferenciaEntity();
+    persistenceEntity.observacao = domainEntity.observacao;
+
     persistenceEntity.vereditoGeral = domainEntity.vereditoGeral;
 
     if (domainEntity.checkpoint) {

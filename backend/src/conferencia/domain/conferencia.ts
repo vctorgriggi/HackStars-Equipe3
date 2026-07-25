@@ -5,6 +5,12 @@ import { Transformador } from '../../transformadors/domain/transformador';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class Conferencia {
+  @ApiProperty({
+    type: () => String,
+    nullable: true,
+  })
+  observacao?: string | null;
+
   // Gravado só pela engine (nunca via DTO); legível em toda resposta.
   @ApiProperty({
     type: () => String,
