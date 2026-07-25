@@ -106,14 +106,14 @@
           "raw": "{\n  \"payloadQr\": \"{{payloadQrDemo}}\",\n  \"etapaCodigo\": \"fixacao-placa\",\n  \"leituras\": [\n    { \"campo\": \"serie-chumbada-1\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-chumbada-2\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-chumbada-3\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-placa\", \"valorLido\": \"847833\", \"confianca\": 0.97 },\n    { \"campo\": \"patrimonio-placa\", \"valorLido\": \"251328\", \"confianca\": 0.9 },\n    { \"campo\": \"patrimonio-serigrafia\", \"valorLido\": \"251328\", \"confianca\": 0.92 },\n    { \"campo\": \"cliente-serigrafia\", \"valorLido\": \"143091 - Energisa Rondônia Distribuidora de Energia S.A\", \"confianca\": 0.88 }\n  ]\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/api/v1/conferencia/executar",
+          "raw": "{{baseUrl}}/api/v1/conferencias/executar",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
             "api",
             "v1",
-            "conferencia",
+            "conferencias",
             "executar"
           ]
         },
@@ -139,14 +139,14 @@
           "raw": "{\n  \"payloadQr\": \"{{payloadQrDemo}}\",\n  \"etapaCodigo\": \"serigrafia\",\n  \"leituras\": [\n    { \"campo\": \"serie-chumbada-1\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-chumbada-2\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-chumbada-3\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-placa\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"patrimonio-placa\", \"valorLido\": \"251328\", \"confianca\": 0.95 },\n    { \"campo\": \"patrimonio-serigrafia\", \"valorLido\": \"251328\", \"confianca\": 0.95 },\n    { \"campo\": \"cliente-serigrafia\", \"valorLido\": \"143091 - Energisa Rondônia Distribuidora de Energia S.A\", \"confianca\": 0.95 }\n  ]\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/api/v1/conferencia/executar",
+          "raw": "{{baseUrl}}/api/v1/conferencias/executar",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
             "api",
             "v1",
-            "conferencia",
+            "conferencias",
             "executar"
           ]
         },
@@ -172,14 +172,14 @@
           "raw": "{\n  \"payloadQr\": \"{{payloadQrDemo}}\",\n  \"limiarConfianca\": 0,\n  \"leituras\": [\n    { \"campo\": \"serie-placa\", \"valorLido\": \"847233\", \"confianca\": 0 }\n  ]\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/api/v1/conferencia/executar",
+          "raw": "{{baseUrl}}/api/v1/conferencias/executar",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
             "api",
             "v1",
-            "conferencia",
+            "conferencias",
             "executar"
           ]
         },
@@ -205,14 +205,14 @@
           "raw": "{\n  \"payloadQr\": \"lixo sem formato @@@@ texto aleatorio que nao e token unico\",\n  \"leituras\": [\n    { \"campo\": \"serie-placa\", \"valorLido\": \"847233\", \"confianca\": 0.9 }\n  ]\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/api/v1/conferencia/executar",
+          "raw": "{{baseUrl}}/api/v1/conferencias/executar",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
             "api",
             "v1",
-            "conferencia",
+            "conferencias",
             "executar"
           ]
         },
@@ -247,14 +247,14 @@
           ]
         },
         "url": {
-          "raw": "{{baseUrl}}/api/v1/foto-evidencia/upload",
+          "raw": "{{baseUrl}}/api/v1/fotos-evidencia/upload",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
             "api",
             "v1",
-            "foto-evidencia",
+            "fotos-evidencia",
             "upload"
           ]
         },
@@ -296,14 +296,14 @@
           }
         ],
         "url": {
-          "raw": "{{baseUrl}}/api/v1/projeto-modelos",
+          "raw": "{{baseUrl}}/api/v1/projetos-modelo",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
             "api",
             "v1",
-            "projeto-modelos"
+            "projetos-modelo"
           ]
         },
         "description": "Seed: EPT-163-PI-676 com a checklist de 8 campos. É daqui que a engine tira a lista do que conferir — nunca de código."
@@ -328,14 +328,14 @@
           "raw": "{\n  \"valorEsperado\": \"847833\"\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/api/v1/campo-conferidos/:id",
+          "raw": "{{baseUrl}}/api/v1/campos-conferidos/:id",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
             "api",
             "v1",
-            "campo-conferidos",
+            "campos-conferidos",
             ":id"
           ],
           "variable": [
@@ -359,14 +359,14 @@
           }
         ],
         "url": {
-          "raw": "{{baseUrl}}/api/v1/transformadors?page=1&limit=10",
+          "raw": "{{baseUrl}}/api/v1/transformadores?page=1&limit=10",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
             "api",
             "v1",
-            "transformadors"
+            "transformadores"
           ],
           "query": [
             {

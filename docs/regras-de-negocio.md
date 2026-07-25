@@ -12,7 +12,7 @@
 fonte alimenta o lado "esperado" da comparação nesta rodada: sem ERP, sem
 digitação, sem constante. O mapeamento é por PREFIXO do nome do campo do
 checklist, em `ORIGENS_DO_ESPERADO` de
-`backend/src/conferencia/conferencia-execucao.service.ts`: `serie-*` ←
+`backend/src/conferencias/conferencia-execucao.service.ts`: `serie-*` ←
 `numeroSerie`, `patrimonio-*` ← `patrimonio`, `cliente-*` ← `cliente`. Campo
 com prefixo fora dessa lista fica sem valor esperado.
 
@@ -22,9 +22,9 @@ o esperado dela viria do projeto estruturado, que não existe nesta rodada. Como
 resultado (R15). Mesmo arquivo, comentário sobre `ORIGENS_DO_ESPERADO`.
 
 **R3 — `numeroSerie` é a chave de negócio única da peça.** Coluna `unique: true`
-em `backend/src/transformadors/infrastructure/persistence/relational/entities/transformador.entity.ts`;
-a busca de negócio é `TransformadorsService.findByNumeroSerie`
-(`backend/src/transformadors/transformadors.service.ts`). É o número que a
+em `backend/src/transformadores/infrastructure/persistence/relational/entities/transformador.entity.ts`;
+a busca de negócio é `TransformadoresService.findByNumeroSerie`
+(`backend/src/transformadores/transformadores.service.ts`). É o número que a
 fábrica crava 3× no metal, e é por isso que ele serve de chave.
 
 **R4 — Patrimônio é numeração do cliente e nunca é chave.** A coluna é `NOT NULL`
@@ -81,7 +81,7 @@ política de veredito e vive só na checklist — a extração não a enxerga
 **R13 — Valores canônicos de `fonteFisica`: `placa`, `serigrafia`, `chumbado-1`,
 `chumbado-2`, `chumbado-3`, `geral`.** A fonte única em código é a união literal
 `FonteFisica` em `backend/src/extracao/ports/extractor.port.ts`;
-`backend/src/foto-evidencia/fonte-fisica.enum.ts` deriva dela com `satisfies`, o
+`backend/src/fotos-evidencia/fonte-fisica.enum.ts` deriva dela com `satisfies`, o
 que quebra a compilação se as duas listas divergirem. Grafia divergente quebra o
 pareamento campo ↔ evidência.
 
@@ -96,7 +96,7 @@ com upsert por `codigo`.
 ## 3. Vereditos
 
 **R15 — Três estados, e só três: `conforme`, `divergente`, `nao_conferivel`.**
-União literal `Veredito` em `backend/src/conferencia/engine/tipos.ts`.
+União literal `Veredito` em `backend/src/conferencias/engine/tipos.ts`.
 `conforme` = o valor lido bate com o esperado e a leitura tem lastro.
 `divergente` = leu, tem lastro, e não bate — a peça está errada.
 `nao_conferivel` = o sistema **não sabe** — falta esperado, falta leitura ou a
@@ -105,7 +105,7 @@ confiança não sustenta a afirmação. `nao_conferivel` não é um "quase confo
 
 **R16 — A engine avalia campo a campo, na ordem da checklist, e as quatro regras
 abaixo são testadas nesta ordem** (`conferir` em
-`backend/src/conferencia/engine/engine-conformidade.ts`). A primeira que casar
+`backend/src/conferencias/engine/engine-conformidade.ts`). A primeira que casar
 decide o campo; as seguintes nem são avaliadas.
 
 **R17 — (a) Sem valor esperado.** Campo **opcional** some do resultado (não
@@ -162,7 +162,7 @@ política é constante enterrada.
 **R25 — Limiar padrão 0.8, sobrescrevível por requisição.** `LIMIAR_CONFIANCA_PADRAO`
 vive na **borda** (`conferencia-execucao.service.ts`), nunca dentro da engine;
 o cliente pode mandar `limiarConfianca` (0..1) no corpo do
-`POST /conferencia/executar` e ele vence o padrão. `OpcoesEngine.limiarConfianca`
+`POST /conferencias/executar` e ele vence o padrão. `OpcoesEngine.limiarConfianca`
 é parâmetro obrigatório da engine.
 
 **R26 — Toda leitura carrega confiança, foto de evidência e, quando o serviço
@@ -172,10 +172,10 @@ fornecer, bounding box.** `LeituraCampo` (engine) e `LeituraExtraida`
 `fotoEvidenciaId` da foto de origem em toda leitura **mesmo que o adapter
 esqueça** — vínculo leitura → evidência é regra de ouro, não cortesia do adapter.
 
-**R27 — O veredito tem um único caminho de escrita: `CampoConferidosService.criarComVeredito`.**
+**R27 — O veredito tem um único caminho de escrita: `CamposConferidosService.criarComVeredito`.**
 Método server-side, sem rota HTTP e sem DTO equivalente, chamado apenas pela
 execução de conferência com o resultado já calculado pela engine
-(`backend/src/campo-conferidos/campo-conferidos.service.ts`).
+(`backend/src/campos-conferidos/campos-conferidos.service.ts`).
 
 **R28 — Veredito nunca entra pela borda HTTP.** `CreateCampoConferidoDto` e
 `UpdateCampoConferidoDto` não têm `veredito`; `CreateConferenciaDto` e
@@ -219,17 +219,17 @@ slug e não como id (`CheckpointsService.findByCodigo`).
 desconhecido devolve 422 `etapa-desconhecida: <codigo>` sem ter criado
 transformador nenhum. Etapa errada não deixa peça órfã no banco.
 
-**R35 — A posição da peça na linha é derivada, nunca coluna.** `EventoPassagem`
-registra peça × checkpoint × `createdAt`; a posição atual é o último evento. Não
-existe coluna de posição em `Transformador`.
+**R35 — A posição da peça na linha é derivada, nunca coluna.** `Passagem`
+registra peça × checkpoint × `createdAt`; a posição atual é a última
+passagem. Não existe coluna de posição em `Transformador`.
 
 **R36 — Há dois tipos de exceção, e cada uma mora na sua entidade.**
-`EventoPassagem.observacao` é **exceção de trânsito** (por que a peça parou ou
+`Passagem.observacao` é **exceção de trânsito** (por que a peça parou ou
 avançou naquele ponto). `Conferencia.observacao` é **exceção de conformidade**
 (o aceite do time sobre uma conferência divergente, auditável). Ambas são
 colunas opcionais e ambas entram por DTO normal — diferente do veredito (R28).
 `Conferencia.observacao` **não** é escrita pela execução: entra depois, por
-`PATCH /conferencia/:id`.
+`PATCH /conferencias/:id`.
 
 ## 6. Extração
 
@@ -297,7 +297,7 @@ serviço pago é decisão explícita, nunca acidente.
 
 **R46 — Três formatos aceitos, testados nesta ordem: JSON → token único →
 chave:valor.** `parsePayloadEtiqueta` em
-`backend/src/transformadors/qr/qr-payload.parser.ts`. O token único vem antes de
+`backend/src/transformadores/qr/qr-payload.parser.ts`. O token único vem antes de
 chave:valor porque um payload como `TPD-408136` sozinho é um identificador de
 lookup, não uma etiqueta incompleta.
 
@@ -337,7 +337,7 @@ carrega esse defeito de fábrica, e é ele que a demo existe para pegar.
 Patrimônio, na placa e na serigrafia: **251328**. Cliente na serigrafia:
 Energisa Rondônia. Fontes: SPEC.md (problema e critério 2), `LEITURAS_DEMO` no
 mock e o teste-âncora em
-`backend/src/conferencia/engine/engine-conformidade.spec.ts`.
+`backend/src/conferencias/engine/engine-conformidade.spec.ts`.
 
 **R53 — O resultado que o sistema DEVE dar.** `vereditoGeral` = **`divergente`**,
 com **`serie-placa` como o único campo divergente** (esperado `847233`, lido
@@ -357,7 +357,7 @@ após normalização (R20). QR com o nome completo do cliente produz um segundo
 campo divergente e quebra a leitura "só a série da placa diverge" — conferir o
 texto do cliente ao montar o payload de demonstração.
 
-## Rodapé — `POST /api/v1/conferencia/executar`: erro → status
+## Rodapé — `POST /api/v1/conferencias/executar`: erro → status
 
 | Situação | Status | Corpo |
 | --- | --- | --- |

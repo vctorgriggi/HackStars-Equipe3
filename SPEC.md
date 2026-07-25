@@ -72,17 +72,17 @@ linha, dando rastreabilidade de trânsito.
   reais informadas pelo time: adesivação/separação da etiqueta → serigrafia →
   enchimento de óleo e conferência → fixação da placa de identificação
   (última). Seed do MVP com essas etapas; nomes ajustáveis com a TRAEL.
-- **EventoPassagem** — registro peça × checkpoint × timestamp, criado por scan
+- **Passagem** — registro peça × checkpoint × timestamp, criado por scan
   do QR no checkpoint, com `observacao` opcional (ex.: "parou por erro aceito
-  pelo time — motivo"). A posição atual da peça na linha é derivada (último
-  evento), nunca coluna duplicada.
+  pelo time — motivo"). A posição atual da peça na linha é derivada (última
+  passagem), nunca coluna duplicada.
 
 ```mermaid
 erDiagram
     PROJETO_MODELO |o--o{ TRANSFORMADOR : "define a checklist de"
     TRANSFORMADOR ||--o{ CONFERENCIA : "e conferido em"
-    TRANSFORMADOR ||--o{ EVENTO_PASSAGEM : "passa por"
-    CHECKPOINT ||--o{ EVENTO_PASSAGEM : "registra"
+    TRANSFORMADOR ||--o{ PASSAGEM : "passa por"
+    CHECKPOINT ||--o{ PASSAGEM : "registra"
     CHECKPOINT |o--o{ CONFERENCIA : "gate opcional"
     CONFERENCIA ||--o{ CAMPO_CONFERIDO : "compara"
     CONFERENCIA |o--o{ FOTO_EVIDENCIA : "recebe"
@@ -134,7 +134,7 @@ erDiagram
         string fonteFisica "obrigatoria: placa | serigrafia | chumbado-1..3 | geral"
         uuid conferenciaId FK "opcional"
     }
-    EVENTO_PASSAGEM {
+    PASSAGEM {
         uuid id PK
         uuid transformadorId FK
         uuid checkpointId FK
@@ -266,8 +266,8 @@ atrás dessas mesmas fronteiras; engine e portas não mudam.
    `nao_conferivel`, e o veredito geral nunca é `conforme` enquanto existir
    campo OBRIGATÓRIO não conferível (campo opcional ilegível não bloqueia o
    conforme — decisão da rodada nucleo, PLAN T1.2).
-5. Scan do QR em um checkpoint cria EventoPassagem com timestamp, e a tela da
-   peça lista os eventos em ordem cronológica.
+5. Scan do QR em um checkpoint cria Passagem com timestamp, e a tela da
+   peça lista as passagens em ordem cronológica.
 6. Conferência com veredito `divergente` gera alerta visível fora da tela de
    veredito, e o scan dessa peça em um checkpoint exibe o alerta no ato.
 
@@ -320,7 +320,7 @@ câmera é provisionada amarrada ao `codigo` de um Checkpoint.
    referência).
 3. Em cada etapa instrumentada, câmera fixa captura ao detectar a peça →
    extração → engine compara contra QR + checklist do projeto → conforme:
-   EventoPassagem automático e a peça segue; divergente: alerta e bloqueio de
+   Passagem automática e a peça segue; divergente: alerta e bloqueio de
    avanço até correção.
 4. Gate final (pós-placa): última conferência total → libera expedição.
 5. Indicadores de auditoria alimentados automaticamente por etapa e campo.
@@ -372,7 +372,7 @@ resulta `conforme`; peça de outro projeto conferida contra X é acusada.
 
 Relatórios de desvios, retrabalho e gargalos por etapa, na linha do doc do
 desafio (não conformidades, OTIF). O modelo de dados do Must já registra a
-matéria-prima — Conferencia, CampoConferido e EventoPassagem com timestamps e
+matéria-prima — Conferencia, CampoConferido e Passagem com timestamps e
 evidências; esta evolução é leitura agregada, não mudança de escrita.
 Aceitação futura: relatório de divergências por etapa e por campo em um
 período escolhido, batendo com os registros brutos.

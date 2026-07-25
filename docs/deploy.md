@@ -95,7 +95,7 @@ respondendo `divergente` só em `serie-placa` (7 campos no RDS) e upload de
 foto com URL assinada do S3 abrindo no navegador.
 
 Com `EXTRACTOR_DRIVER=textract` (mesma data), o ciclo completo no ar: upload de
-`PLACA-4.jpg` → `POST /conferencia/executar-com-fotos` → Textract leu `847833`
+`PLACA-4.jpg` → `POST /conferencias/executar-com-fotos` → Textract leu `847833`
 com 99,87% de confiança contra o `847233` da etiqueta, veredito `divergente`
 só em `serie-placa` e os campos sem foto em `nao_conferivel`. É o critério de
 aceitação 2 do SPEC passando com visão real, sem leitura digitada.

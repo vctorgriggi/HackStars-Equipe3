@@ -59,7 +59,7 @@ const infrastructurePersistenceModule = RelationalFilePersistenceModule;
   ],
   controllers: [FilesLocalController],
   providers: [ConfigModule, ConfigService, FilesLocalService],
-  // MulterModule é reexportado para que outros módulos (ex.: foto-evidencia)
+  // MulterModule é reexportado para que outros módulos (ex.: fotos-evidencia)
   // usem o FileInterceptor com o storage deste driver, sem duplicar config.
   exports: [FilesLocalService, MulterModule],
 })

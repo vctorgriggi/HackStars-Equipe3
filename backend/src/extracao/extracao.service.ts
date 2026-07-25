@@ -23,7 +23,7 @@ export interface AlvoChecklist {
  * porta; nenhum controller fala com adapter direto.
  *
  * NAO decide veredito e NAO compara com valor esperado: so produz leituras.
- * Quem julga e `conferir()` em `src/conferencia/engine`.
+ * Quem julga e `conferir()` em `src/conferencias/engine`.
  */
 @Injectable()
 export class ExtracaoService {

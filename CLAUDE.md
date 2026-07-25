@@ -43,25 +43,29 @@ não conformidade que chega ao cliente hoje).
 ```
 backend/                  # NestJS (base brocoders/nestjs-boilerplate)
   src/
-    transformadors/       # CRUD Transformador (gerado); recebe o parser do QR (T1.1)
-    projeto-modelos/      # CRUD ProjetoModelo (gerado); checklist por modelo como dado
-    conferencia/          # CRUD Conferencia (gerado); recebe a engine de comparação (T1.2)
-    campo-conferidos/     # CRUD CampoConferido (gerado)
-    foto-evidencia/       # CRUD FotoEvidencia (gerado); recebe upload/S3 (T2.3)
+    transformadores/      # CRUD Transformador (gerado); recebe o parser do QR (T1.1)
+    projetos-modelo/      # CRUD ProjetoModelo (gerado); checklist por modelo como dado
+    conferencias/         # CRUD Conferencia (gerado); recebe a engine de comparação (T1.2)
+    campos-conferidos/    # CRUD CampoConferido (gerado)
+    fotos-evidencia/      # CRUD FotoEvidencia (gerado); recebe upload/S3 (T2.3)
     checkpoints/          # CRUD Checkpoint (gerado); seed das etapas ordenadas da linha
-    evento-passagems/     # CRUD EventoPassagem (gerado); trânsito (T4.1)
+    passagens/            # CRUD Passagem (gerado); trânsito (T4.1)
     extracao/             # ExtractorPort + adapters textract|bedrock|mock;
                           #   driver por env EXTRACTOR_DRIVER (mock default)
     auth/, files/, i18n/  # herdados do boilerplate; não usados nesta rodada
 frontend/                 # Next.js 16: leitura QR, fotos, veredito, histórico
 ```
 
-Nomes de pasta seguem a pluralização do gerador (transformadors,
-evento-passagems) — não renomear, os generators dependem disso. O mapa
-conceitual do PLAN: transformadores → `transformadors/`, conformidade →
-`conferencia/` + `campo-conferidos/`, evidencias → `foto-evidencia/`,
-transito → `checkpoints/` + `evento-passagems/`. Entidade ou propriedade nova
-entra pelos generators (recipe em backend/CLAUDE.md), nunca à mão.
+Pasta e rota vão no plural correto do português (`transformadores/`,
+`campos-conferidos/`, `projetos-modelo/`) — o gerador aprendeu os plurais do
+domínio, então entidade nova já nasce com a pasta e a rota certas; se um nome
+novo não estiver coberto, corrija a regra no gerador, não o resultado à mão.
+Nome de classe segue singular (`Transformador`, `CampoConferido`) — só a pasta
+e a rota pluralizam. O mapa conceitual do PLAN: transformadores →
+`transformadores/`, conformidade → `conferencias/` + `campos-conferidos/`,
+evidencias → `fotos-evidencia/`, transito → `checkpoints/` + `passagens/`.
+Entidade ou propriedade nova entra pelos generators (recipe em
+backend/CLAUDE.md), nunca à mão.
 
 Funcionalidade nova entra como módulo novo atrás das mesmas fronteiras
 (auditoria, ERP e câmeras fixas já estão planejadas assim); nada novo entra
@@ -90,17 +94,23 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
   política de campo parcialmente legível está em aberto e vai mudar isso).
   Default do endpoint: `LIMIAR_CONFIANCA_PADRAO = 0.8` em
   `conferencia-execucao.service.ts`, sobrescrevível por request.
-- Escrita de veredito tem UM caminho: `CampoConferidosService.criarComVeredito`
+- Escrita de veredito tem UM caminho: `CamposConferidosService.criarComVeredito`
   (server-side, sem rota HTTP). Nunca crie outro — é o que mantém a regra de
   ouro auditável.
 - CampoConferido é IMUTÁVEL via HTTP (update → 422): PATCH no lastro
   (valores/confiança/foto) de um veredito já emitido falsificaria a trilha de
   auditoria (revisão R1). Comparação usa Unicode NFC; confiança <= 0 nunca é
   lastro, mesmo com limiar 0.
-- Fluxo do endpoint `POST /conferencia/executar`: parse do QR → find-or-create
+- Fluxo do endpoint `POST /conferencias/executar`: parse do QR → find-or-create
   por numeroSerie → ProjetoModelo (codigoProjeto do QR → vínculo da peça →
   único do banco) → checklist → engine → persistência. Checkpoint resolve
-  ANTES de qualquer escrita.
+  ANTES de qualquer escrita. Com `etapaCodigo`, a checklist é recortada por
+  etapa (semântica CUMULATIVA: a etapa N confere o que ela e as anteriores
+  gravaram); recorte vazio → 422 `etapa-sem-campos-conferiveis`.
+- `POST /conferencias/executar-com-fotos` é a variante com visão real: lê os
+  bytes das FotoEvidencia (S3 ou disco), chama o ExtractorPort e delega o
+  veredito ao MESMO `executar()` — nunca duplique a orquestração; a extração
+  só produz leituras, quem compara continua sendo a engine.
 - A lista de campos a conferir também é parâmetro — o chamador a carrega da
   checklist do ProjetoModelo da peça (seed da demo: EPT-163-PI-676). Serigrafia
   varia por cliente/modelo; lista hardcoded geraria falso conforme para outros
@@ -122,7 +132,7 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
   placa.jpg, chumbado-1.jpg…). Sem credencial, falha com mensagem apontando
   docs/aws.md.
 - Fonte única em código dos valores de `fonteFisica`: união literal
-  `FonteFisica` em extracao/ports/extractor.port.ts; foto-evidencia deriva
+  `FonteFisica` em extracao/ports/extractor.port.ts; fotos-evidencia deriva
   dela com `satisfies` (divergência quebra a compilação).
 - Nenhuma chamada de visão fora de ação explícita do operador — créditos AWS
   são finitos (SPEC, constraint 4); sem reprocessamento em loop.
@@ -209,11 +219,10 @@ do hackathon:
 10. `confianca` das leituras vem do cliente HTTP até a extração ser plugada
     no fluxo (T3.2) — confiança forjável por design transitório; a guarda
     `confianca <= 0` e o limiar mínimo mitigam o caso flagrante.
-11. `POST /conferencia/executar` avalia a checklist INTEIRA: campo sem leitura
-    volta `nao_conferivel` mesmo quando a marcação ainda nem existe na peça
-    (placa na etapa 1). Falta a conferência parcial por etapa — cada item da
-    checklist precisa dizer em qual etapa é validado. Paliativo: o chamador
-    manda só os campos daquela etapa e lê o resultado ciente disso.
+11. RESOLVIDO (2026-07-25): a conferência parcial por etapa existe — cada item
+    da checklist diz sua `etapa`, e `POST /conferencias/executar` com
+    `etapaCodigo` recorta a checklist (cumulativo). O comportamento antigo
+    (checklist inteira) permanece quando a request não manda etapa.
 12. Chaves AWS vivem nas variáveis do serviço App Runner porque o boilerplate
     valida `ACCESS_KEY_ID`/`SECRET_ACCESS_KEY` quando `FILE_DRIVER=s3`
     (files/config/file.config.ts). A instance role existe e já serve

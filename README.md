@@ -92,7 +92,7 @@ TOKEN=$(curl -s -X POST http://localhost:3001/api/v1/auth/email/login \
 
 # etiqueta e chumbado dizem 847233; a placa foi gravada 847833
 # (patrimônio e cliente abaixo são ilustrativos; só as séries vêm da peça real)
-curl -s -X POST http://localhost:3001/api/v1/conferencia/executar \
+curl -s -X POST http://localhost:3001/api/v1/conferencias/executar \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{
     "payloadQr": "{\"numeroSerie\":\"847233\",\"patrimonio\":\"251328\",\"cliente\":\"143091 - Energisa Rondônia Distribuidora de Energia S.A\",\"codigoProjeto\":\"EPT-163-PI-676\"}",
@@ -131,11 +131,11 @@ Todos exigem JWT (login abaixo), exceto `GET /` e os arquivos de evidência.
 | Método | Rota | Papel |
 | --- | --- | --- |
 | POST | `/api/v1/auth/email/login` | Token JWT (admin seed: `admin@example.com` / `secret`) |
-| POST | `/api/v1/conferencia/executar` | O coração: QR + leituras → veredito campo a campo persistido |
-| POST | `/api/v1/foto-evidencia/upload` | Multipart: foto + `fonteFisica` (whitelist canônica) → URL assinada |
+| POST | `/api/v1/conferencias/executar` | O coração: QR + leituras → veredito campo a campo persistido |
+| POST | `/api/v1/fotos-evidencia/upload` | Multipart: foto + `fonteFisica` (whitelist canônica) → URL assinada |
 | GET | `/api/v1/checkpoints` | Etapas ordenadas da linha (seed: 4 etapas com slug) |
-| GET | `/api/v1/projeto-modelos` | Projetos com checklist (seed: modelo da peça de demo) |
-| CRUD | `/api/v1/{transformadors, conferencia, campo-conferidos, foto-evidencia, evento-passagems}` | Gerados pelo boilerplate; `PATCH /campo-conferidos/:id` responde 422 (imutável — trilha de auditoria) |
+| GET | `/api/v1/projetos-modelo` | Projetos com checklist (seed: modelo da peça de demo) |
+| CRUD | `/api/v1/{transformadores, conferencias, campos-conferidos, fotos-evidencia, passagens}` | Gerados pelo boilerplate; `PATCH /campos-conferidos/:id` responde 422 (imutável — trilha de auditoria) |
 
 ## Status
 
@@ -144,10 +144,10 @@ Prazo: demo em 2026-07-27.
 | Fase                                   | Escopo                                                    | Status                  |
 | -------------------------------------- | --------------------------------------------------------- | ----------------------- |
 | 0 — Fundação                           | scaffolds, 7 entidades, migrations, seeds da linha e do modelo | ✅ completa         |
-| 1 — Núcleo de conformidade (TDD)       | parser do QR, engine pura, `POST /conferencia/executar`    | ✅ completa             |
+| 1 — Núcleo de conformidade (TDD)       | parser do QR, engine pura, `POST /conferencias/executar`   | ✅ completa             |
 | 2 — Extração por visão                 | `ExtractorPort` + adapters textract/bedrock/mock, upload S3 | ✅ exceto o spike T2.1  |
 | 3 — Fluxo ponta a ponta                | QR no celular, captura de fotos, tela de veredito          | a fazer                 |
-| 4 — Trânsito e alerta                  | EventoPassagem, histórico da peça, alerta de divergência   | a fazer                 |
+| 4 — Trânsito e alerta                  | Passagem, histórico da peça, alerta de divergência         | a fazer                 |
 | 5 (opcional) — Dashboard e indicadores | linha e auditoria por etapa/campo                          | a fazer                 |
 | 6 (opcional) — Ingestão do projeto     | PDF do desenho → checklist via Bedrock → revisão           | a fazer                 |
 

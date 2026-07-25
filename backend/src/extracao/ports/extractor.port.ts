@@ -7,7 +7,7 @@
 //
 // REGRA DE OURO 2: toda leitura sai com `confianca` e `fotoEvidenciaId`. Um
 // extrator NUNCA decide veredito — quem decide e a engine de conformidade
-// (`src/conferencia/engine`). Leitura sem lastro (confianca null ou baixa)
+// (`src/conferencias/engine`). Leitura sem lastro (confianca null ou baixa)
 // chega la e vira `nao_conferivel`, nunca `conforme`.
 
 /**

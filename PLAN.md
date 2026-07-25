@@ -45,7 +45,9 @@ Depende de: nada.
   - Desvio: entidades criadas pelos generators do boilerplate (recipe em
     backend/CLAUDE.md); nomes de pasta ficaram como o gerador pluraliza
     (transformadors, campo-conferidos, evento-passagems) — não vale brigar
-    com o hygen. Mapa conceito → pasta real no CLAUDE.md raiz.
+    com o hygen. Mapa conceito → pasta real no CLAUDE.md raiz. (Pastas e rotas
+    renomeadas para o plural correto do português na rodada nomes-pt,
+    2026-07-25; EventoPassagem virou Passagem.)
   - Verificação: migration roda limpa em banco vazio; tabelas conforme SPEC
     (Entidades). Feito em 2026-07-25: 7 tabelas no Postgres (incl.
     projeto_modelo); GET /api/v1/checkpoints (com JWT do admin seed) devolve
@@ -69,7 +71,7 @@ Depende de: Fase 0 completa.
   - Testes (primeiro): payload real → campos esperados (série, patrimônio,
     pedido, seq, cliente); payload inválido → erro claro.
   - Feito em 2026-07-25 (agente Opus, TDD): parser em
-    `transformadors/qr/` com 26 testes — formatos JSON (com aliases),
+    `transformadores/qr/` com 26 testes — formatos JSON (com aliases),
     chave:valor (acentos normalizados) e código de lookup; fixture simulando a
     etiqueta real; erros tipados (`PayloadInvalidoError`).
   - Desvio: o QR físico ainda não foi decodificado — a decisão em aberto do
@@ -82,7 +84,7 @@ Depende de: Fase 0 completa.
     do veredito geral na precedência divergente > nao_conferivel > conforme;
     caso da peça de demo (847233 × 847833) acusando só a série da placa.
   - Feito em 2026-07-25 (agente Opus, TDD): `conferir()` pura em
-    `conferencia/engine/` com 39 testes, incluindo o teste-âncora. Regras
+    `conferencias/engine/` com 39 testes, incluindo o teste-âncora. Regras
     extras fixadas: valor igual com confiança baixa NUNCA vira conforme;
     opcional `nao_conferivel` não bloqueia o conforme geral; opcional sem
     valor esperado é omitido do resultado.
@@ -93,7 +95,7 @@ Depende de: Fase 0 completa.
 - [x] T1.3 — Endpoints de conferência com leituras mockadas · módulo: conformidade
   - Verificação: criar conferência via curl com leituras simuladas e receber
     vereditos campo a campo persistidos. Feito em 2026-07-25 (agente Opus +
-    verificação do orquestrador): `POST /api/v1/conferencia/executar` → 201
+    verificação do orquestrador): `POST /api/v1/conferencias/executar` → 201
     com veredito divergente só em serie-placa, 7 campos persistidos com
     veredito e confiança; POST repetido não duplica transformador; 422 para
     payload inválido/só-código/etapa inexistente.
@@ -103,8 +105,8 @@ Depende de: Fase 0 completa.
   - Desvios: checkpoint resolvido ANTES de qualquer escrita (etapa inválida
     não deixa transformador órfão); codigoProjeto do QR sem cadastro não é
     erro — cai para vínculo da peça → projeto único do banco; escrita de
-    veredito só por `CampoConferidosService.criarComVeredito` (server-side,
-    sem rota HTTP); `forwardRef` nos módulos conferencia ↔ campo-conferidos;
+    veredito só por `CamposConferidosService.criarComVeredito` (server-side,
+    sem rota HTTP); `forwardRef` nos módulos conferencias ↔ campos-conferidos;
     colunas NOT NULL recebem `''` quando o valor não existe (valorEsperado de
     campo sem esperado; cliente de etiqueta sem cliente) — sentinela a revisar
     se algum dia virar filtro de consulta.
@@ -159,7 +161,7 @@ Depende de: Fase 1 completa.
     fornecer) e vínculo à foto; nenhuma chamada AWS fora do adapter.
 - [x] T2.3 — Upload de fotos e storage S3 · módulo: evidencias
   - Verificação: foto sobe pelo endpoint, URL (assinada) abre no navegador.
-    Feito em 2026-07-25 (agente Opus): POST /foto-evidencia/upload multipart
+    Feito em 2026-07-25 (agente Opus): POST /fotos-evidencia/upload multipart
     com fonteFisica validada por whitelist canônica (422 fora dela), url
     fetchável sem auth via rota de files do boilerplate, vínculo opcional a
     conferência validado; driver local ativo, S3 = troca de FILE_DRIVER.
@@ -216,11 +218,11 @@ Depende de: Fase 2 completa.
 Objetivo: critérios de aceitação 5 e 6 do SPEC passando.
 Depende de: Fase 3 completa.
 
-- [ ] T4.1 — EventoPassagem via scan de QR no checkpoint · módulo: transito (+ frontend)
-  - Verificação manual: selecionar checkpoint, ler QR, evento criado com
+- [ ] T4.1 — Passagem via scan de QR no checkpoint · módulo: transito (+ frontend)
+  - Verificação manual: selecionar checkpoint, ler QR, passagem criada com
     timestamp.
   - Aceitação: scans repetidos no mesmo checkpoint não corrompem o histórico
-    (eventos distintos, ordenados).
+    (passagens distintas, ordenadas).
 - [ ] T4.2 — Tela de histórico da peça · módulo: frontend
   - Verificação manual: critério 5 do SPEC executado ponta a ponta.
   - Aceitação: histórico em ordem cronológica com nome do checkpoint e hora.
@@ -251,12 +253,12 @@ Depende de: Fase 3 completa (adapter Bedrock existente); pode ser pulada;
 concorre com a Fase 5 pelo tempo restante — priorizar a que render mais na
 demo.
 
-- [ ] T6.1 — Upload do PDF e extração da checklist via Bedrock · módulo: extracao (+ projeto-modelos)
+- [ ] T6.1 — Upload do PDF e extração da checklist via Bedrock · módulo: extracao (+ projetos-modelo)
   - Verificação manual: subir o EPT-163-PI-676 e comparar a checklist extraída
     com a seedada na Fase 0 (gabarito conhecido).
   - Aceitação: proposta de checklist com campo, fonte física e obrigatoriedade;
     nunca cria ProjetoModelo direto — sempre passa pela revisão (T6.2).
-- [ ] T6.2 — Tela de revisão e aprovação da checklist · módulo: frontend (+ projeto-modelos)
+- [ ] T6.2 — Tela de revisão e aprovação da checklist · módulo: frontend (+ projetos-modelo)
   - Verificação manual: editar um item extraído errado e aprovar; ProjetoModelo
     criado reflete a edição.
   - Aceitação: aprovação é por modelo (uma vez), não por peça — checklist
