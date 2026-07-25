@@ -112,6 +112,17 @@ exemplo abreviado (`serie-chumbada-2/3`, `patrimonio-serigrafia`) voltam
 `nao_conferivel` — enviando as 7 leituras completas, o resultado é exatamente o
 critério de aceitação 2 do SPEC.
 
+## Ver funcionando (celular ou navegador)
+
+**https://qzat8cp2m8.us-east-1.awsapprunner.com/demo** — página de teste
+servida pela própria API: escolha a etapa, leia o QR pela câmera, fotografe
+as faces (vão para o S3) e dispare a conferência para ver o veredito campo a
+campo com a foto-evidência. É temporária, para inspecionar a API sem depender
+do app; o app real é o `frontend/`.
+
+API no ar: `https://qzat8cp2m8.us-east-1.awsapprunner.com` (Swagger em `/docs`).
+Coleção de testes pronta em `docs/trael-api.postman_collection.json`.
+
 ## Endpoints principais
 
 A lista completa e sempre atual está no Swagger: `http://localhost:3001/docs`.
