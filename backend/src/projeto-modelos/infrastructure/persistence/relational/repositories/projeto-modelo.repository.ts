@@ -54,6 +54,22 @@ export class ProjetoModeloRelationalRepository implements ProjetoModeloRepositor
     return entities.map((entity) => ProjetoModeloMapper.toDomain(entity));
   }
 
+  async findByCodigo(
+    codigo: ProjetoModelo['codigo'],
+  ): Promise<NullableType<ProjetoModelo>> {
+    const entity = await this.projetoModeloRepository.findOne({
+      where: { codigo },
+    });
+
+    return entity ? ProjetoModeloMapper.toDomain(entity) : null;
+  }
+
+  async findAll(): Promise<ProjetoModelo[]> {
+    const entities = await this.projetoModeloRepository.find();
+
+    return entities.map((entity) => ProjetoModeloMapper.toDomain(entity));
+  }
+
   async update(
     id: ProjetoModelo['id'],
     payload: Partial<ProjetoModelo>,

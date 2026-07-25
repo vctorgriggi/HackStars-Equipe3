@@ -20,6 +20,16 @@ export abstract class ProjetoModeloRepository {
 
   abstract findByIds(ids: ProjetoModelo['id'][]): Promise<ProjetoModelo[]>;
 
+  // codigo do desenho (coluna UNIQUE): o QR da etiqueta referencia o projeto
+  // por codigo.
+  abstract findByCodigo(
+    codigo: ProjetoModelo['codigo'],
+  ): Promise<NullableType<ProjetoModelo>>;
+
+  // Sem paginacao de proposito: usado para decidir se ha um unico projeto
+  // cadastrado (fallback de resolucao na execucao de conferencia).
+  abstract findAll(): Promise<ProjetoModelo[]>;
+
   abstract update(
     id: ProjetoModelo['id'],
     payload: DeepPartial<ProjetoModelo>,

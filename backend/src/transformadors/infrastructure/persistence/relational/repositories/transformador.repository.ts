@@ -54,6 +54,16 @@ export class TransformadorRelationalRepository implements TransformadorRepositor
     return entities.map((entity) => TransformadorMapper.toDomain(entity));
   }
 
+  async findByNumeroSerie(
+    numeroSerie: Transformador['numeroSerie'],
+  ): Promise<NullableType<Transformador>> {
+    const entity = await this.transformadorRepository.findOne({
+      where: { numeroSerie },
+    });
+
+    return entity ? TransformadorMapper.toDomain(entity) : null;
+  }
+
   async update(
     id: Transformador['id'],
     payload: Partial<Transformador>,

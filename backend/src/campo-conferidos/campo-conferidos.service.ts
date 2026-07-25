@@ -84,6 +84,51 @@ export class CampoConferidosService {
     });
   }
 
+  /**
+   * Unico caminho que grava `veredito`: chamado server-side pela execucao de
+   * conferencia, com o resultado ja calculado pela engine. Nao existe rota
+   * nem DTO HTTP equivalente — veredito nunca entra pela borda (regra de ouro).
+   *
+   * `fotoEvidenciaId` inexistente no banco nao derruba a conferencia: o campo
+   * e persistido sem foto (a evidencia e complementar ao veredito).
+   */
+  async criarComVeredito(dados: {
+    conferencia: Conferencia;
+    nomeCampo: string;
+    valorEsperado: string;
+    valorLido?: string | null;
+    confianca?: number | null;
+    veredito: string;
+    regiaoLeitura?: string | null;
+    fotoEvidenciaId?: string | null;
+  }): Promise<CampoConferido> {
+    let fotoEvidencia: FotoEvidencia | null = null;
+
+    if (dados.fotoEvidenciaId) {
+      fotoEvidencia = await this.fotoEvidenciaService.findById(
+        dados.fotoEvidenciaId,
+      );
+    }
+
+    return this.campoConferidoRepository.create({
+      regiaoLeitura: dados.regiaoLeitura ?? null,
+
+      fotoEvidencia,
+
+      veredito: dados.veredito,
+
+      confianca: dados.confianca ?? null,
+
+      valorLido: dados.valorLido ?? null,
+
+      valorEsperado: dados.valorEsperado,
+
+      nomeCampo: dados.nomeCampo,
+
+      conferencia: dados.conferencia,
+    });
+  }
+
   findAllWithPagination({
     paginationOptions,
   }: {

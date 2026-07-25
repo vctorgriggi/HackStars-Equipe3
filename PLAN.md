@@ -65,27 +65,46 @@ Depende de: nada.
 Objetivo: engine de comparação pura testada, sem tocar AWS.
 Depende de: Fase 0 completa.
 
-- [ ] T1.1 — Decodificar QR real e fixar o parser do payload · módulo: transformadores
+- [x] T1.1 — Decodificar QR real e fixar o parser do payload · módulo: transformadores
   - Testes (primeiro): payload real → campos esperados (série, patrimônio,
     pedido, seq, cliente); payload inválido → erro claro.
-  - Aceitação: decisão em aberto "formato do payload do QR" resolvida e
-    registrada; se o QR for só código de lookup, fallback de digitação manual
-    definido aqui.
-- [ ] T1.2 — Engine de comparação campo a campo · módulo: conformidade
+  - Feito em 2026-07-25 (agente Opus, TDD): parser em
+    `transformadors/qr/` com 26 testes — formatos JSON (com aliases),
+    chave:valor (acentos normalizados) e código de lookup; fixture simulando a
+    etiqueta real; erros tipados (`PayloadInvalidoError`).
+  - Desvio: o QR físico ainda não foi decodificado — a decisão em aberto do
+    formato SEGUE ABERTA; o parser cobre os formatos prováveis e o payload
+    só-código responde 422 no endpoint (fallback de digitação manual é da
+    Fase 3, T3.1).
+- [x] T1.2 — Engine de comparação campo a campo · módulo: conformidade
   - Testes (primeiro): campo igual → `conforme`; diferente → `divergente`;
     confiança abaixo do limiar ou leitura ausente → `nao_conferivel`; agregação
     do veredito geral na precedência divergente > nao_conferivel > conforme;
     caso da peça de demo (847233 × 847833) acusando só a série da placa.
+  - Feito em 2026-07-25 (agente Opus, TDD): `conferir()` pura em
+    `conferencia/engine/` com 39 testes, incluindo o teste-âncora. Regras
+    extras fixadas: valor igual com confiança baixa NUNCA vira conforme;
+    opcional `nao_conferivel` não bloqueia o conforme geral; opcional sem
+    valor esperado é omitido do resultado.
   - Aceitação: engine é função pura (valores esperados + leituras com
     confiança → vereditos); zero imports de I/O ou SDK. A lista de campos a
     conferir é parâmetro de entrada, nunca constante — o chamador a carrega do
     ProjetoModelo da peça (seedado com o modelo da demo na Fase 0).
-- [ ] T1.3 — Endpoints de conferência com leituras mockadas · módulo: conformidade
+- [x] T1.3 — Endpoints de conferência com leituras mockadas · módulo: conformidade
   - Verificação: criar conferência via curl com leituras simuladas e receber
-    vereditos campo a campo persistidos.
+    vereditos campo a campo persistidos. Feito em 2026-07-25 (agente Opus +
+    verificação do orquestrador): `POST /api/v1/conferencia/executar` → 201
+    com veredito divergente só em serie-placa, 7 campos persistidos com
+    veredito e confiança; POST repetido não duplica transformador; 422 para
+    payload inválido/só-código/etapa inexistente.
   - Aceitação: contrato request/response estável para a Fase 3 consumir;
     Transformador resolvido por find-or-create com `numeroSerie` como chave
     (patrimônio não é único entre clientes — SPEC, decisões em aberto).
+  - Desvios: checkpoint resolvido ANTES de qualquer escrita (etapa inválida
+    não deixa transformador órfão); codigoProjeto do QR sem cadastro não é
+    erro — cai para vínculo da peça → projeto único do banco; escrita de
+    veredito só por `CampoConferidosService.criarComVeredito` (server-side,
+    sem rota HTTP); `forwardRef` nos módulos conferencia ↔ campo-conferidos.
 
 ## Fase 2 — Extração por visão
 

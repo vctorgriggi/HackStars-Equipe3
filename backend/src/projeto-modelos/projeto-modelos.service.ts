@@ -51,6 +51,15 @@ export class ProjetoModelosService {
     return this.projetoModeloRepository.findByIds(ids);
   }
 
+  // Codigo do desenho lido do QR da etiqueta.
+  findByCodigo(codigo: ProjetoModelo['codigo']) {
+    return this.projetoModeloRepository.findByCodigo(codigo);
+  }
+
+  findAll() {
+    return this.projetoModeloRepository.findAll();
+  }
+
   async update(
     id: ProjetoModelo['id'],
 

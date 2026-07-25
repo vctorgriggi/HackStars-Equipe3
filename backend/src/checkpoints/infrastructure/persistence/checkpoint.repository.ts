@@ -18,6 +18,12 @@ export abstract class CheckpointRepository {
 
   abstract findByIds(ids: Checkpoint['id'][]): Promise<Checkpoint[]>;
 
+  // codigo e o slug estavel da etapa (coluna UNIQUE): o dispositivo informa a
+  // etapa por codigo, nunca por id.
+  abstract findByCodigo(
+    codigo: Checkpoint['codigo'],
+  ): Promise<NullableType<Checkpoint>>;
+
   abstract update(
     id: Checkpoint['id'],
     payload: DeepPartial<Checkpoint>,

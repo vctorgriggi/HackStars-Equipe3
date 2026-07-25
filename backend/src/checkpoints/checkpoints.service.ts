@@ -51,6 +51,11 @@ export class CheckpointsService {
     return this.checkpointRepository.findByIds(ids);
   }
 
+  // Etapa informada pelo dispositivo chega como codigo (slug), nao como id.
+  findByCodigo(codigo: Checkpoint['codigo']) {
+    return this.checkpointRepository.findByCodigo(codigo);
+  }
+
   async update(
     id: Checkpoint['id'],
 

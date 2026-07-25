@@ -52,6 +52,16 @@ export class CheckpointRelationalRepository implements CheckpointRepository {
     return entities.map((entity) => CheckpointMapper.toDomain(entity));
   }
 
+  async findByCodigo(
+    codigo: Checkpoint['codigo'],
+  ): Promise<NullableType<Checkpoint>> {
+    const entity = await this.checkpointRepository.findOne({
+      where: { codigo },
+    });
+
+    return entity ? CheckpointMapper.toDomain(entity) : null;
+  }
+
   async update(
     id: Checkpoint['id'],
     payload: Partial<Checkpoint>,

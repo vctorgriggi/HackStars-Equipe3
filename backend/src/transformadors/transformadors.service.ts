@@ -84,6 +84,12 @@ export class TransformadorsService {
     return this.transformadorRepository.findByIds(ids);
   }
 
+  // Chave de negocio da peca: usada pelo find-or-create da execucao de
+  // conferencia (o QR traz numero de serie, nunca o id interno).
+  findByNumeroSerie(numeroSerie: Transformador['numeroSerie']) {
+    return this.transformadorRepository.findByNumeroSerie(numeroSerie);
+  }
+
   async update(
     id: Transformador['id'],
 

@@ -8,9 +8,13 @@ import {
   Delete,
   UseGuards,
   Query,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { ConferenciaService } from './conferencia.service';
+import { ConferenciaExecucaoService } from './conferencia-execucao.service';
 import { CreateConferenciaDto } from './dto/create-conferencia.dto';
+import { ExecutarConferenciaDto } from './dto/executar-conferencia.dto';
 import { UpdateConferenciaDto } from './dto/update-conferencia.dto';
 import {
   ApiBearerAuth,
@@ -18,6 +22,7 @@ import {
   ApiOkResponse,
   ApiParam,
   ApiTags,
+  ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import { Conferencia } from './domain/conferencia';
 import { AuthGuard } from '@nestjs/passport';
@@ -36,7 +41,10 @@ import { FindAllConferenciaDto } from './dto/find-all-conferencia.dto';
   version: '1',
 })
 export class ConferenciaController {
-  constructor(private readonly conferenciaService: ConferenciaService) {}
+  constructor(
+    private readonly conferenciaService: ConferenciaService,
+    private readonly conferenciaExecucaoService: ConferenciaExecucaoService,
+  ) {}
 
   @Post()
   @ApiCreatedResponse({
@@ -44,6 +52,23 @@ export class ConferenciaController {
   })
   create(@Body() createConferenciaDto: CreateConferenciaDto) {
     return this.conferenciaService.create(createConferenciaDto);
+  }
+
+  @Post('executar')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiCreatedResponse({
+    description:
+      'Conferencia executada: peca (find-or-create pelo numero de serie), ' +
+      'veredito geral calculado pela engine e um CampoConferido por campo ' +
+      'do checklist avaliado.',
+  })
+  @ApiUnprocessableEntityResponse({
+    description:
+      'payloadQr ilegivel/somente-codigo, etapa-desconhecida ou ' +
+      'projeto-modelo-indeterminado.',
+  })
+  executar(@Body() executarConferenciaDto: ExecutarConferenciaDto) {
+    return this.conferenciaExecucaoService.executar(executarConferenciaDto);
   }
 
   @Get()

@@ -10,9 +10,9 @@ escrevemos código aqui**, não documentação. Quando uma convenção for decid
 durante a implementação, registre-a aqui. Contexto detalhado mora em @SPEC.md
 (o quê e por quê) e @PLAN.md (ordem de execução).
 
-**Fase atual = Fase 1 — Núcleo de conformidade (TDD).** ERP, câmeras fixas e
-perfis de usuário não pertencem a esta rodada; estão em SPEC.md, seção
-"Planejado / rodadas futuras".
+**Fase atual = Fase 2 — Extração por visão.** ERP, câmeras fixas e perfis de
+usuário não pertencem a esta rodada; estão em SPEC.md, seção "Planejado /
+rodadas futuras".
 
 ## Regra de ouro
 
@@ -86,6 +86,15 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
   `conforme` só com todos os campos conformes.
 - Limiar de confiança é parâmetro da engine, não constante enterrada (a
   política de campo parcialmente legível está em aberto e vai mudar isso).
+  Default do endpoint: `LIMIAR_CONFIANCA_PADRAO = 0.8` em
+  `conferencia-execucao.service.ts`, sobrescrevível por request.
+- Escrita de veredito tem UM caminho: `CampoConferidosService.criarComVeredito`
+  (server-side, sem rota HTTP). Nunca crie outro — é o que mantém a regra de
+  ouro auditável.
+- Fluxo do endpoint `POST /conferencia/executar`: parse do QR → find-or-create
+  por numeroSerie → ProjetoModelo (codigoProjeto do QR → vínculo da peça →
+  único do banco) → checklist → engine → persistência. Checkpoint resolve
+  ANTES de qualquer escrita.
 - A lista de campos a conferir também é parâmetro — o chamador a carrega da
   checklist do ProjetoModelo da peça (seed da demo: EPT-163-PI-676). Serigrafia
   varia por cliente/modelo; lista hardcoded geraria falso conforme para outros
