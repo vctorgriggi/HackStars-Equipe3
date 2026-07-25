@@ -189,6 +189,29 @@ Depende de: Fase 1 completa.
     medidas no spike, foto indo para o S3, veredito 100% vindo da API.
   - Desvio: é ferramenta TEMPORÁRIA de inspeção, fora de `frontend/` — não
     substitui a Fase 3; serve para validar a API sem esperar o app.
+  - Atualizada na rodada nomes-e-analise (2026-07-25): virou fluxo GUIADO
+    0→5 (entrar → etapa → etiqueta → fotos → extrair → veredito) com
+    contexto "em produção" por passo e o Textract como único caminho de
+    destaque; leituras digitadas viraram "modo avançado". Motivo: usuário
+    real se perdeu na bancada. `?etapa=` passou a ser respeitado.
+- [x] T2.6 — Conferência parcial por etapa (descoberta desta rodada) · módulo: conformidade
+  - Feito em 2026-07-25 (agente Opus): itens da checklist ganharam `etapa`
+    (codigo do Checkpoint em que a marcação passa a existir);
+    `filtrarChecklistPorEtapa()` pura com semântica CUMULATIVA (o gate N
+    reconfere o que os anteriores gravaram — detecta troca de peça);
+    resposta expõe `etapaAvaliada` e `camposAvaliados`; recorte vazio → 422.
+    Resolve o gap 11 do CLAUDE.md; item sem `etapa` é sempre avaliado.
+- [x] T2.7 — Extração plugada no fluxo: POST /conferencias/executar-com-fotos (descoberta desta rodada) · módulo: conformidade (+ extracao, evidencias)
+  - Feito em 2026-07-25 (agente Opus + rodada de análise): fotos já enviadas
+    → bytes (S3/disco) → ExtractorPort → MESMO `executar()` — engine segue
+    única. Endurecido pela revisão: `prepararExecucao()` resolve QR, etapa,
+    projeto e recorte ANTES de pagar visão (422 barato) e antes de qualquer
+    escrita; recorte filtra as fotos enviadas (resumo com
+    `fotosForaDoRecorte`); evidência vinculada à conferência após o
+    veredito; leituras conflitantes da mesma fonte → `nao_conferivel`
+    (nunca escolha silenciosa). Antecipa o lado servidor da T3.2.
+  - Verificação no ar: cenário-âncora com foto real via Textract →
+    `divergente` só em serie-placa; 152 testes unitários.
 
 ## Fase 3 — Fluxo de conferência ponta a ponta
 
@@ -306,4 +329,4 @@ demo.
       checklist do banco desde a T1.2; ingestão automática do PDF virou Fase 6
       opcional (2026-07-25).
 
-<!-- rodada: visao-e-deploy @ a67b234 -->
+<!-- rodada: nomes-e-analise @ a75da83 -->

@@ -226,9 +226,12 @@ do hackathon:
    campos deixa conferência com veredito geral e campos parciais; janela
    pequena, aceito no prazo (revisão R1). Transação entra com o hardening
    pós-demo.
-10. `confianca` das leituras vem do cliente HTTP até a extração ser plugada
-    no fluxo (T3.2) — confiança forjável por design transitório; a guarda
-    `confianca <= 0` e o limiar mínimo mitigam o caso flagrante.
+10. `confianca` forjável — RESOLVIDO no caminho principal (2026-07-25):
+    `POST /conferencias/executar-com-fotos` carimba confiança e evidência
+    server-side (extração plugada). O `/executar` com leituras digitadas
+    permanece (modo avançado do /demo e testes sem AWS) e nele a confiança
+    segue vindo do cliente — aceito enquanto a rota existir; some com o gap
+    13 (remoção do /demo).
 11. RESOLVIDO (2026-07-25): a conferência parcial por etapa existe — cada item
     da checklist diz sua `etapa`, e `POST /conferencias/executar` com
     `etapaCodigo` recorta a checklist (cumulativo). O comportamento antigo
