@@ -112,6 +112,20 @@ exemplo abreviado (`serie-chumbada-2/3`, `patrimonio-serigrafia`) voltam
 `nao_conferivel` — enviando as 7 leituras completas, o resultado é exatamente o
 critério de aceitação 2 do SPEC.
 
+## Endpoints principais
+
+A lista completa e sempre atual está no Swagger: `http://localhost:3001/docs`.
+Todos exigem JWT (login abaixo), exceto `GET /` e os arquivos de evidência.
+
+| Método | Rota | Papel |
+| --- | --- | --- |
+| POST | `/api/v1/auth/email/login` | Token JWT (admin seed: `admin@example.com` / `secret`) |
+| POST | `/api/v1/conferencia/executar` | O coração: QR + leituras → veredito campo a campo persistido |
+| POST | `/api/v1/foto-evidencia/upload` | Multipart: foto + `fonteFisica` (whitelist canônica) → URL assinada |
+| GET | `/api/v1/checkpoints` | Etapas ordenadas da linha (seed: 4 etapas com slug) |
+| GET | `/api/v1/projeto-modelos` | Projetos com checklist (seed: modelo da peça de demo) |
+| CRUD | `/api/v1/{transformadors, conferencia, campo-conferidos, foto-evidencia, evento-passagems}` | Gerados pelo boilerplate; `PATCH /campo-conferidos/:id` responde 422 (imutável — trilha de auditoria) |
+
 ## Status
 
 Prazo: demo em 2026-07-27.
