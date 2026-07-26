@@ -247,6 +247,28 @@ export const PAGINA_DEMO = `<!doctype html>
   .v-divergente { background: var(--vermelho-fundo); border-color: var(--vermelho); color: var(--vermelho); }
   .v-nao_conferivel { background: var(--ambar-fundo); border-color: var(--ambar); color: var(--ambar); }
   .v-conforme { background: var(--verde-fundo); border-color: var(--verde); color: var(--verde); }
+  .alarme-consistencia {
+    border: 2px solid var(--ambar); background: var(--ambar-fundo);
+    border-radius: 6px; padding: 14px; margin-bottom: 14px;
+  }
+  .alarme-consistencia .titulo-alarme {
+    font-size: 17px; font-weight: 700; line-height: 1.3; color: var(--ambar);
+  }
+  .alarme-consistencia .explica { font-size: 13px; margin: 6px 0 0; color: var(--tinta-fraca); }
+  .alarme-consistencia .explica b { color: var(--ambar); }
+  .alarme-consistencia .achado {
+    background: #fff; border: 1px solid var(--ambar); border-radius: 4px;
+    padding: 10px 12px; margin-top: 10px;
+  }
+  .alarme-consistencia .texto-achado {
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 22px; font-weight: 700; letter-spacing: .04em; color: var(--tinta);
+    word-break: break-word;
+  }
+  .alarme-consistencia .quantas { font-size: 13px; color: var(--tinta-fraca); margin-top: 2px; }
+  .alarme-consistencia ul { margin: 8px 0 0; padding-left: 18px; font-size: 14px; color: var(--tinta); }
+  .alarme-consistencia li { margin-bottom: 6px; }
+  .alarme-consistencia a { color: var(--acento); display: inline-block; min-height: 24px; }
   .cartao-campo {
     border: 1px solid var(--borda); border-left: 6px solid var(--borda);
     border-radius: 4px; padding: 10px 12px; margin-bottom: 8px; background: #fff;
@@ -1195,8 +1217,58 @@ export const PAGINA_DEMO = `<!doctype html>
     return 'Conferência completa · ' + quantos + ' campos';
   }
 
+  // fotoEvidenciaId -> fonte/url das fotos que ESTA sessão enviou. Id que não
+  // veio daqui simplesmente não vira link (nenhuma rota nova é inventada).
+  function fotoPorId(id) {
+    var achada = null;
+    Object.keys(estado.fotos).forEach(function (fonte) {
+      if (estado.fotos[fonte].id === id) {
+        achada = { fonte: fonte, url: estado.fotos[fonte].url };
+      }
+    });
+    return achada;
+  }
+
+  // ALARME, nunca veredito: o veredito geral nasce só da checklist, na API.
+  // Este bloco mostra o que a visão leu na peça e não bate com a etiqueta —
+  // segunda camada, independente. Sem achados não sai nada na tela.
+  function blocoDosAchados(achados) {
+    if (!achados || !achados.length) { return ''; }
+
+    var itens = achados.map(function (achado) {
+      var ocorrencias = achado.ocorrencias || [];
+      var linhas = ocorrencias.map(function (ocorrencia) {
+        var foto = ocorrencia.fotoEvidenciaId ? fotoPorId(ocorrencia.fotoEvidenciaId) : null;
+        var confianca = 'confiança ' + esc(formatarConfianca(ocorrencia.confianca));
+        if (foto && foto.url) {
+          return '<li>' + esc(foto.fonte) + ' · ' + confianca +
+            ' · <a href="' + esc(foto.url) + '" target="_blank" rel="noopener">ver foto (' +
+            esc(foto.fonte) + ')</a></li>';
+        }
+        return '<li>' + confianca + ' · foto não identificada nesta sessão</li>';
+      }).join('');
+
+      return '<div class="achado">' +
+        '<div class="texto-achado">' + esc(achado.texto) + '</div>' +
+        '<div class="quantas">' + ocorrencias.length + ' ocorrência(s) nas fotos desta conferência</div>' +
+        '<ul>' + linhas + '</ul></div>';
+    }).join('');
+
+    return '<div class="alarme-consistencia">' +
+      '<div class="titulo-alarme">Números encontrados que não batem com a etiqueta</div>' +
+      '<p class="explica">Verificação extra, independente da checklist: a visão leu estes textos na peça e ' +
+      'nenhum corresponde a um valor da etiqueta. <b>Não altera o veredito acima</b> — é alerta para ' +
+      'conferência humana (placa de outra peça, etiqueta trocada, peça trocada na esteira).</p>' +
+      itens + '</div>';
+  }
+
   function faixaDaExtracao(extracao) {
     if (!extracao) { return ''; }
+    // Quanto texto a visão leu além dos alvos da checklist: com o alarme
+    // vazio, é a medida do que foi olhado e não assustou ninguém.
+    var livres = typeof extracao.achadosLivres === 'number'
+      ? ' · ' + esc(extracao.achadosLivres) + ' texto(s) livre(s) lidos'
+      : '';
     // Transparência de custo: fotos fora do recorte da etapa NÃO foram
     // enviadas à visão (dinheiro que deixou de ser gasto) — mostrar para o
     // operador entender por que "mandei 4 fotos e só 2 contaram".
@@ -1206,10 +1278,11 @@ export const PAGINA_DEMO = `<!doctype html>
     if (extracao.leiturasProduzidas === 0) {
       return '<div class="faixa-extracao vazia">Extração: driver ' + esc(extracao.driver) +
         ' · ' + esc(extracao.fotos) + ' foto(s) · 0 leitura(s) — nenhuma leitura extraída: ' +
-        'verifique enquadramento e iluminação.' + fora + '</div>';
+        'verifique enquadramento e iluminação.' + fora + livres + '</div>';
     }
     return '<div class="faixa-extracao">Extração: driver ' + esc(extracao.driver) +
-      ' · ' + esc(extracao.fotos) + ' foto(s) · ' + esc(extracao.leiturasProduzidas) + ' leitura(s)' + fora + '</div>';
+      ' · ' + esc(extracao.fotos) + ' foto(s) · ' + esc(extracao.leiturasProduzidas) + ' leitura(s)' +
+      fora + livres + '</div>';
   }
 
   function renderizar(resposta) {
@@ -1225,6 +1298,11 @@ export const PAGINA_DEMO = `<!doctype html>
       '<div class="sub">Peça ' + esc(peca.numeroSerie || '?') + '</div>' +
       '<div class="sub">' + esc(linhaDaEtapa(resposta)) + '</div>' +
       '</div>';
+
+    // Logo abaixo do veredito para não passar despercebido no celular, e com
+    // forma/cor próprias (âmbar, caixa de alarme) — nunca a faixa vermelha do
+    // divergente: confundir alarme com veredito é o erro caro aqui.
+    html += blocoDosAchados(resposta.achadosInconsistentes);
 
     html += (resposta.campos || []).map(function (campo) {
       var url = urlDaFonte(campo.fonteFisica);
