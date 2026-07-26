@@ -22,13 +22,16 @@
  *
  * - `relevo`: gravado no metal, mesma cor do tanque (serie chumbada);
  * - `tinta`: serigrafia preta sobre o tanque;
+ * - `qr`: QR Code impresso NA PECA (o da placa de identificacao). Nao e texto
+ *   que alguem le: e dado binario com correcao de erro, decodificado
+ *   LOCALMENTE (`adapters/qr-imagem.ts`), sem OCR e sem AWS;
  * - `indefinido`: o nome do campo nao diz. Inclui de proposito os campos de
  *   PLACA (`serie-placa`, `patrimonio-placa`): a placa da TRAEL e preta com
  *   texto claro, mas placa clara com texto escuro existe, e amarrar o tipo dela
  *   a um modelo especifico seria falso conhecimento. Placa resolve por ROTULO
  *   (`N°`/`PATRIMONIO`), que e evidencia melhor que fisica de pixel.
  */
-export type TipoDeMarcacao = 'relevo' | 'tinta' | 'indefinido';
+export type TipoDeMarcacao = 'relevo' | 'tinta' | 'qr' | 'indefinido';
 
 /**
  * Tipo de marcacao esperado num campo, derivado do NOME (mesma limitacao,
@@ -39,8 +42,18 @@ export type TipoDeMarcacao = 'relevo' | 'tinta' | 'indefinido';
  * que nao declara nenhum dos dois fica `indefinido` — e `indefinido` NUNCA e
  * casado por contraste, entao esquecer de nomear degrada para o comportamento
  * de hoje (campo nulo, `nao_conferivel`), nunca para uma leitura chutada.
+ *
+ * `qr` e testado PRIMEIRO porque ele nao e uma variacao de como o numero foi
+ * pintado: e outro CANAL de leitura. Campo `qr` nao passa por OCR, nao entra na
+ * discriminacao por contraste (`adapters/contraste.ts`, que so casa `relevo` e
+ * `tinta`) e nao e relido em recortes — releitura de recorte existe para
+ * enquadramento de texto, e QR ou decodifica ou nao decodifica.
  */
 export function tipoDeMarcacaoDoCampo(campo: string): TipoDeMarcacao {
+  if (ehMarcacaoQr(campo)) {
+    return 'qr';
+  }
+
   if (ehMarcacaoEmRelevo(campo)) {
     return 'relevo';
   }
@@ -48,6 +61,30 @@ export function tipoDeMarcacaoDoCampo(campo: string): TipoDeMarcacao {
   return segmentos(campo).some((segmento) => segmento.startsWith('serigrafia'))
     ? 'tinta'
     : 'indefinido';
+}
+
+/**
+ * Marcacao que e um QR Code na peca (`serie-placa-qr`, `patrimonio-placa-qr`),
+ * derivada do NOME DO CAMPO — mesma limitacao e mesma saida futura de
+ * `ehMarcacaoEmRelevo` (gap 19 do CLAUDE.md: a checklist ainda nao declara o
+ * tipo de marcacao).
+ *
+ * Segmento EXATO `qr`, nunca substring: um campo `serie-qrx` ou um cliente que
+ * escreva `esquerda` continuam fora.
+ *
+ * FALHA SEGURA NOS DOIS SENTIDOS: campo de QR sem `qr` no nome so deixa de ser
+ * decodificado (fica nulo -> `nao_conferivel`, o comportamento de sempre);
+ * campo de texto batizado com `-qr-` por engano nao recebe leitura de OCR e
+ * tambem fica nulo. Nenhum dos dois caminhos produz um valor chutado, que e a
+ * unica coisa que a regra de ouro proibe aqui.
+ *
+ * Nome absurdo (`serie-chumbada-qr`) tambem falha seguro, so que de forma cara:
+ * `ehMarcacaoEmRelevo` continua verdadeiro, entao a engine exigiria
+ * corroboracao por recorte de uma leitura que o decode nunca corrobora — o
+ * campo sai `nao_conferivel`, nunca acusado e nunca aprovado por engano.
+ */
+export function ehMarcacaoQr(campo: string): boolean {
+  return segmentos(campo).includes('qr');
 }
 
 /**

@@ -78,6 +78,28 @@ Depende de: Fase 0 completa.
     formato SEGUE ABERTA; o parser cobre os formatos prováveis e o payload
     só-código responde 422 no endpoint (fallback de digitação manual é da
     Fase 3, T3.1).
+  - Atualização 2026-07-26 (o desvio acima caiu): os QRs físicos foram
+    decodificados (zxing-cpp sobre `fotos-demo/`) e o parser ganhou o formato
+    POSICIONAL do QR da PLACA — 41 testes na suite do parser. Medido: a
+    ETIQUETA é código de lookup de 13 dígitos (`1001020511056`, mesma família
+    dos EAN-13 impressos) e a PLACA traz um payload posicional de
+    identificação sem rótulo — projeto, série, patrimônio, potência, classe e
+    data, SEM cliente/pedido/seq —, com
+    `TPD-408136` (projeto), `847233` (série) e `251328` (patrimônio); o
+    `codigoProjeto` já entra na cascata de resolução existente, sem tocar
+    conferências. Detecção deliberadamente estreita (9+ linhas úteis, nenhum
+    rótulo conhecido, exatamente um código de projeto como âncora, e
+    deslocamentos RELATIVOS a ela) porque a amostra é de UMA peça; linha fora
+    do esperado vira 422 `posicional-*`, nunca campo chutado. Potência e
+    classe (10/15) existem no payload e continuam FORA do valor esperado.
+    Duas limitações registradas no SPEC, não corrigidas: (1) sem
+    cliente/pedido/seq, conferência disparada pelo QR da placa nunca chega a
+    `conforme` com o seed atual (`cliente-serigrafia-frente` obrigatório sai
+    `nao_conferivel` motivo `sem-valor-esperado`) — comportamento correto, a
+    régua não se rebaixa; (2) o payload é AUTO-REFERENTE (mora na placa que
+    `serie-placa`/`patrimonio-placa` conferem), então placa trocada se
+    confirma sozinha e a acusação recai nas chumbadas. A fonte da verdade do
+    fluxo segue sendo a ETIQUETA.
 - [x] T1.2 — Engine de comparação campo a campo · módulo: conformidade
   - Testes (primeiro): campo igual → `conforme`; diferente → `divergente`;
     confiança abaixo do limiar ou leitura ausente → `nao_conferivel`; agregação
@@ -566,6 +588,11 @@ demo.
   de disco local; corte na ordem Could → Should, nunca no Must.
 - **Payload do QR desconhecido** (SPEC, constraint 5) → T1.1 na frente de tudo
   que depende dele; plano B: digitação manual dos valores esperados.
+  RESOLVIDO PARCIALMENTE em 2026-07-26: os dois QRs da peça foram
+  decodificados e o parser cobre o formato real da PLACA. O risco mudou de
+  forma — o QR da ETIQUETA é lookup puro, então o "plano B" da digitação
+  manual virou o caminho normal dela na T3.1, e é isso que a UI precisa
+  entregar.
 - **Créditos AWS** (SPEC, constraint 4) → visão só sob disparo explícito
   (T3.2, e no servidor uma chamada por foto com teto de 10); spike com timebox
   (T2.1). O bloqueio de cotas do Bedrock que assombrou o dia CAIU na noite de
@@ -579,8 +606,18 @@ demo.
       sempre (limiar 0.9, medido com a peça real na T2.1/rodada
       nomes-e-analise); similaridade aproximada fica fora — em série de
       transformador, "quase igual" é divergente (2026-07-25).
-- [ ] **Formato do payload do QR** — campos embutidos ou código de lookup;
-      afeta T1.1 e T3.1.
+- [x] **Formato do payload do QR** — resolvido por medição em 2026-07-26: são
+      os DOIS. O QR da PLACA traz um payload posicional de IDENTIFICAÇÃO, sem
+      rótulo (`… / TPD-408136 / 01/06/2026 / 847233 / … / 251328 / …`) — não é
+      payload completo: sem cliente, pedido, seq nem descrição; o
+      QR da ETIQUETA é só código de lookup de 13 dígitos (`1001020511056`).
+      Efeito na T3.1: a digitação manual deixa de ser plano B e vira caminho
+      obrigatório para quem lê a etiqueta, porque o lookup precisaria de ERP
+      (Won't desta rodada) — e também para quem lê a placa e quer veredito
+      completo, já que sem cliente o gate da serigrafia não fecha `conforme`.
+      Segue aberto o significado das linhas 1/2/6/10 do
+      payload da placa e se o layout é estável entre modelos — amostra de UMA
+      peça, detalhe no SPEC (inclusive a auto-referência do QR da placa).
 - [x] **Textract vs Bedrock para extração** — resolvido: TEXTRACT, medido com
       as fotos reais (docs/visao-ocr.md); leu inclusive o relevo chumbado, que
       era o risco. Reavaliado na noite de 2026-07-25, com a conta destravada:

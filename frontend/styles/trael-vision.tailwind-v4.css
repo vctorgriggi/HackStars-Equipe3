@@ -1,0 +1,83 @@
+/* TRAEL Vision — Tailwind v4 (@theme). Importe DEPOIS de trael-vision.css:
+   @import "tailwindcss";
+   @import "./trael-vision.css";
+   @import "./theme.tailwind-v4.css";
+   Gera utilities: bg-brand-primary, text-reading-mismatch, font-mono, rounded-md, shadow-2, etc. */
+@theme inline {
+  --color-brand-primary: var(--color-brand-primary);
+  --color-brand-primary-600: var(--color-brand-primary-600);
+  --color-brand-primary-700: var(--color-brand-primary-700);
+  --color-brand-medium: var(--color-brand-medium);
+  --color-brand-accent: var(--color-brand-accent);
+  --color-brand-ink: var(--color-brand-ink);
+  --color-brand-on: var(--color-brand-on);
+  --color-brand-surface: var(--brand-surface);
+  --color-reading-pending: var(--color-reading-pending);
+  --color-reading-pending-hc: var(--color-reading-pending-hc);
+  --color-reading-pending-soft: var(--reading-pending-soft);
+  --color-reading-processing: var(--color-reading-processing);
+  --color-reading-processing-hc: var(--color-reading-processing-hc);
+  --color-reading-processing-soft: var(--reading-processing-soft);
+  --color-reading-success: var(--color-reading-success);
+  --color-reading-success-hc: var(--color-reading-success-hc);
+  --color-reading-success-soft: var(--reading-success-soft);
+  --color-reading-lowconf: var(--color-reading-lowconf);
+  --color-reading-lowconf-hc: var(--color-reading-lowconf-hc);
+  --color-reading-lowconf-soft: var(--reading-lowconf-soft);
+  --color-reading-mismatch: var(--color-reading-mismatch);
+  --color-reading-mismatch-hc: var(--color-reading-mismatch-hc);
+  --color-reading-mismatch-soft: var(--reading-mismatch-soft);
+  --color-reading-validated: var(--color-reading-validated);
+  --color-reading-validated-hc: var(--color-reading-validated-hc);
+  --color-reading-validated-soft: var(--reading-validated-soft);
+  --color-viz-1: var(--viz-1); --color-viz-2: var(--viz-2); --color-viz-3: var(--viz-3);
+  --color-viz-4: var(--viz-4); --color-viz-5: var(--viz-5); --color-viz-6: var(--viz-6);
+  --color-bg-base: var(--bg-base);
+  --color-bg-canvas: var(--bg-canvas);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-surface-inset: var(--surface-inset);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-line-focus: var(--border-focus);
+  --color-text-1: var(--text-1);
+  --color-text-2: var(--text-2);
+  --color-text-3: var(--text-3);
+  --color-text-inverse: var(--text-inverse);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --radius-xs: var(--radius-xs); --radius-sm: var(--radius-sm); --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg); --radius-xl: var(--radius-xl);
+  --shadow-1: var(--shadow-1); --shadow-2: var(--shadow-2); --shadow-3: var(--shadow-3);
+  --ease-standard: var(--ease-standard); --ease-out: var(--ease-out);
+
+  /* Paridade px: o DS é inteiramente em px (--topbar-h:52px, --row-h:40px,
+     --text-*:px); a escala de spacing em px remove o descompasso rem/px na
+     UI densa (p-4 ≡ --space-4 = 16px). */
+  --spacing: 4px;
+
+  /* Escala tipográfica do DS como utilities text-* (self-ref = mesmo idioma
+     das cores acima: @theme inline resolve contra :root em runtime). */
+  --text-2xs: var(--text-2xs);  --text-2xs--line-height: var(--leading-snug);
+  --text-xs:  var(--text-xs);   --text-xs--line-height:  var(--leading-snug);
+  --text-sm:  var(--text-sm);   --text-sm--line-height:  var(--leading-normal);
+  --text-md:  var(--text-md);   --text-md--line-height:  var(--leading-normal);
+  --text-base: var(--text-base); --text-base--line-height: var(--leading-normal);
+  --text-lg:  var(--text-lg);   --text-lg--line-height:  var(--leading-snug);
+  --text-xl:  var(--text-xl);   --text-xl--line-height:  var(--leading-snug);
+  --text-2xl: var(--text-2xl);  --text-2xl--line-height: var(--leading-tight);
+  --text-3xl: var(--text-3xl);  --text-3xl--line-height: var(--leading-tight);
+  --text-4xl: var(--text-4xl);  --text-4xl--line-height: var(--leading-tight);
+
+  --font-weight-medium:   var(--weight-medium);
+  --font-weight-semibold: var(--weight-semibold);
+  --font-weight-bold:     var(--weight-bold);
+
+  --color-viz-track: var(--viz-track);
+  --radius-pill: var(--radius-pill);
+
+  /* Breakpoint do shell — o matchMedia('(max-width:880px)') do protótipo,
+     invertido para mobile-first: desk: aplica de 881px pra cima. */
+  --breakpoint-desk: 881px;
+}

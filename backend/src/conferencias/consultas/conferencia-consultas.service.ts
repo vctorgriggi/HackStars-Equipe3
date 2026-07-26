@@ -8,9 +8,9 @@ import {
 import { CampoConferidoRepository } from '../../campos-conferidos/infrastructure/persistence/campo-conferido.repository';
 import { ConferenciaRepository } from '../infrastructure/persistence/conferencia.repository';
 import { Conferencia } from '../domain/conferencia';
+import { paraFotoDaEvidencia } from '../dto/resumos-compartilhados.dto';
 import {
   CampoVeredito,
-  FotoEvidenciaResumo,
   indexarChecklist,
   VereditoConferencia,
 } from './veredito-conferencia';
@@ -93,7 +93,10 @@ export class ConferenciaConsultasService {
         confianca: campoConferido.confianca ?? null,
         veredito: campoConferido.veredito ?? null,
         regiaoLeitura: campoConferido.regiaoLeitura ?? null,
-        fotoEvidencia: this.resumirEvidencia(campoConferido.fotoEvidencia),
+        // INSTANCIA, nunca objeto literal: e o que faz o
+        // `@TransformUrlEvidencia()` disparar e a `url` chegar pronta ao front
+        // (assinada sob s3, absoluta sob local).
+        fotoEvidencia: paraFotoDaEvidencia(campoConferido.fotoEvidencia),
       }));
 
     return {
@@ -118,25 +121,5 @@ export class ConferenciaConsultasService {
       },
       campos,
     };
-  }
-
-  /**
-   * INSTANCIA, nunca objeto literal: e o que faz o `@TransformUrlEvidencia()`
-   * disparar e a `url` chegar pronta ao front (assinada sob s3, absoluta sob
-   * local). Ver o comentario de `FotoEvidenciaResumo`.
-   */
-  private resumirEvidencia(
-    foto: { id: string; url: string; fonteFisica: string } | null | undefined,
-  ): FotoEvidenciaResumo | null {
-    if (!foto) {
-      return null;
-    }
-
-    const resumo = new FotoEvidenciaResumo();
-    resumo.id = foto.id;
-    resumo.url = foto.url;
-    resumo.fonteFisica = foto.fonteFisica;
-
-    return resumo;
   }
 }

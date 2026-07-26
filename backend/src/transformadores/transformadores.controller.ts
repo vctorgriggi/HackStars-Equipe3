@@ -15,6 +15,7 @@ import {
   TransformadorConsultasService,
 } from './consultas/transformador-consultas.service';
 import { ConferenciaResumo } from './consultas/conferencia-resumo';
+import { TransformadorComSituacao } from './consultas/transformador-situacao';
 import { CreateTransformadorDto } from './dto/create-transformador.dto';
 import { UpdateTransformadorDto } from './dto/update-transformador.dto';
 import {
@@ -69,18 +70,21 @@ export class TransformadoresController {
 
   @Get()
   @ApiOperation({
-    summary: 'Lista pecas, opcionalmente filtradas',
+    summary: 'Lista pecas com situacao (veredito vigente + etapa atual)',
     description:
-      'Sem filtro, pagina o cadastro inteiro (comportamento historico). ' +
-      '`numeroSerie` e a chave de negocio e devolve 0 ou 1 item — e como o ' +
-      'front resolve "li o QR, quero a peca". `pedido` recorta o lote.',
+      'Cada item traz a identidade enxuta da peca (sem a checklist do ' +
+      'projeto), `vereditoVigente` (a conferencia mais recente, como a ' +
+      'engine gravou — `null` = nunca conferida) e `etapaAtual` (derivada da ' +
+      'ultima passagem — `null` = sem passagem). `numeroSerie` e a chave de ' +
+      'negocio e devolve 0 ou 1 item — e como o front resolve "li o QR, ' +
+      'quero a peca". `pedido` recorta o lote. Filtros por igualdade exata.',
   })
   @ApiOkResponse({
-    type: InfinityPaginationResponse(Transformador),
+    type: InfinityPaginationResponse(TransformadorComSituacao),
   })
   async findAll(
     @Query() query: FindAllTransformadoresDto,
-  ): Promise<InfinityPaginationResponseDto<Transformador>> {
+  ): Promise<InfinityPaginationResponseDto<TransformadorComSituacao>> {
     const page = query?.page ?? 1;
     let limit = query?.limit ?? 10;
     if (limit > 50) {
@@ -88,7 +92,7 @@ export class TransformadoresController {
     }
 
     return infinityPagination(
-      await this.transformadoresService.findAllWithPagination({
+      await this.transformadorConsultasService.listarComSituacao({
         filterOptions: {
           numeroSerie: query?.numeroSerie,
           pedido: query?.pedido,

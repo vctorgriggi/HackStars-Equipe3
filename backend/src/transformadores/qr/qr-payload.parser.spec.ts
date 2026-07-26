@@ -2,9 +2,10 @@ import { PayloadEtiqueta, PayloadInvalidoError } from './payload-etiqueta';
 import { parsePayloadEtiqueta } from './qr-payload.parser';
 
 /**
- * Fixture-ancora: simula a etiqueta impressa real (formato chave:valor).
- * O conteudo exato do QR ainda nao foi decodificado (decisao em aberto T1.1);
- * quando for lido, ele vira apenas mais uma fixture aqui.
+ * Fixture-ancora: simula a etiqueta impressa (formato chave:valor).
+ * Continua valendo como formato alternativo: o QR da ETIQUETA real, medido em
+ * 2026-07-26, e apenas um codigo de lookup de 13 digitos (ver a suite
+ * "formato codigo"), entao nenhum QR da peca de demo produz este layout hoje.
  */
 const ETIQUETA_CHAVE_VALOR = [
   'Pedido: 68202',
@@ -25,6 +26,37 @@ const ETIQUETA_ESPERADA: PayloadEtiqueta = {
   descricao: 'TRANSFORMADOR 10kVA 15kV 1F 240/120V 8660V',
   codigoProjeto: 'TPD-408136',
 };
+
+/**
+ * Fixture REAL do QR da PLACA de identificacao, decodificado em 2026-07-26
+ * (zxing-cpp sobre fotos-demo/PLACA-4.jpg e
+ * DIAGONAL-TRASEIRA-DIREITA-2.jpg — as duas leituras deram o mesmo conteudo).
+ * Linhas separadas por CRLF, sem rotulo nenhum.
+ *
+ * Layout inferido por evidencia externa (etiqueta impressa e placa da mesma
+ * peca): linha 3 = codigo de projeto, linha 5 = numero de serie, linha 9 =
+ * patrimonio. Linhas 1/2/6/10 seguem de significado DESCONHECIDO — amostra
+ * unica, por isso o parser nao mapeia nada alem do que foi corroborado.
+ *
+ * Detalhe do dominio: o QR desta placa carrega a serie CORRETA (847233),
+ * enquanto o numero IMPRESSO nela e 847833 — o defeito conhecido da peca de
+ * demo e de impressao, e nao contamina o payload.
+ */
+const PLACA_POSICIONAL_CRLF = [
+  '91616',
+  '19930',
+  'TPD-408136',
+  '01/06/2026',
+  '847233',
+  '1',
+  '10',
+  '15',
+  '251328',
+  '226/13299',
+].join('\r\n');
+
+/** Codigo lido do QR da ETIQUETA adesiva real (2026-07-26): lookup de 13 digitos. */
+const ETIQUETA_CODIGO_LOOKUP = '1001020511056';
 
 const ETIQUETA_JSON = JSON.stringify({
   pedido: '68202',
@@ -189,6 +221,208 @@ describe('parsePayloadEtiqueta', () => {
     });
   });
 
+  describe('formato posicional (QR da placa de identificacao)', () => {
+    it('should parse o payload real da placa com CRLF entre as linhas', () => {
+      expect(parsePayloadEtiqueta(PLACA_POSICIONAL_CRLF)).toEqual({
+        tipo: 'completo',
+        dados: {
+          numeroSerie: '847233',
+          patrimonio: '251328',
+          codigoProjeto: 'TPD-408136',
+          cliente: null,
+          pedido: null,
+          seq: null,
+          descricao: null,
+        },
+      });
+    });
+
+    it('should aceitar a mesma sequencia separada por LF', () => {
+      const payload = PLACA_POSICIONAL_CRLF.split('\r\n').join('\n');
+
+      expect(parsePayloadEtiqueta(payload)).toEqual(
+        parsePayloadEtiqueta(PLACA_POSICIONAL_CRLF),
+      );
+    });
+
+    it('should ignorar linhas vazias e espacos ao redor dos valores', () => {
+      const payload = [
+        '',
+        '  91616 ',
+        '19930',
+        '',
+        ' TPD-408136',
+        '01/06/2026',
+        '  847233  ',
+        '1',
+        '10',
+        '15',
+        ' 251328',
+        '226/13299',
+        '   ',
+      ].join('\r\n');
+
+      const resultado = parsePayloadEtiqueta(payload);
+
+      if (resultado.tipo !== 'completo') {
+        throw new Error('esperado tipo completo');
+      }
+      expect(resultado.dados.numeroSerie).toBe('847233');
+      expect(resultado.dados.patrimonio).toBe('251328');
+    });
+
+    it('should seguir o deslocamento RELATIVO quando o codigo do projeto muda de linha', () => {
+      // Mesma peca, codigo do projeto na 1a linha: serie 2 linhas depois,
+      // patrimonio 6 linhas depois. Nada aqui e indice absoluto.
+      const payload = [
+        'TPD-408136',
+        '01/06/2026',
+        '847233',
+        '1',
+        '10',
+        '15',
+        '251328',
+        '226/13299',
+        '91616',
+        '19930',
+      ].join('\n');
+
+      const resultado = parsePayloadEtiqueta(payload);
+
+      if (resultado.tipo !== 'completo') {
+        throw new Error('esperado tipo completo');
+      }
+      expect(resultado.dados.numeroSerie).toBe('847233');
+      expect(resultado.dados.patrimonio).toBe('251328');
+      expect(resultado.dados.codigoProjeto).toBe('TPD-408136');
+    });
+
+    it('should aceitar outro prefixo de projeto no padrao (ex.: EPT)', () => {
+      const payload = PLACA_POSICIONAL_CRLF.replace('TPD-408136', 'EPT-408136');
+
+      const resultado = parsePayloadEtiqueta(payload);
+
+      if (resultado.tipo !== 'completo') {
+        throw new Error('esperado tipo completo');
+      }
+      expect(resultado.dados.codigoProjeto).toBe('EPT-408136');
+    });
+
+    it('should deixar cliente, pedido, seq e descricao ausentes (o formato nao os traz)', () => {
+      const resultado = parsePayloadEtiqueta(PLACA_POSICIONAL_CRLF);
+
+      if (resultado.tipo !== 'completo') {
+        throw new Error('esperado tipo completo');
+      }
+      expect(resultado.dados.cliente).toBeNull();
+      expect(resultado.dados.pedido).toBeNull();
+      expect(resultado.dados.seq).toBeNull();
+      expect(resultado.dados.descricao).toBeNull();
+    });
+
+    it('should recusar quando a linha do numero de serie nao e identificador numerico', () => {
+      // Amostra unica: se o layout nao bate, o parser NAO chuta outro campo.
+      const payload = PLACA_POSICIONAL_CRLF.replace(
+        '\r\n847233\r\n',
+        '\r\n01/06/2026\r\n',
+      );
+
+      esperarMotivo(payload, /posicional-numero-serie-invalido/);
+    });
+
+    it('should recusar numero de serie curto demais para ser identificador', () => {
+      const payload = PLACA_POSICIONAL_CRLF.replace(
+        '\r\n847233\r\n',
+        '\r\n7\r\n',
+      );
+
+      esperarMotivo(payload, /posicional-numero-serie-invalido/);
+    });
+
+    it('should recusar quando a linha do patrimonio nao e identificador numerico', () => {
+      const payload = PLACA_POSICIONAL_CRLF.replace(
+        '\r\n251328\r\n',
+        '\r\n226/13299\r\n',
+      );
+
+      esperarMotivo(payload, /posicional-patrimonio-invalido/);
+    });
+
+    it('should recusar quando o deslocamento do patrimonio cai fora do payload', () => {
+      const payload = [
+        '91616',
+        '19930',
+        '01/06/2026',
+        '1',
+        '10',
+        'TPD-408136',
+        '15',
+        '847233',
+        '251328',
+      ].join('\n');
+
+      esperarMotivo(payload, /posicional-patrimonio-ausente/);
+    });
+
+    it('should nomear a linha problematica na mensagem de erro', () => {
+      const payload = PLACA_POSICIONAL_CRLF.replace(
+        '\r\n847233\r\n',
+        '\r\nABC\r\n',
+      );
+
+      esperarMotivo(payload, /linha 5/);
+      esperarMotivo(payload, /ABC/);
+    });
+
+    it('should exigir 9+ linhas: payload curto cai nos formatos existentes', () => {
+      const curto = [
+        '91616',
+        '19930',
+        'TPD-408136',
+        '01/06/2026',
+        '847233',
+        '1',
+        '10',
+        '15',
+      ].join('\r\n');
+
+      // 8 linhas: nao e posicional. Cai no chave:valor, que so reconhece o TPD
+      // e acusa a falta dos obrigatorios — nunca inventa serie/patrimonio.
+      esperarMotivo(curto, /campos-obrigatorios-ausentes/);
+    });
+
+    it('should exigir UM unico codigo de projeto: dois codigos caem nos formatos existentes', () => {
+      const ambiguo = PLACA_POSICIONAL_CRLF.replace(
+        '\r\n226/13299',
+        '\r\nEPT-163999',
+      );
+
+      esperarMotivo(ambiguo, /campos-obrigatorios-ausentes/);
+    });
+
+    it('should manter o payload ROTULADO no formato chave:valor mesmo com 9+ linhas', () => {
+      // Guarda de regressao: rotulo vence posicao. Um payload com chaves
+      // conhecidas nunca e lido por deslocamento.
+      const rotulado = [
+        'Pedido: 68202',
+        'Núm. Série: 847233',
+        'Seq: 98',
+        'Patrimônio: 251328',
+        'Cliente: 143091 - Energisa Rondônia Distribuidora de Energia S.A',
+        'TRANSFORMADOR 10kVA 15kV 1F 240/120V 8660V',
+        'TPD-408136',
+        'Tensao: 15kV',
+        'Fabricado no Brasil',
+        'Peso: 120kg',
+      ].join('\r\n');
+
+      expect(parsePayloadEtiqueta(rotulado)).toEqual({
+        tipo: 'completo',
+        dados: ETIQUETA_ESPERADA,
+      });
+    });
+  });
+
   describe('formato JSON', () => {
     it('should parse o JSON equivalente a etiqueta', () => {
       expect(parsePayloadEtiqueta(ETIQUETA_JSON)).toEqual({
@@ -332,6 +566,18 @@ describe('parsePayloadEtiqueta', () => {
 
     it('should recusar token acima de 64 caracteres', () => {
       esperarMotivo('A'.repeat(65), 'formato-desconhecido');
+    });
+
+    it('should tratar o QR REAL da etiqueta adesiva como codigo de lookup', () => {
+      // Medido em 2026-07-26 (zxing-cpp sobre fotos-demo/ETIQUETA-1.jpg): o QR
+      // da etiqueta nao carrega campos, e sim um codigo de 13 digitos da mesma
+      // familia dos EAN-13 impressos ao lado. Sem ERP nesta rodada, o caminho
+      // de recuperacao e a digitacao manual dos campos (SPEC, T3.1) — e por
+      // isso o parser marca `tipo: 'codigo'` em vez de fingir uma identidade.
+      expect(parsePayloadEtiqueta(ETIQUETA_CODIGO_LOOKUP)).toEqual({
+        tipo: 'codigo',
+        codigo: '1001020511056',
+      });
     });
   });
 

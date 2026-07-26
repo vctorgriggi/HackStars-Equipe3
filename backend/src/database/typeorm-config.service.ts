@@ -27,7 +27,6 @@ export class TypeOrmConfigService implements TypeOrmOptionsFactory {
       migrations: [__dirname + '/migrations/**/*{.ts,.js}'],
       cli: {
         entitiesDir: 'src',
-
         subscribersDir: 'subscriber',
       },
       // SSL condicionado ao env: o RDS exige TLS (DATABASE_SSL_ENABLED=true),

@@ -9,10 +9,12 @@ import {
 
 import { CamposConferidosService } from '../campos-conferidos/campos-conferidos.service';
 import { CheckpointsService } from '../checkpoints/checkpoints.service';
+import { FotosEvidenciaService } from '../fotos-evidencia/fotos-evidencia.service';
 import { ProjetosModeloService } from '../projetos-modelo/projetos-modelo.service';
 import { TransformadoresService } from '../transformadores/transformadores.service';
 
 import { Checkpoint } from '../checkpoints/domain/checkpoint';
+import { FotoEvidencia } from '../fotos-evidencia/domain/foto-evidencia';
 import { ProjetoModelo } from '../projetos-modelo/domain/projeto-modelo';
 import { Transformador } from '../transformadores/domain/transformador';
 
@@ -22,12 +24,13 @@ import { ehMarcacaoEmRelevo } from '../extracao/ports/marcacao';
 
 import { conferir, normalizar, temLastro } from './engine/engine-conformidade';
 import { temConteudo } from './engine/normalizacao';
-import { ItemChecklist, LeituraCampo } from './engine/tipos';
+import { ItemChecklist, LeituraCampo, ModoComparacao } from './engine/tipos';
 import { ExecutarConferenciaDto } from './dto/executar-conferencia.dto';
 import {
   CampoExecutado,
   ResultadoExecucao,
 } from './dto/resultado-execucao.dto';
+import { paraFotoDaEvidencia } from './dto/resumos-compartilhados.dto';
 import { ConferenciaRepository } from './infrastructure/persistence/conferencia.repository';
 
 /**
@@ -137,26 +140,94 @@ export function filtrarChecklistPorEtapa(
 
 /**
  * De onde sai o valor esperado de cada campo do checklist, por PREFIXO do nome
- * do campo. O prefixo diz O QUE o campo carrega ('serie-', 'patrimonio-',
- * 'cliente-'); o resto do nome diz como foi gravado e em qual VISTA da peca
- * esta ('serie-chumbada-topo', 'patrimonio-serigrafia-frente', 'serie-placa').
+ * do campo, E como ele e comparado. O prefixo diz O QUE o campo carrega
+ * ('serie-', 'patrimonio-', 'cliente-'); o resto do nome diz como foi gravado e
+ * em qual VISTA da peca esta ('serie-chumbada-topo',
+ * 'patrimonio-serigrafia-frente', 'serie-placa').
  * Trocar o eixo de `fonteFisica` para vistas nao mexe aqui de proposito: o
  * casamento e por prefixo, entao nome novo de posicao continua achando sua
  * origem. Nesta rodada o esperado vem so do QR da etiqueta.
  *
- * 'potencia-*' NAO aparece de proposito: a potencia nao esta no QR — o
- * esperado virá do projeto estruturado no futuro. Sem valor esperado, a engine
- * omite o campo opcional do resultado e marca o obrigatorio como
- * 'nao_conferivel' (motivo 'sem-valor-esperado').
+ * 'potencia-*' ENTROU em 2026-07-26, e a origem dela e a unica que nao e um
+ * campo proprio do QR: a etiqueta imprime a potencia dentro da DESCRICAO
+ * ('TRANSFORMADOR 10kVA 15kV 1F 240/120V 8660V'), e o parser ja entrega esse
+ * texto. Derivar dali respeita a constraint 5 do SPEC — o valor vem do payload,
+ * nao de constante nossa. Descricao ausente (ou sem 'kVA') devolve null e o
+ * comportamento antigo fica intacto: campo opcional omitido, obrigatorio
+ * 'nao_conferivel' com motivo 'sem-valor-esperado'.
+ *
+ * Isto e o FALLBACK, nao a fonte preferida: a marcacao que o desenho manda
+ * gravar na frente e '1H - 10 kVA' COMPLETA, e o '1H' nao existe em payload
+ * nenhum (a descricao traz '1F', que e outra coisa — mapear 1F -> 1H seria
+ * inventar regra). Quem define a marcacao e o PROJETO, entao o esperado
+ * preferido vem do item da checklist ('esperadoFixo', ver
+ * `montarValoresEsperados`); a derivacao pela descricao continua valendo para
+ * checklist antiga, que nao declara nada.
+ *
+ * MOTIVO DE NEGOCIO de a potencia ter deixado de ser omitida: campo sem esperado
+ * sai do resultado, entao potencia gravada errada na peca produzia SILENCIO — e
+ * marcacao errada e o primeiro teste que um avaliador faz.
+ *
+ * `modo` mora AQUI, no mesmo lugar da origem, porque e a mesma pergunta vista
+ * de dois angulos: quem sabe de onde vem o esperado e quem sabe como ele
+ * aparece gravado na peca. Todo identificador e 'exato' — em numero de serie,
+ * "quase igual" e divergente. A EXCECAO e 'cliente-', medida em 2026-07-26 com
+ * o Textract no ar (gap 21): a serigrafia carrega a MARCA ('Energisa'), o QR
+ * carrega a razao social com codigo ('143091 - Energisa Rondonia
+ * Distribuidora de Energia S.A'), e a igualdade exata acusava a peca CORRETA —
+ * quebrando o criterio 2 do SPEC em toda conferencia com QR real. Contencao de
+ * TOKEN INTEIRO, nao substring nem fuzzy; a regra e seus limites estao em
+ * `engine/comparacao.ts`.
  */
 const ORIGENS_DO_ESPERADO: {
   prefixo: string;
   ler: (payload: PayloadEtiqueta) => string | null;
+  modo: ModoComparacao;
 }[] = [
-  { prefixo: 'serie-', ler: (payload) => payload.numeroSerie },
-  { prefixo: 'patrimonio-', ler: (payload) => payload.patrimonio },
-  { prefixo: 'cliente-', ler: (payload) => payload.cliente },
+  { prefixo: 'serie-', ler: (payload) => payload.numeroSerie, modo: 'exato' },
+  {
+    prefixo: 'patrimonio-',
+    ler: (payload) => payload.patrimonio,
+    modo: 'exato',
+  },
+  {
+    prefixo: 'cliente-',
+    ler: (payload) => payload.cliente,
+    modo: 'contem-token',
+  },
+  {
+    prefixo: 'potencia-',
+    ler: (payload) => potenciaDaDescricao(payload.descricao),
+    modo: 'esperado-contido',
+  },
 ];
+
+/**
+ * Primeira potencia em kVA escrita na DESCRICAO da etiqueta, normalizada para
+ * 'numero + espaco + kVA'.
+ *
+ * Aceita a unidade colada ('10kVA') ou separada ('10 kVA'), em qualquer caixa, e
+ * decimal com virgula ou ponto ('7,5 kVA' — modelo de outra potencia existe). A
+ * PRIMEIRA ocorrencia vence: na descricao real a potencia abre o texto
+ * ('TRANSFORMADOR 10kVA 15kV ...'), e varrer o resto atras de um segundo kVA
+ * seria inventar criterio de desempate.
+ *
+ * A normalizacao existe para o valor esperado sair legivel na resposta e na
+ * coluna `valorEsperado` ('10 kVA', nao '10kVA'); a COMPARACAO nao depende dela
+ * — o modo `esperado-contido` trata as duas grafias como o mesmo dado
+ * (`engine/comparacao.ts`).
+ *
+ * Exportada para teste direto, como as demais regras deste arquivo.
+ */
+export function potenciaDaDescricao(descricao: string | null): string | null {
+  if (descricao === null) {
+    return null;
+  }
+
+  const achado = /(\d+(?:[.,]\d+)?)\s*kva/i.exec(descricao);
+
+  return achado === null ? null : `${achado[1]} kVA`;
+}
 
 // Exportado por ser a validação ÚNICA de item de checklist — a versão que
 // vivia duplicada em conferencia-extracao divergia (não validava `etapa`) e
@@ -176,7 +247,13 @@ export function ehItemChecklist(valor: unknown): valor is ItemChecklist {
     // item cairia calado no ramo "etapa desconhecida". `null` e aceito como
     // "sem etapa" (codificacao natural em JSON — achado BAIXA da revisao) e
     // normalizado para undefined em lerChecklist.
-    (item.etapa == null || typeof item.etapa === 'string')
+    (item.etapa == null || typeof item.etapa === 'string') &&
+    // `esperadoFixo` segue a MESMA politica de `etapa`: opcional (nenhuma
+    // checklist antiga a tem, e todas continuam validas), string quando
+    // presente, `null` aceito como ausencia. Aceitar sem exigir e o que mantem
+    // esta funcao a validacao UNICA do sistema — ela tambem serve a releitura
+    // do veredito e ao plano de fotos, que ignoram a chave.
+    (item.esperadoFixo == null || typeof item.esperadoFixo === 'string')
   );
 }
 
@@ -191,6 +268,20 @@ export function montarValoresEsperados(
   const valoresEsperados: Record<string, string> = {};
 
   for (const item of checklist) {
+    // PRECEDENCIA do esperado declarado pelo MODELO (2026-07-26): quando o item
+    // da checklist traz `esperadoFixo`, ele vence a derivacao por prefixo. Vale
+    // para marcacao que nao e identidade da peca — a potencia da frente, cujo
+    // texto completo ('1H - 10 kVA') sai do desenho e nao existe em payload
+    // nenhum. A identidade (serie, patrimonio, cliente) NAO usa esta porta: o
+    // seed nao declara `esperadoFixo` nesses campos, e declarar seria trocar a
+    // fonte da verdade do QR por um dado editavel — exatamente o que a
+    // constraint 5 do SPEC proibe. O argumento completo esta no tipo
+    // (`ItemChecklist.esperadoFixo`).
+    if (temConteudo(item.esperadoFixo)) {
+      valoresEsperados[item.campo] = item.esperadoFixo;
+      continue;
+    }
+
     const origem = ORIGENS_DO_ESPERADO.find((atual) =>
       item.campo.startsWith(atual.prefixo),
     );
@@ -211,6 +302,41 @@ export function montarValoresEsperados(
   return valoresEsperados;
 }
 
+/**
+ * Mapa `campo -> modo de comparacao` para a engine, derivado da MESMA tabela de
+ * prefixos que resolve o valor esperado. Existe como funcao separada (e nao
+ * como retorno duplo de `montarValoresEsperados`) so para nao mexer no contrato
+ * de quem ja consome aquele record.
+ *
+ * A ENGINE NAO DEDUZ MODO NENHUM: ela recebe este mapa e usa 'exato' para todo
+ * campo ausente dele. Ficar aqui e o que impede a checklist (dado, hoje varchar
+ * sem validacao estrutural — gap 5, e escrita por LLM na Fase 6) de afrouxar a
+ * comparacao de um campo `serie-*` sem ninguem perceber.
+ *
+ * O MODO CONTINUA SAINDO DO PREFIXO mesmo quando o esperado vem de
+ * `esperadoFixo`: a checklist escolhe o VALOR, nunca o critério de igualdade.
+ * Campo de prefixo desconhecido com `esperadoFixo` cai no default `exato` — o
+ * criterio mais estrito, que e a falha segura correta aqui.
+ */
+export function montarModosDeComparacao(
+  checklist: ItemChecklist[],
+): Record<string, ModoComparacao> {
+  const modos: Record<string, ModoComparacao> = {};
+
+  for (const item of checklist) {
+    const origem = ORIGENS_DO_ESPERADO.find((atual) =>
+      item.campo.startsWith(atual.prefixo),
+    );
+    if (origem === undefined) {
+      continue;
+    }
+
+    modos[item.campo] = origem.modo;
+  }
+
+  return modos;
+}
+
 @Injectable()
 export class ConferenciaExecucaoService {
   private readonly logger = new Logger(ConferenciaExecucaoService.name);
@@ -223,6 +349,12 @@ export class ConferenciaExecucaoService {
     private readonly checkpointService: CheckpointsService,
 
     private readonly campoConferidoService: CamposConferidosService,
+
+    // So LEITURA daqui: a foto que lastreia cada campo volta na resposta para
+    // o front nao ter de parear campo x evidencia por estado local da sessao.
+    // Quem escreve o vinculo continua sendo `criarComVeredito` (persistencia)
+    // e `vincularAConferencia` (fluxo com fotos).
+    private readonly fotosEvidenciaService: FotosEvidenciaService,
 
     private readonly conferenciaRepository: ConferenciaRepository,
   ) {}
@@ -252,7 +384,7 @@ export class ConferenciaExecucaoService {
       await this.transformadorService.findByNumeroSerie(payload.numeroSerie);
 
     const projetoModelo = await this.resolverProjetoModelo(
-      payload,
+      payload.codigoProjeto ?? null,
       transformadorExistente,
     );
 
@@ -318,7 +450,7 @@ export class ConferenciaExecucaoService {
       checklist,
       valoresEsperados,
       marcarLeiturasTrocadas(leituras, valoresEsperados, limiarConfianca),
-      { limiarConfianca },
+      { limiarConfianca, modosPorCampo: montarModosDeComparacao(checklist) },
     );
 
     // Recorte NAO VAZIO que mesmo assim nao avaliou campo nenhum: todos os
@@ -339,15 +471,17 @@ export class ConferenciaExecucaoService {
       });
     }
 
+    const idsDeEvidencia = leituras
+      .map((leitura) => leitura.fotoEvidenciaId)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0);
+
     // Ultimo 422 possivel, e por isso o ultimo passo antes da escrita: foto
     // emprestada de OUTRA conferencia (achado A2). A mesma recusa acontecia no
     // fim da linha, dentro de `criarComVeredito`, ja com a conferencia criada e
     // N campos gravados — sobrava conferencia orfa com campos parciais, que o
     // scan de passagem ainda leria como "ultima conferencia" da peca.
     await this.campoConferidoService.validarEvidenciasDisponiveis(
-      leituras
-        .map((leitura) => leitura.fotoEvidenciaId)
-        .filter((id): id is string => typeof id === 'string' && id.length > 0),
+      idsDeEvidencia,
     );
 
     // Primeira escrita do fluxo: daqui para baixo, nenhum 422.
@@ -382,9 +516,21 @@ export class ConferenciaExecucaoService {
       );
     }
 
+    // Uma consulta para o lote inteiro (<= 10 fotos por conferencia), nao uma
+    // por campo. So LEITURA: e a mesma evidencia que o lastro aponta, montada
+    // para a resposta.
+    const evidenciasPorId = await this.carregarEvidencias(idsDeEvidencia);
+
     const campos: CampoExecutado[] = [];
     for (const campo of resultado.campos) {
       const leitura = leituras.find((atual) => atual.campo === campo.campo);
+      // A MESMA leitura alimenta o lastro persistido e a resposta: regiao e
+      // foto saem daqui e sao passadas adiante sem segunda resolucao — duas
+      // resolucoes independentes ja divergiram neste projeto, e aqui a
+      // divergencia apontaria o operador para a foto errada.
+      const regiaoLeitura = leitura?.regiaoLeitura ?? null;
+      const fotoEvidenciaId = leitura?.fotoEvidenciaId ?? null;
+
       const campoConferido = await this.campoConferidoService.criarComVeredito({
         conferencia,
         nomeCampo: campo.campo,
@@ -394,11 +540,20 @@ export class ConferenciaExecucaoService {
         valorLido: campo.valorLido,
         confianca: campo.confianca,
         veredito: campo.veredito,
-        regiaoLeitura: leitura?.regiaoLeitura ?? null,
-        fotoEvidenciaId: leitura?.fotoEvidenciaId ?? null,
+        regiaoLeitura,
+        fotoEvidenciaId,
       });
 
-      campos.push({ ...campo, campoConferidoId: campoConferido.id });
+      campos.push({
+        ...campo,
+        campoConferidoId: campoConferido.id,
+        regiaoLeitura,
+        fotoEvidencia: paraFotoDaEvidencia(
+          fotoEvidenciaId === null
+            ? null
+            : evidenciasPorId.get(fotoEvidenciaId),
+        ),
+      });
     }
 
     return {
@@ -430,6 +585,28 @@ export class ConferenciaExecucaoService {
       campos,
       incoerencias: resultado.incoerencias,
     };
+  }
+
+  /**
+   * Fotos referenciadas pelas leituras, indexadas por id, em UMA consulta.
+   *
+   * Existe para a resposta poder dizer DE ONDE cada leitura saiu (id, url
+   * pronta e vista) sem N+1 e sem cache: o volume e o de uma conferencia (<= 10
+   * fotos). Id que nao existe mais simplesmente nao entra no mapa — o campo sai
+   * com `fotoEvidencia: null`, coerente com `criarComVeredito`, que persiste o
+   * campo sem foto em vez de derrubar um veredito legitimo.
+   */
+  private async carregarEvidencias(
+    ids: string[],
+  ): Promise<Map<string, FotoEvidencia>> {
+    const unicos = [...new Set(ids)];
+    if (unicos.length === 0) {
+      return new Map();
+    }
+
+    const fotos = await this.fotosEvidenciaService.findByIds(unicos);
+
+    return new Map(fotos.map((foto) => [foto.id, foto]));
   }
 
   /**
@@ -515,24 +692,29 @@ export class ConferenciaExecucaoService {
   }
 
   /**
-   * Ordem: codigo do projeto no QR -> vinculo ja existente na peca -> unico
-   * projeto cadastrado. Codigo do QR sem cadastro correspondente nao e erro:
-   * cai para os proximos criterios.
+   * Ordem: codigo do projeto (do QR, ou informado pelo chamador) -> vinculo ja
+   * existente na peca -> unico projeto cadastrado. Codigo sem cadastro
+   * correspondente nao e erro: cai para os proximos criterios.
    *
    * `transformador` é `null` quando a peça ainda não existe (primeiro scan) —
    * a cascata simplesmente pula o critério do vínculo. É a REGRA ÚNICA do
    * sistema: antes, `executarComFotos` tinha uma cópia sem o critério do
    * vínculo, e com 2 projetos cadastrados os dois endpoints discordavam
    * (achado 12).
+   *
+   * PUBLICA porque o plano de fotos (`GET /conferencias/plano-de-fotos`)
+   * precisa da MESMA cascata sem ter QR nenhum em mãos: ele chama com o codigo
+   * da query e `transformador: null`. Recebe o codigo solto, e nao o payload,
+   * exatamente por isso — quem nao tem etiqueta nao deveria ter de fabricar uma
+   * para descobrir o projeto.
    */
-  private async resolverProjetoModelo(
-    payload: PayloadEtiqueta,
+  async resolverProjetoModelo(
+    codigoProjeto: string | null,
     transformador: Transformador | null,
   ): Promise<ProjetoModelo> {
-    if (payload.codigoProjeto) {
-      const porCodigo = await this.projetoModeloService.findByCodigo(
-        payload.codigoProjeto,
-      );
+    if (codigoProjeto) {
+      const porCodigo =
+        await this.projetoModeloService.findByCodigo(codigoProjeto);
       if (porCodigo) {
         return porCodigo;
       }
@@ -558,8 +740,13 @@ export class ConferenciaExecucaoService {
   /**
    * checklist e texto JSON na coluna. JSON quebrado e dado corrompido, nao
    * erro do cliente: 500 com mensagem que aponta o projeto.
+   *
+   * PUBLICA pelo mesmo motivo de `resolverProjetoModelo`: o plano de fotos le a
+   * checklist pela MESMA porta (e com a mesma validacao) que a execucao —
+   * checklist lida de dois jeitos e a receita de o plano prometer uma foto que
+   * a conferencia nao cobra.
    */
-  private lerChecklist(projetoModelo: ProjetoModelo): ItemChecklist[] {
+  lerChecklist(projetoModelo: ProjetoModelo): ItemChecklist[] {
     let bruto: unknown;
 
     try {
@@ -582,9 +769,13 @@ export class ConferenciaExecucaoService {
       );
     }
 
-    // etapa: null (aceito pelo guard) vira undefined — downstream só conhece
-    // "string presente" ou "ausente".
-    return bruto.map((item) => ({ ...item, etapa: item.etapa ?? undefined }));
+    // etapa e esperadoFixo: null (aceito pelo guard) vira undefined —
+    // downstream só conhece "string presente" ou "ausente".
+    return bruto.map((item) => ({
+      ...item,
+      etapa: item.etapa ?? undefined,
+      esperadoFixo: item.esperadoFixo ?? undefined,
+    }));
   }
 }
 

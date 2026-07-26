@@ -1,0 +1,9 @@
+/* TRAEL Vision Design System — entry point.
+   Vendorizado de trael-vision-tokens/ (raiz do repo). Fontes carregadas via
+   next/font em app/layout.tsx, não via @import de CDN — por isso
+   tokens/fonts.css não entra aqui (ver frontend/DESIGN.md). */
+@import "./tokens/colors.css";
+@import "./tokens/typography.css";
+@import "./tokens/spacing.css";
+@import "./tokens/elevation.css";
+@import "./tokens/base.css";

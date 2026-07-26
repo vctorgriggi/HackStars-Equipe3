@@ -8,6 +8,30 @@ export interface ItemChecklist {
   fonteFisica: string; // ex.: 'placa'
   obrigatorio: boolean;
   /**
+   * Valor esperado DEFINIDO PELO MODELO, para marcação que não é identidade da
+   * peça. Opcional: item sem a chave segue resolvendo o esperado pela origem do
+   * prefixo (o QR), exatamente como antes.
+   *
+   * POR QUE ISTO NÃO FERE A CONSTRAINT 5 DO SPEC (2026-07-26): a fonte da
+   * verdade única é da IDENTIDADE — série, patrimônio e cliente continuam
+   * vindo EXCLUSIVAMENTE do payload do QR, e nenhum campo desses aceita este
+   * valor no seed. Potência é outra coisa: ela não identifica a peça, não viaja
+   * em campo do QR, e quem a define é o DESENHO do modelo (EPT-163-PI-676 pede
+   * `1H - 10 kVA` na frente — confirmado no desenho pelo time em 2026-07-26).
+   * O ProjetoModelo é justamente o desenho virado dado, então tirar o esperado
+   * dele é ler a fonte certa, não inventar valor.
+   *
+   * Por que vale a pena: sem esperado, a engine OMITIA o campo opcional e a
+   * marcação errada saía em silêncio — e marcação errada é o que o avaliador vai
+   * testar. Com esperado, `2H - 10 kVA` na peça vira `divergente`.
+   *
+   * A engine NÃO lê esta chave: quem a transforma em valor esperado é o
+   * chamador (`montarValoresEsperados`), no mesmo lugar em que resolve o
+   * esperado do QR. A engine continua recebendo apenas
+   * `Record<campo, valorEsperado>`.
+   */
+  esperadoFixo?: string;
+  /**
    * `codigo` do Checkpoint em que a marcação passa a existir fisicamente na
    * peça — a partir dele o campo é conferível. Usado FORA da engine, pelo
    * chamador, para recortar a checklist por etapa (conferência parcial); a
@@ -70,8 +94,40 @@ export interface LeituraCampo {
   corroboracao?: 'confirmada' | 'nao-confirmada';
 }
 
+/**
+ * CRITERIO DE IGUALDADE TEXTUAL de um campo. Como o limiar, e POLITICA — entra
+ * por parametro, nunca por constante (nem por dedução dentro da engine: quem
+ * conhece prefixo de campo é o chamador).
+ *
+ * - `exato` (default): igualdade do valor normalizado. Vale para TODO
+ *   identificador — em número de série, "quase igual" é divergente.
+ * - `contem-token`: o lido é um TOKEN INTEIRO (ou uma sequência de tokens
+ *   inteiros consecutivos) do esperado, comparando sem acento e sem caixa.
+ *   Existe por medição (2026-07-26, gap 21): a serigrafia carrega a MARCA
+ *   (`Energisa`) e o QR carrega a razão social com código
+ *   (`143091 - Energisa Rondônia ...`), então a igualdade exata acusava a peça
+ *   CORRETA. Não é fuzzy match: pedaço de palavra (`ener`) continua divergente
+ *   e a contenção vale num sentido só (lido dentro do esperado).
+ * - `esperado-contido`: o INVERSO de `contem-token` — o esperado inteiro tem de
+ *   aparecer como sequência de tokens consecutivos DENTRO do lido. Existe para
+ *   a marcação que o desenho manda gravar junto de outro texto na mesma face:
+ *   o projeto pede `1H - 10 kVA` e a serigrafia é lida numa tirada só, então o
+ *   lido pode trazer companhia (`1H - 10 kVA 15 kV`). Continua não sendo fuzzy:
+ *   `2H - 10 kVA` e `1H - 20 kVA` são DIVERGENTES (o esperado não está lá), e
+ *   `10 kVA` sozinho também (falta o `1H` que o desenho pede). É o modo mais
+ *   frouxo da engine e por isso vale só para campo que NÃO é identidade da peça
+ *   — a decisão é do chamador, em `ORIGENS_DO_ESPERADO`.
+ */
+export type ModoComparacao = 'exato' | 'contem-token' | 'esperado-contido';
+
 export interface OpcoesEngine {
   limiarConfianca: number; // parâmetro obrigatório — nunca constante enterrada
+  /**
+   * Modo de comparação POR CAMPO. Campo ausente do mapa (ou mapa ausente) usa
+   * `exato` — o default preserva o comportamento de todo campo que o chamador
+   * não classificou.
+   */
+  modosPorCampo?: Record<string, ModoComparacao>;
 }
 
 /**

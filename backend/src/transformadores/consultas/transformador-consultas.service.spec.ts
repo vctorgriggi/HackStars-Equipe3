@@ -78,6 +78,7 @@ interface Bancada {
   service: TransformadorConsultasService;
   listarPassagens: jest.Mock;
   listarConferencias: jest.Mock;
+  listarPecas: jest.Mock;
 }
 
 function montarBancada(
@@ -85,12 +86,17 @@ function montarBancada(
     pecaExiste?: boolean;
     passagens?: Passagem[];
     conferencias?: Conferencia[];
+    pecas?: Transformador[];
+    vigentes?: Map<string, Conferencia>;
+    ultimasPassagens?: Map<string, Passagem>;
   } = {},
 ): Bancada {
+  const listarPecas = jest.fn(() => Promise.resolve(opcoes.pecas ?? []));
   const transformadorRepository = {
     findById: jest.fn(() =>
       Promise.resolve(opcoes.pecaExiste === false ? null : peca()),
     ),
+    findAllWithPagination: listarPecas,
   } as unknown as TransformadorRepository;
 
   const listarPassagens = jest.fn(() =>
@@ -98,6 +104,9 @@ function montarBancada(
   );
   const passagemRepository = {
     findAllByTransformador: listarPassagens,
+    findUltimaPorTransformadores: jest.fn(() =>
+      Promise.resolve(opcoes.ultimasPassagens ?? new Map()),
+    ),
   } as unknown as PassagemRepository;
 
   const listarConferencias = jest.fn(() =>
@@ -105,6 +114,9 @@ function montarBancada(
   );
   const conferenciaRepository = {
     findAllByTransformador: listarConferencias,
+    findUltimaPorTransformadores: jest.fn(() =>
+      Promise.resolve(opcoes.vigentes ?? new Map()),
+    ),
   } as unknown as ConferenciaRepository;
 
   return {
@@ -115,8 +127,96 @@ function montarBancada(
     ),
     listarPassagens,
     listarConferencias,
+    listarPecas,
   };
 }
+
+describe('listarComSituacao — listagem com veredito vigente e etapa atual', () => {
+  it('should juntar veredito vigente e etapa atual por peca, do jeito gravado', async () => {
+    const { service } = montarBancada({
+      pecas: [peca()],
+      vigentes: new Map([
+        [
+          'transformador-1',
+          conferencia(
+            'conferencia-9',
+            'divergente',
+            checkpoint('serigrafia', 2),
+            60,
+          ),
+        ],
+      ]),
+      ultimasPassagens: new Map([
+        [
+          'transformador-1',
+          passagem('passagem-9', checkpoint('serigrafia', 2), 55),
+        ],
+      ]),
+    });
+
+    const [item] = await service.listarComSituacao({
+      paginationOptions: { page: 1, limit: 10 },
+    });
+
+    expect(item.numeroSerie).toBe('847233');
+    expect(item.vereditoVigente).toEqual({
+      id: 'conferencia-9',
+      vereditoGeral: 'divergente',
+      createdAt: new Date(AGORA.getTime() + 60 * 60_000),
+      checkpoint: { codigo: 'serigrafia', nome: 'serigrafia' },
+    });
+    expect(item.etapaAtual).toEqual({
+      checkpoint: { codigo: 'serigrafia', nome: 'serigrafia', ordem: 2 },
+      em: new Date(AGORA.getTime() + 55 * 60_000),
+    });
+  });
+
+  it('should devolver null (nunca inventar) para peca sem conferencia e sem passagem', async () => {
+    const { service } = montarBancada({ pecas: [peca()] });
+
+    const [item] = await service.listarComSituacao({
+      paginationOptions: { page: 1, limit: 10 },
+    });
+
+    expect(item.vereditoVigente).toBeNull();
+    expect(item.etapaAtual).toBeNull();
+  });
+
+  it('should recortar o projeto para so o codigo, sem a checklist', async () => {
+    // gap 3: o eager arrastaria a checklist inteira em cada linha da listagem.
+    const comProjeto = {
+      ...peca(),
+      projetoModelo: {
+        id: 'projeto-1',
+        codigo: 'EPT-163-PI-676',
+        checklist: '[{"campo":"serie-placa"}]',
+        createdAt: AGORA,
+        updatedAt: AGORA,
+      },
+    } as Transformador;
+    const { service } = montarBancada({ pecas: [comProjeto] });
+
+    const [item] = await service.listarComSituacao({
+      paginationOptions: { page: 1, limit: 10 },
+    });
+
+    expect(item.projetoModelo).toEqual({ codigo: 'EPT-163-PI-676' });
+  });
+
+  it('should repassar filtros e paginacao ao repositorio de pecas', async () => {
+    const { service, listarPecas } = montarBancada();
+
+    await service.listarComSituacao({
+      filterOptions: { numeroSerie: '847233', pedido: undefined },
+      paginationOptions: { page: 2, limit: 25 },
+    });
+
+    expect(listarPecas).toHaveBeenCalledWith({
+      filterOptions: { numeroSerie: '847233', pedido: undefined },
+      paginationOptions: { page: 2, limit: 25 },
+    });
+  });
+});
 
 describe('historicoDePassagens — criterio 5 do SPEC', () => {
   it('should listar os eventos na ordem cronologica recebida do repositorio', async () => {

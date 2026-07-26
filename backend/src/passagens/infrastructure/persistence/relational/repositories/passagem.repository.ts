@@ -53,6 +53,34 @@ export class PassagemRelationalRepository implements PassagemRepository {
     return entities.map((entity) => PassagemMapper.toDomain(entity));
   }
 
+  async findUltimaPorTransformadores(
+    transformadorIds: string[],
+  ): Promise<Map<string, Passagem>> {
+    const ultimas = new Map<string, Passagem>();
+    if (transformadorIds.length === 0) {
+      return ultimas;
+    }
+
+    // Mesmo desenho da conferencia vigente: DISTINCT ON por peca com a linha
+    // mais recente vencendo, e o transformador entra so pelo id (gap 3).
+    const entities = await this.passagemRepository
+      .createQueryBuilder('passagem')
+      .distinctOn(['transformador.id'])
+      .leftJoinAndSelect('passagem.checkpoint', 'checkpoint')
+      .leftJoin('passagem.transformador', 'transformador')
+      .addSelect('transformador.id')
+      .where('transformador.id IN (:...transformadorIds)', { transformadorIds })
+      .orderBy('transformador.id', 'ASC')
+      .addOrderBy('passagem.createdAt', 'DESC')
+      .addOrderBy('passagem.id', 'DESC')
+      .getMany();
+
+    for (const entity of entities) {
+      ultimas.set(entity.transformador.id, PassagemMapper.toDomain(entity));
+    }
+    return ultimas;
+  }
+
   async findById(id: Passagem['id']): Promise<NullableType<Passagem>> {
     const entity = await this.passagemRepository.findOne({
       where: { id },

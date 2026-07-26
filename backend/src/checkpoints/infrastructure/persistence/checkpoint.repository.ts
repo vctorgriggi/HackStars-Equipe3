@@ -14,6 +14,12 @@ export abstract class CheckpointRepository {
     paginationOptions: IPaginationOptions;
   }): Promise<Checkpoint[]>;
 
+  // Sem paginacao de proposito, e ORDENADO POR `ordem`: a linha de producao
+  // inteira cabe numa tela (4 etapas no seed) e o plano de fotos precisa dela
+  // na sequencia real — a ordem e o que define o recorte cumulativo de cada
+  // gate.
+  abstract findAll(): Promise<Checkpoint[]>;
+
   abstract findById(id: Checkpoint['id']): Promise<NullableType<Checkpoint>>;
 
   abstract findByIds(ids: Checkpoint['id'][]): Promise<Checkpoint[]>;

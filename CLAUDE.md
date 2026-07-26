@@ -46,13 +46,19 @@ não conformidade que chega ao cliente hoje).
 ```
 backend/                  # NestJS (base brocoders/nestjs-boilerplate)
   src/
-    transformadores/      # CRUD Transformador (gerado); recebe o parser do QR (T1.1)
+    transformadores/      # CRUD Transformador (gerado); recebe o parser do QR (T1.1);
+                          #   GET /lotes (consultas/): pecas agrupadas por pedido,
+                          #   contadores e progresso server-side — lote NAO e entidade
     projetos-modelo/      # CRUD ProjetoModelo (gerado); checklist por modelo como dado
     conferencias/         # CRUD Conferencia (gerado); recebe a engine de comparação (T1.2)
     campos-conferidos/    # CRUD CampoConferido (gerado)
     fotos-evidencia/      # CRUD FotoEvidencia (gerado); recebe upload/S3 (T2.3)
     checkpoints/          # CRUD Checkpoint (gerado); seed das etapas ordenadas da linha
     passagens/            # CRUD Passagem (gerado); trânsito (T4.1)
+    clientes/             # Cliente (gerado, LEITURA); nasce por find-or-create do QR;
+                          #   GET lista com contadores server-side (consultas/)
+    cameras/              # CRUD Camera (gerado): provisionamento câmera fixa —
+                          #   vínculo a Checkpoint + fonteFisica (vista); seed 1/gate
     extracao/             # ExtractorPort + adapters textract|bedrock|mock;
                           #   driver por env EXTRACTOR_DRIVER (mock default)
     auth/, files/, i18n/  # herdados do boilerplate; não usados nesta rodada
@@ -113,6 +119,18 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
   medido, a confiança do OCR no relevo mede enquadramento, não correção
   (docs/visao-ocr.md). A regra restringe ACUSAÇÃO, nunca aprovação — e a placa
   IMPRESSA continua `divergente` com uma leitura (cenário-âncora).
+- **Comparação é exata; a única exceção é medida.** O critério de igualdade
+  textual é parâmetro por campo (`modosPorCampo`, `engine/comparacao.ts`):
+  `exato` para todo identificador, e `contem-token` só para `cliente-*` — o
+  lido precisa ser TOKEN INTEIRO (ou sequência consecutiva) do esperado, sem
+  acento e sem caixa. Motivo (medido em 2026-07-26 com o Textract no ar, gap
+  21): a serigrafia carrega a MARCA (`Energisa`) e o QR a razão social com
+  código (`143091 - Energisa Rondônia…`), então a igualdade exata acusava a
+  peça CORRETA e quebrava o critério 2 do SPEC em toda conferência com QR real.
+  Não é fuzzy match (`ener` segue `divergente`) e não vale invertido. Quem
+  escolhe o modo é o chamador, no mesmo lugar do contrato de prefixo
+  (`ORIGENS_DO_ESPERADO`) — a engine não conhece prefixo, e a checklist (dado)
+  não pode afrouxar comparação de campo nenhum.
 - CampoConferido é IMUTÁVEL via HTTP (update → 422): PATCH no lastro
   (valores/confiança/foto) de um veredito já emitido falsificaria a trilha de
   auditoria (revisão R1). Comparação usa Unicode NFC; confiança <= 0 nunca é
@@ -215,13 +233,42 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
   NestJS.
 - Payload do QR é decodificado no front (leitura da câmera) mas interpretado
   na API (parser em `transformadores`) — o front não extrai campos do payload.
+- **Tempo real da esteira** (`backend/src/tempo-real/`): Socket.IO no
+  namespace `/tempo-real` (path default `/socket.io` — o prefixo `api` não se
+  aplica a gateway). Evento único `passagem-registrada`, emitido SÓ por
+  `PassagemRegistroService.registrar()` via `AnuncioPassagemService.anunciar()`
+  (o CRUD `POST /passagens` não emite; anunciar nunca lança — o scan já foi
+  gravado). O evento carrega o MESMO `ResultadoRegistroPassagem` do POST +
+  `checkpointAnterior` (o `from` da animação, server-authoritative) + `totais`
+  ABSOLUTOS de todos os checkpoints — o cliente substitui, nunca incrementa.
+  Estado inicial em `GET /tempo-real/esteira` (posição = última passagem;
+  rebuscado a cada reconnect). Cliente NUNCA força `transports`: no App Runner
+  não há upgrade de WebSocket e o socket.io degrada sozinho para long-polling.
+  A dependência de módulos é de mão única: `PassagensModule` importa
+  `TempoRealModule`, nunca o contrário.
+- `GET /conferencias/plano-de-fotos` é a fonte ÚNICA do recorte por etapa para
+  clientes: quais vistas cada gate pede, já com a semântica cumulativa
+  aplicada no servidor. Nenhum cliente reimplementa a regra — a `/demo`
+  carregava 3 cópias dela e foi migrada para consulta de pertencimento
+  ("esta vista está nas desta etapa?"). Sem plano, o cliente não pede foto
+  nenhuma: "não sei" nunca vira "preciso de todas".
+- A resposta de execução carrega `regiaoLeitura` + `fotoEvidencia` POR CAMPO,
+  e resposta e lastro persistido saem da MESMA leitura — nunca de duas
+  resoluções independentes (é o mesmo erro do ProjetoModelo resolvido duas
+  vezes: elas divergem, e aí a tela mostra evidência de um veredito que o
+  banco gravou com outra).
+- Evidência de campo é a classe compartilhada `FotoDaEvidenciaResposta`
+  (`conferencias/dto/resumos-compartilhados.dto.ts`), usada também pelos
+  achados e pela releitura — nome de schema OpenAPI é global, cópia por módulo
+  vira schema duplicado para o front escolher.
 - **Resposta de endpoint de domínio é CLASSE com `@ApiProperty`, nunca
   interface**: o Swagger só enxerga classes, e interface some na compilação —
   a rota chega ao front com schema de resposta vazio. Regra prática: se um tipo
   aparece no retorno de um método de controller, ele é classe. As respostas dos
   endpoints do fluxo moram em `conferencias/dto/resultado-execucao*.dto.ts`,
   `conferencias/consultas/veredito-conferencia.ts`,
-  `transformadores/consultas/*.ts` e `passagens/passagem-registro.service.ts`;
+  `transformadores/consultas/*.ts` e
+  `passagens/dto/resultado-registro-passagem.dto.ts`;
   as projeções repetidas (`CheckpointResumo`, `EtapaResumo`,
   `TransformadorResumo`) vivem uma única vez em
   `conferencias/dto/resumos-compartilhados.dto.ts` — nome de schema é global no
@@ -275,8 +322,10 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
   `patrimonio-serigrafia-frente`, `cliente-serigrafia-frente`,
   `potencia-serigrafia-frente`, `serie-placa`, `patrimonio-placa`. O PREFIXO
   (`serie-`, `patrimonio-`, `cliente-`) é contrato: é por ele que
-  `ORIGENS_DO_ESPERADO` acha o valor esperado no QR (`potencia-*` fica de fora
-  de propósito — a potência não vem do QR).
+  `ORIGENS_DO_ESPERADO` acha o valor esperado no QR (`potencia-*` mudou em 2026-07-26:
+  o esperado dela vem do `esperadoFixo` do item da checklist — o desenho
+  define a marcação completa `1H - 10 kVA` — com fallback derivado da
+  `descricao` do payload; comparação por `esperado-contido`).
 - Identificadores estáveis: gates e regras casam por `codigo` (Checkpoint,
   ProjetoModelo), nunca por nome exibido nem por `ordem` — nome e ordem mudam.
 - Boilerplate traz auth/i18n que não usamos nesta rodada: não gastar tempo
@@ -447,14 +496,39 @@ do hackathon:
     como quarto sinal — papel é muito mais claro que chapa pintada. Decisão em
     aberto no SPEC.
 
+24. O namespace Socket.IO `/tempo-real` é SEM auth no handshake (decisão
+    2026-07-26): o `frontend/` guarda o JWT em cookie httpOnly que o navegador
+    não lê — token no handshake exigiria expor o JWT ao browser, quebrando o
+    desenho do BFF. O que trafega é contagem, código de etapa e número de
+    série (nada que a `/demo` pública já não mostre), e o gateway só EMITE —
+    não há mensagem de cliente processada. O snapshot HTTP
+    (`GET /tempo-real/esteira`) segue atrás de JWT. Fechar com token no
+    handshake quando a auth for revisada (junto dos gaps 13/17).
+
 ## Decisões em aberto
 
 - [x] **Política para campo parcialmente legível** — resolvido: rejeitar
       sempre, com limiar 0.9 medido na peça real; nada de similaridade
       aproximada. Leitura fraca vira `nao_conferivel` e vai para o olho
       humano com a foto (rodada nomes-e-analise, 2026-07-25).
-- [ ] **Formato do payload do QR** — campos embutidos ou código de lookup
-      (afeta T1.1, T3.1).
+- [x] **Formato do payload do QR** — resolvido por medição em 2026-07-26: são
+      os dois, um por QR. PLACA = payload posicional de IDENTIFICAÇÃO sem
+      rótulo — projeto, série, patrimônio, potência, classe e data, SEM
+      cliente/pedido/seq (âncora `TPD-408136`, série 2 linhas depois,
+      patrimônio 6);
+      ETIQUETA = código de lookup de 13 dígitos, que sem ERP não resolve — a
+      digitação manual da T3.1 virou necessidade, não plano B. O parser
+      (`transformadores/qr/`) cobre os dois; detecção estreita e 422
+      `posicional-*` em vez de campo chutado, porque a amostra é de UMA peça.
+      Duas limitações do QR da placa, documentadas e NÃO contornadas: sem
+      cliente ele nunca fecha `conforme` no seed atual
+      (`cliente-serigrafia-frente` sai `nao_conferivel` motivo
+      `sem-valor-esperado` — a régua não se rebaixa), e ele é AUTO-REFERENTE
+      (vive na placa que `serie-placa`/`patrimonio-placa` conferem), então
+      placa trocada se confirma sozinha e a acusação recai nas chumbadas. A
+      fonte da verdade do fluxo segue sendo a ETIQUETA.
+      Detalhe, linhas ainda sem significado e o efeito no código do
+      ProjetoModelo (o TPD viaja no QR): SPEC.md, decisões em aberto.
 - [x] **Textract vs Bedrock** — resolvido: Textract (spike T2.1 com fotos
       reais, docs/visao-ocr.md). `EXTRACTOR_DRIVER=textract`. Reavaliado na
       noite de 2026-07-25, quando a conta destravou o Bedrock: os modelos Nova

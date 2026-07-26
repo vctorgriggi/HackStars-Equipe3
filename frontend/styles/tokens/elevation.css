@@ -1,0 +1,26 @@
+/* ============================================================
+   TRAEL Vision — Elevation, focus, motion
+   Sombras discretas (software de monitoramento, não marketing).
+   ============================================================ */
+
+:root {
+  --shadow-1: 0 1px 2px hsl(var(--shadow-color) / 0.30);
+  --shadow-2: 0 2px 6px hsl(var(--shadow-color) / 0.35), 0 1px 2px hsl(var(--shadow-color) / 0.30);
+  --shadow-3: 0 8px 24px hsl(var(--shadow-color) / 0.45), 0 2px 6px hsl(var(--shadow-color) / 0.30);
+  --shadow-pop: 0 12px 40px hsl(var(--shadow-color) / 0.55);
+  --shadow-inset: inset 0 1px 0 hsl(var(--shadow-color) / 0.20);
+
+  --ring-focus: 0 0 0 2px var(--bg-canvas), 0 0 0 4px var(--border-focus);
+  --ring-focus-tight: 0 0 0 2px var(--border-focus);
+
+  /* motion — funcional, curto, sem bounce */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1); 
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1); 
+  --dur-fast: 90ms; 
+  --dur-base: 150ms; 
+  --dur-slow: 240ms; 
+
+  /* overlay chrome sobre vídeo de câmera */
+  --overlay-scrim: linear-gradient(180deg, rgba(6,10,14,0) 0%, rgba(6,10,14,0.72) 100%); 
+  --overlay-chip-bg: rgba(6,10,14,0.78);
+}

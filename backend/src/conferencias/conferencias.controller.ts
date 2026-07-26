@@ -15,7 +15,12 @@ import { ConferenciasService } from './conferencias.service';
 import { ConferenciaConsultasService } from './consultas/conferencia-consultas.service';
 import { ConferenciaExecucaoService } from './conferencia-execucao.service';
 import { ConferenciaExtracaoService } from './conferencia-extracao.service';
+import { ConferenciaLaudoService } from './laudo/conferencia-laudo.service';
+import { ConferenciaPlanoService } from './plano/conferencia-plano.service';
+import { IndicadoresService } from './consultas/indicadores.service';
 import { CreateConferenciaDto } from './dto/create-conferencia.dto';
+import { Indicadores } from './dto/indicadores.dto';
+import { PlanoDeFotos, PlanoDeFotosQueryDto } from './dto/plano-de-fotos.dto';
 import { ExecutarComFotosDto } from './dto/executar-com-fotos.dto';
 import { ExecutarConferenciaDto } from './dto/executar-conferencia.dto';
 import { UpdateConferenciaDto } from './dto/update-conferencia.dto';
@@ -26,10 +31,12 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiServiceUnavailableResponse,
   ApiTags,
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import { Conferencia } from './domain/conferencia';
+import { LaudoDaConferencia } from './dto/laudo.dto';
 import { ResultadoExecucao } from './dto/resultado-execucao.dto';
 import { ResultadoExecucaoComExtracao } from './dto/resultado-execucao-com-extracao.dto';
 import { VereditoConferencia } from './consultas/veredito-conferencia';
@@ -54,6 +61,9 @@ export class ConferenciasController {
     private readonly conferenciaExecucaoService: ConferenciaExecucaoService,
     private readonly conferenciaExtracaoService: ConferenciaExtracaoService,
     private readonly conferenciaConsultasService: ConferenciaConsultasService,
+    private readonly conferenciaLaudoService: ConferenciaLaudoService,
+    private readonly conferenciaPlanoService: ConferenciaPlanoService,
+    private readonly indicadoresService: IndicadoresService,
   ) {}
 
   @Post()
@@ -96,7 +106,10 @@ export class ConferenciasController {
   @ApiUnprocessableEntityResponse({
     description:
       'Codigos possiveis (em `errors`): `payload-invalido` / ' +
-      '`payload-somente-codigo` (QR ilegivel ou so com codigo de lookup), ' +
+      '`payload-somente-codigo` (QR ilegivel ou so com codigo de lookup — o ' +
+      'caso do QR da ETIQUETA, medido: 13 digitos sem campo nenhum; a ' +
+      'mensagem manda digitar os campos manualmente, porque o lookup ' +
+      'automatico exige ERP e e rodada futura), ' +
       '`etapa-desconhecida` (nao existe Checkpoint com esse `codigo`), ' +
       '`projeto-modelo-indeterminado` (o QR nao aponta projeto, a peca nao tem ' +
       'vinculo e ha 0 ou 2+ projetos cadastrados), ' +
@@ -151,6 +164,158 @@ export class ConferenciasController {
     return this.conferenciaExtracaoService.executarComFotos(
       executarComFotosDto,
     );
+  }
+
+  // ORDEM DE ROTA: `:id/laudo` tem dois segmentos e nao colide com os POSTs
+  // estaticos de um segmento acima (`executar`, `executar-com-fotos`) — mas
+  // fica depois deles de proposito, para manter a regra local "estatica antes
+  // de dinamica" valendo sem que ninguem precise conferir a contagem de
+  // segmentos ao acrescentar a proxima rota.
+  @Post(':id/laudo')
+  @HttpCode(HttpStatus.OK)
+  @ApiParam({
+    name: 'id',
+    type: String,
+    required: true,
+  })
+  @ApiOperation({
+    summary: 'LAUDO POR IA: redige em prosa o veredito que a engine já emitiu',
+    description:
+      'Manda os FATOS JÁ DECIDIDOS de uma conferência a um Claude no Bedrock ' +
+      'e devolve um laudo curto, em linguagem de chão de fábrica, para o ' +
+      'operador ler ou anexar.\n\n' +
+      'O LAUDO NÃO DECIDE NADA. Ele não compara campo, não reclassifica, não ' +
+      'suaviza e não completa veredito — é REDAÇÃO sobre fato, e o veredito ' +
+      'gravado continua sendo o que vale. O texto sempre termina dizendo ' +
+      'isso, e a API carimba a frase caso o modelo a esqueça.\n\n' +
+      'FONTE DOS FATOS: exatamente a mesma de `GET /conferencias/{id}/campos` ' +
+      '— o que está PERSISTIDO no banco. Consequência direta do gap 22 do ' +
+      'CLAUDE.md: `motivo` do campo, `incoerencias` e `achadosInconsistentes` ' +
+      'não são gravados, então o laudo não fala deles. Ele relata veredito ' +
+      'geral, etapa avaliada, e campo a campo o esperado, o lido e a ' +
+      'confiança. Nada é recalculado na leitura: rodar a engine de novo aqui ' +
+      'abriria a chance de o laudo contradizer o veredito que a tela mostra.\n\n' +
+      'CUSTO E DISPARO: uma única chamada paga por requisição (~US$ 0,01), ' +
+      'SÓ sob ação explícita do operador — mesma constraint 4 do SPEC que ' +
+      'rege a visão. Sem retry automático e sem laço.\n\n' +
+      'NÃO PERSISTE NADA: nem o laudo, nem o fato de ele ter sido pedido. ' +
+      'Dois cliques geram dois textos possivelmente diferentes; o veredito, ' +
+      'esse sim gravado, é sempre o mesmo. Persistir o laudo (com o modelo e ' +
+      'o horário) é assunto da rodada de auditoria.\n\n' +
+      'Modelo por env `LAUDO_MODEL_ID`; driver por `LAUDO_DRIVER` ' +
+      '(`bedrock` default | `mock`). Com `mock`, `modelo` volta como `mock` e ' +
+      'o texto se anuncia como SIMULADO — exiba isso, não esconda.',
+  })
+  @ApiOkResponse({
+    type: LaudoDaConferencia,
+    description:
+      'Laudo redigido: `laudo` (texto em parágrafos, terminando no ' +
+      'disclaimer obrigatório), `modelo` (qual modelo escreveu) e `geradoEm`.',
+  })
+  @ApiNotFoundResponse({
+    description:
+      '`conferencia-inexistente: <id>` — mesma checagem da releitura do ' +
+      'veredito, feita ANTES de qualquer chamada paga.',
+  })
+  @ApiServiceUnavailableResponse({
+    description:
+      '`laudo-indisponivel: <detalhe>` quando o serviço de redação falha ' +
+      '(sem credencial, modelo não habilitado na conta, timeout, resposta ' +
+      'vazia). É erro EXPLÍCITO de propósito: devolver texto vazio ou um ' +
+      '"não foi possível analisar" ao lado de uma peça divergente seria lido ' +
+      'como "nada a relatar". O veredito da conferência segue intacto e ' +
+      'legível pelas outras rotas.',
+  })
+  gerarLaudo(@Param('id') id: string): Promise<LaudoDaConferencia> {
+    return this.conferenciaLaudoService.gerarLaudo(id);
+  }
+
+  // ATENCAO A ORDEM: esta rota tem de vir ANTES de `@Get(':id')`, senao o
+  // parametro dinamico engole 'plano-de-fotos' e o cliente recebe 404/500 de
+  // "conferencia inexistente".
+  @Get('plano-de-fotos')
+  @ApiOperation({
+    summary: 'QUAIS FOTOS TIRAR em cada etapa, direto da checklist do projeto',
+    description:
+      'Devolve, por etapa da linha e por VISTA da peca, os campos que aquele ' +
+      'gate confere — a lista de fotos que o operador precisa tirar antes de ' +
+      'disparar `POST /conferencias/executar-com-fotos`.\n\n' +
+      'POR QUE EXISTE: o cliente estava remontando o recorte da checklist por ' +
+      'conta propria a partir de `GET /checkpoints` + `GET /projetos-modelo`. ' +
+      'Regra duplicada e regra que diverge — aqui o plano sai das MESMAS ' +
+      'funcoes que a conferencia usa, entao a foto que a tela pede e o campo ' +
+      'que o gate cobra nunca discordam.\n\n' +
+      'SEMANTICA CUMULATIVA: cada `etapas[]` traz o recorte da etapa E das ' +
+      'anteriores (a etapa N reconfere o que ja estava gravado — e assim que ' +
+      'se detecta troca de peca), entao a ultima etapa tende a pedir tudo. ' +
+      'Item da checklist sem `etapa`, ou com etapa que nao existe como ' +
+      'Checkpoint, aparece em TODOS os recortes com `entraNaEtapa: null`. ' +
+      '`pecaInteira` e o recorte sem etapa nenhuma (checklist completa).\n\n' +
+      'RESOLUCAO DO PROJETO: `?projeto=<codigo>` quando informado; senao, o ' +
+      'unico ProjetoModelo cadastrado. E a mesma cascata da conferencia menos ' +
+      'o elo do vinculo da peca (aqui nao ha QR). Codigo inexistente nao e ' +
+      'erro: cai no fallback do unico projeto.\n\n' +
+      'Somente LEITURA: nao cria peca, nao chama visao e nao gasta credito ' +
+      'AWS.',
+  })
+  @ApiOkResponse({
+    type: PlanoDeFotos,
+    description:
+      'Plano completo: `projeto`, a `checklist` inteira na ordem original, um ' +
+      'plano por Checkpoint em `etapas` (ordenados pela `ordem` da linha) e ' +
+      '`pecaInteira`. Cada campo vem com `tipoMarcacao` (`relevo` exige ' +
+      'enquadramento cuidadoso) e `entraNaEtapa`.',
+  })
+  @ApiUnprocessableEntityResponse({
+    description:
+      '`projeto-modelo-indeterminado`: nenhum `?projeto=` foi informado (ou o ' +
+      'codigo nao existe) e ha 0 ou 2+ projetos cadastrados — a API se recusa ' +
+      'a chutar de qual modelo e a peca. Alem dele, checklist corrompida no ' +
+      'banco responde 500 `checklist-invalido: <projeto>` (JSON malformado, ' +
+      'array vazio ou item fora do formato) — e dado corrompido, nao erro do ' +
+      'cliente.',
+  })
+  planoDeFotos(@Query() query: PlanoDeFotosQueryDto): Promise<PlanoDeFotos> {
+    return this.conferenciaPlanoService.planoDeFotos(query?.projeto);
+  }
+
+  // ATENCAO A ORDEM: como a rota acima, esta precisa vir ANTES de `@Get(':id')`
+  // — senao o parametro dinamico engole 'indicadores'.
+  @Get('indicadores')
+  @ApiOperation({
+    summary: 'DASHBOARD E AUDITORIA: os numeros da linha, agregados no banco',
+    description:
+      'Uma leitura so com as quatro perguntas do painel: quanto ja se ' +
+      'conferiu (`totais`), em QUAL ETAPA a nao conformidade aparece ' +
+      '(`porEtapa`), QUAIS CAMPOS mais dao problema (`porCampo`) e ONDE cada ' +
+      'peca esta com QUAL veredito vigente (`linha`, o dashboard de linha).\n\n' +
+      'NENHUM RECALCULO ACONTECE AQUI. Todo numero e `COUNT` sobre o veredito ' +
+      'que a engine JA GRAVOU (`conferencia.vereditoGeral` e ' +
+      '`campo_conferido.veredito`) — a rota agrega, nunca compara. Conferencia ' +
+      'sem veredito (linha crua do CRUD) entra no total e em nenhum balde, ' +
+      'entao `divergentes + naoConferiveis + conformes` pode ser menor que ' +
+      '`totais.conferencias`.\n\n' +
+      'ATENCAO AO GAP 14 do CLAUDE.md: a conferencia nao persiste marca de ' +
+      'cobertura, entao `conforme` COM etapa preenchida atesta apenas o ' +
+      'recorte daquele gate — nunca a peca inteira. Por isso a etapa viaja ' +
+      'colada ao veredito em `linha[].ultimaConferencia` e os grupos de ' +
+      '`porEtapa` nunca sao somados num "conforme geral da fabrica" pela API. ' +
+      'Exibir veredito sem etapa produz o falso OK que a regra de ouro proibe.\n\n' +
+      'SEM PAGINACAO nesta rodada (volume de demo): `linha` traz no maximo 200 ' +
+      'pecas, escolhidas pelo movimento mais recente; `totais.pecas` conta ' +
+      'TODAS, e a diferenca entre os dois denuncia o corte.\n\n' +
+      'Somente LEITURA: nao cria peca, nao chama visao e nao gasta credito AWS.',
+  })
+  @ApiOkResponse({
+    type: Indicadores,
+    description:
+      'Indicadores do banco inteiro. `porEtapa` vem na ordem da linha com o ' +
+      'grupo sem etapa (peca inteira) por ultimo; `porCampo` vem por ' +
+      'divergentes desc (o topo e onde investigar primeiro); `linha` vem pela ' +
+      'passagem mais recente, com quem nunca passou por checkpoint no fim.',
+  })
+  indicadores(): Promise<Indicadores> {
+    return this.indicadoresService.indicadores();
   }
 
   @Get()

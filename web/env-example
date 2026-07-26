@@ -1,0 +1,11 @@
+# Copie para `.env.local` quando precisar apontar para uma API que não seja a
+# do próprio host na porta 3001.
+#
+# SÓ URL. Nenhuma credencial entra em variável NEXT_PUBLIC_* — ela vai para o
+# bundle e fica pública (CLAUDE.md, "Nunca fazer"). Todo acesso à AWS acontece
+# dentro do backend NestJS.
+#
+# Sem esta variável, a base é derivada do host da página:
+#   http://<host-da-pagina>:3001/api/v1
+# que é o que faz o celular na rede local funcionar sem configuração.
+NEXT_PUBLIC_API_URL=https://sua-api.awsapprunner.com/api/v1

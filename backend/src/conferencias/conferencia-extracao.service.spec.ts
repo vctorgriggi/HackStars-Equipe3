@@ -773,6 +773,13 @@ describe('ConferenciaExtracaoService — achados livres so alarmam', () => {
             fotoEvidenciaId: ID_FRENTE,
             confianca: CONFIANCA_MOCK,
             regiaoLeitura: null,
+            // O alarme ja vem com a evidencia: o operador abre a foto sem
+            // segunda chamada e sem o front casar id com foto por conta.
+            foto: {
+              id: ID_FRENTE,
+              url: `${ID_FRENTE}.jpg`,
+              fonteFisica: 'frente',
+            },
           },
         ],
       },

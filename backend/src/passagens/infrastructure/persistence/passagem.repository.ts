@@ -29,6 +29,15 @@ export abstract class PassagemRepository {
     paginationOptions: IPaginationOptions;
   }): Promise<Passagem[]>;
 
+  /**
+   * A passagem MAIS RECENTE de cada peca do conjunto (posicao atual na linha,
+   * que e DERIVADA da ultima passagem — SPEC), numa unica query (DISTINCT ON).
+   * Peca que nunca passou por checkpoint nao aparece no mapa.
+   */
+  abstract findUltimaPorTransformadores(
+    transformadorIds: Transformador['id'][],
+  ): Promise<Map<Transformador['id'], Passagem>>;
+
   abstract findById(id: Passagem['id']): Promise<NullableType<Passagem>>;
 
   abstract findByIds(ids: Passagem['id'][]): Promise<Passagem[]>;

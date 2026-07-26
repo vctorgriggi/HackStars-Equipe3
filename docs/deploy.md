@@ -83,6 +83,26 @@ custaram 6 tentativas.
 `AutoDeploymentsEnabled` está **desligado** de propósito: push acidental de
 imagem não derruba a demo; o deploy é sempre um ato explícito.
 
+## O app web/ dentro da mesma imagem (`/app`)
+
+O frontend de produção (`web/`, Next.js) é 100% client-side e viaja DENTRO da
+imagem da API como export estático, servido pelo `ServeStaticModule` em
+`/app` — mesmo domínio HTTPS (câmera do celular exige origem segura), nenhum
+serviço novo. O redeploy da API ganha um pré-passo:
+
+```bash
+cd web && NEXT_PUBLIC_BASE_PATH=/app NEXT_PUBLIC_API_URL=https://qzat8cp2m8.us-east-1.awsapprunner.com/api/v1 npm run build
+rm -rf ../backend/web-app && cp -r out ../backend/web-app   # artefato de build, fora do git
+# ...e segue o redeploy normal do backend (buildx + start-deployment acima)
+```
+
+ATENÇÃO: `NEXT_PUBLIC_*` é embutido NO BUILD do Next — trocar a URL da API
+exige rebuildar o `web/`, não adianta mexer em variável do serviço. Histórico:
+um App Runner dedicado (`trael-web`, imagem em `web/Dockerfile.production`)
+falhou DUAS vezes na criação sem uma linha de log de aplicação, com a mesma
+imagem rodando localmente — serviço deletado; o Dockerfile fica para retomada
+futura com mais calma.
+
 ## Variáveis do serviço
 
 Vêm do `backend/.env` local pelo script de montagem da config e ficam na

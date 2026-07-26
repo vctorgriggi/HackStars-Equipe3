@@ -1,3 +1,6 @@
+import { ClientesService } from '../clientes/clientes.service';
+import { Cliente } from '../clientes/domain/cliente';
+
 import { ProjetosModeloService } from '../projetos-modelo/projetos-modelo.service';
 import { ProjetoModelo } from '../projetos-modelo/domain/projeto-modelo';
 
@@ -21,25 +24,13 @@ import {
   ResultadoParse,
 } from './qr/payload-etiqueta';
 import { parsePayloadEtiqueta } from './qr/qr-payload.parser';
-
-/** Postgres: unique_violation. */
-const CODIGO_VIOLACAO_UNIQUE = '23505';
-
-function ehViolacaoDeUnique(erro: unknown): boolean {
-  const bruto = erro as
-    | { code?: string; driverError?: { code?: string } }
-    | null
-    | undefined;
-
-  return (
-    bruto?.driverError?.code === CODIGO_VIOLACAO_UNIQUE ||
-    bruto?.code === CODIGO_VIOLACAO_UNIQUE
-  );
-}
+import { ehViolacaoDeUnique } from '../utils/violacao-unique';
 
 @Injectable()
 export class TransformadoresService {
   constructor(
+    private readonly clienteService: ClientesService,
+
     private readonly projetoModeloService: ProjetosModeloService,
 
     // Dependencies here
@@ -49,6 +40,25 @@ export class TransformadoresService {
   async create(createTransformadorDto: CreateTransformadorDto) {
     // Do not remove comment below.
     // <creating-property />
+    let clienteVinculado: Cliente | null | undefined = undefined;
+
+    if (createTransformadorDto.clienteVinculado) {
+      const clienteVinculadoObject = await this.clienteService.findById(
+        createTransformadorDto.clienteVinculado.id,
+      );
+      if (!clienteVinculadoObject) {
+        throw new UnprocessableEntityException({
+          status: HttpStatus.UNPROCESSABLE_ENTITY,
+          errors: {
+            clienteVinculado: 'notExists',
+          },
+        });
+      }
+      clienteVinculado = clienteVinculadoObject;
+    } else if (createTransformadorDto.clienteVinculado === null) {
+      clienteVinculado = null;
+    }
+
     let projetoModelo: ProjetoModelo | null | undefined = undefined;
 
     if (createTransformadorDto.projetoModelo) {
@@ -71,6 +81,8 @@ export class TransformadoresService {
     return this.transformadorRepository.create({
       // Do not remove comment below.
       // <creating-property-payload />
+      clienteVinculado,
+
       projetoModelo,
 
       descricao: createTransformadorDto.descricao,
@@ -141,12 +153,19 @@ export class TransformadoresService {
     }
 
     // QR so com codigo de lookup: o fallback de digitacao manual e do front.
+    // Medido em 2026-07-26, o QR da ETIQUETA — o que o fluxo manda ler — e
+    // exatamente isso (13 digitos, sem campo nenhum), entao esta mensagem e o
+    // que o operador REALMENTE ve, nao um canto raro. Por isso ela aponta a
+    // saida em vez de so nomear a limitacao. Prefixo `payload-somente-codigo`
+    // e contrato: a /demo traduz o erro casando esse pedaco por substring.
     if (resultado.tipo === 'codigo') {
       throw new UnprocessableEntityException({
         status: HttpStatus.UNPROCESSABLE_ENTITY,
         errors: {
           payloadQr:
-            'payload-somente-codigo: lookup nao suportado nesta rodada',
+            'payload-somente-codigo: o QR traz apenas um codigo de lookup; ' +
+            'digite os campos da etiqueta manualmente ' +
+            '(lookup automatico e rodada futura)',
         },
       });
     }
@@ -178,12 +197,18 @@ export class TransformadoresService {
         : await this.findByNumeroSerie(payload.numeroSerie);
 
     if (existente) {
-      const atualizacao: Record<string, string> = {};
+      const atualizacao: UpdateTransformadorDto = {};
       if (payload.patrimonio && payload.patrimonio !== existente.patrimonio) {
         atualizacao.patrimonio = payload.patrimonio;
       }
       if (payload.cliente && payload.cliente !== existente.cliente) {
         atualizacao.cliente = payload.cliente;
+        // O cadastro segue o texto do QR: cliente novo no payload realinha o
+        // vinculo (o registro antigo de Cliente permanece, so o vinculo muda).
+        atualizacao.clienteVinculado = {
+          id: (await this.clienteService.buscarOuCriarPorNome(payload.cliente))
+            .id,
+        };
       }
       if (payload.pedido && payload.pedido !== existente.pedido) {
         atualizacao.pedido = payload.pedido;
@@ -195,6 +220,15 @@ export class TransformadoresService {
       return atualizado ?? existente;
     }
 
+    // Ausencia nao e afirmacao: etiqueta sem cliente cria a peca sem vinculo
+    // (e com a sentinela '' na coluna NOT NULL), nunca um cliente vazio.
+    const clienteVinculado = payload.cliente
+      ? {
+          id: (await this.clienteService.buscarOuCriarPorNome(payload.cliente))
+            .id,
+        }
+      : undefined;
+
     try {
       return await this.create({
         numeroSerie: payload.numeroSerie,
@@ -204,6 +238,7 @@ export class TransformadoresService {
         pedido: payload.pedido,
         seq: payload.seq,
         descricao: payload.descricao,
+        clienteVinculado,
       });
     } catch (erro) {
       if (!ehViolacaoDeUnique(erro)) {
@@ -225,6 +260,25 @@ export class TransformadoresService {
   ) {
     // Do not remove comment below.
     // <updating-property />
+    let clienteVinculado: Cliente | null | undefined = undefined;
+
+    if (updateTransformadorDto.clienteVinculado) {
+      const clienteVinculadoObject = await this.clienteService.findById(
+        updateTransformadorDto.clienteVinculado.id,
+      );
+      if (!clienteVinculadoObject) {
+        throw new UnprocessableEntityException({
+          status: HttpStatus.UNPROCESSABLE_ENTITY,
+          errors: {
+            clienteVinculado: 'notExists',
+          },
+        });
+      }
+      clienteVinculado = clienteVinculadoObject;
+    } else if (updateTransformadorDto.clienteVinculado === null) {
+      clienteVinculado = null;
+    }
+
     let projetoModelo: ProjetoModelo | null | undefined = undefined;
 
     if (updateTransformadorDto.projetoModelo) {
@@ -247,6 +301,8 @@ export class TransformadoresService {
     return this.transformadorRepository.update(id, {
       // Do not remove comment below.
       // <updating-property-payload />
+      clienteVinculado,
+
       projetoModelo,
 
       descricao: updateTransformadorDto.descricao,

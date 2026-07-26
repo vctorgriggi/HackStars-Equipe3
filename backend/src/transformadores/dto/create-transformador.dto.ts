@@ -1,3 +1,5 @@
+import { ClienteDto } from '../../clientes/dto/cliente.dto';
+
 import { ProjetoModeloDto } from '../../projetos-modelo/dto/projeto-modelo.dto';
 
 import {
@@ -20,6 +22,8 @@ import {
 } from 'class-transformer';
 
 export class CreateTransformadorDto {
+  clienteVinculado?: ClienteDto | null;
+
   @ApiProperty({
     required: false,
     type: () => ProjetoModeloDto,

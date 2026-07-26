@@ -12,10 +12,8 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { PassagensService } from './passagens.service';
-import {
-  PassagemRegistroService,
-  ResultadoRegistroPassagem,
-} from './passagem-registro.service';
+import { PassagemRegistroService } from './passagem-registro.service';
+import { ResultadoRegistroPassagem } from './dto/resultado-registro-passagem.dto';
 import { CreatePassagemDto } from './dto/create-passagem.dto';
 import { RegistrarPassagemDto } from './dto/registrar-passagem.dto';
 import { UpdatePassagemDto } from './dto/update-passagem.dto';
@@ -89,7 +87,10 @@ export class PassagensController {
   @ApiUnprocessableEntityResponse({
     description:
       'Codigos possiveis (em `errors`): `payload-invalido` / ' +
-      '`payload-somente-codigo` (QR ilegivel ou so com codigo de lookup) e ' +
+      '`payload-somente-codigo` (QR ilegivel ou so com codigo de lookup — o ' +
+      'caso do QR da ETIQUETA, medido: 13 digitos sem campo nenhum; a ' +
+      'mensagem manda digitar os campos manualmente, porque o lookup ' +
+      'automatico exige ERP e e rodada futura) e ' +
       '`etapa-desconhecida: <codigo>` (nao existe Checkpoint com esse ' +
       '`codigo` — mesmo codigo de erro do `/conferencias/executar`, um ' +
       'contrato so). Os dois saem antes da primeira escrita: 422 nunca deixa ' +

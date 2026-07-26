@@ -7,9 +7,13 @@ import { ConferenciaRepository } from '../conferencias/infrastructure/persistenc
 import { ProjetosModeloService } from '../projetos-modelo/projetos-modelo.service';
 import { Transformador } from '../transformadores/domain/transformador';
 import { TransformadorRepository } from '../transformadores/infrastructure/persistence/transformador.repository';
+import { ClientesService } from '../clientes/clientes.service';
 import { TransformadoresService } from '../transformadores/transformadores.service';
 
+import { AnuncioPassagemService } from '../tempo-real/anuncio-passagem.service';
+
 import { PassagemRegistroService } from './passagem-registro.service';
+import { Passagem } from './domain/passagem';
 import { PassagemRepository } from './infrastructure/persistence/passagem.repository';
 
 // Nota de lint: a regra `no-restricted-syntax` do projeto exige que todo `it`
@@ -84,9 +88,16 @@ interface Bancada {
   buscarOuCriar: jest.SpyInstance;
   criarPassagem: jest.Mock;
   ultimasConferencias: jest.Mock;
+  anunciar: jest.Mock;
 }
 
-function montarBancada(opcoes: { conferencias?: Conferencia[] } = {}): Bancada {
+function montarBancada(
+  opcoes: {
+    conferencias?: Conferencia[];
+    /** Onde a peca estava ANTES do scan (ultima passagem existente). */
+    ultimaPassagemEm?: Checkpoint;
+  } = {},
+): Bancada {
   const checkpointService = {
     findByCodigo: jest.fn((codigo: string) =>
       Promise.resolve(
@@ -99,6 +110,12 @@ function montarBancada(opcoes: { conferencias?: Conferencia[] } = {}): Bancada {
   // payload) e exatamente o mesmo que o endpoint de conferencia usa. So o
   // find-or-create vira espiao, porque tem suite propria.
   const transformadorService = new TransformadoresService(
+    {
+      buscarOuCriarPorNome: jest.fn((nome: string) =>
+        Promise.resolve({ id: 'cliente-1', nome }),
+      ),
+      findById: jest.fn(() => Promise.resolve({ id: 'cliente-1' })),
+    } as unknown as ClientesService,
     { findById: jest.fn() } as unknown as ProjetosModeloService,
     {
       findByNumeroSerie: jest.fn(() => Promise.resolve(null)),
@@ -120,6 +137,15 @@ function montarBancada(opcoes: { conferencias?: Conferencia[] } = {}): Bancada {
   });
   const passagemRepository = {
     create: criarPassagem,
+    findUltimaPorTransformadores: jest.fn(() =>
+      Promise.resolve(
+        opcoes.ultimaPassagemEm
+          ? new Map<string, Passagem>([
+              [peca().id, { checkpoint: opcoes.ultimaPassagemEm } as Passagem],
+            ])
+          : new Map<string, Passagem>(),
+      ),
+    ),
   } as unknown as PassagemRepository;
 
   const ultimasConferencias = jest.fn(() =>
@@ -129,23 +155,30 @@ function montarBancada(opcoes: { conferencias?: Conferencia[] } = {}): Bancada {
     findAllByTransformador: ultimasConferencias,
   } as unknown as ConferenciaRepository;
 
+  const anunciar = jest.fn(() => Promise.resolve());
+  const anuncioPassagem = {
+    anunciar,
+  } as unknown as AnuncioPassagemService;
+
   return {
     service: new PassagemRegistroService(
       checkpointService,
       transformadorService,
       passagemRepository,
       conferenciaRepository,
+      anuncioPassagem,
     ),
     buscarOuCriar,
     criarPassagem,
     ultimasConferencias,
+    anunciar,
   };
 }
 
 describe('registrar — 422 barato, antes de escrever', () => {
   it('should recusar etapa inexistente sem criar passagem nem peca', async () => {
     // Caso real: '?etapa=Serigrafia' com S maiusculo digitado na URL.
-    const { service, buscarOuCriar, criarPassagem } = montarBancada();
+    const { service, buscarOuCriar, criarPassagem, anunciar } = montarBancada();
 
     await expect(
       service.registrar({
@@ -158,10 +191,12 @@ describe('registrar — 422 barato, antes de escrever', () => {
 
     expect(buscarOuCriar).not.toHaveBeenCalled();
     expect(criarPassagem).not.toHaveBeenCalled();
+    // O tempo real so anuncia o que FOI gravado: 422 nao vira evento.
+    expect(anunciar).not.toHaveBeenCalled();
   });
 
   it('should recusar payload de QR ilegivel sem tocar o banco', async () => {
-    const { service, buscarOuCriar, criarPassagem } = montarBancada();
+    const { service, buscarOuCriar, criarPassagem, anunciar } = montarBancada();
 
     await expect(
       service.registrar({ payloadQr: '   ', etapaCodigo: 'serigrafia' }),
@@ -169,10 +204,11 @@ describe('registrar — 422 barato, antes de escrever', () => {
 
     expect(buscarOuCriar).not.toHaveBeenCalled();
     expect(criarPassagem).not.toHaveBeenCalled();
+    expect(anunciar).not.toHaveBeenCalled();
   });
 
   it('should recusar payload que so traz codigo de lookup', async () => {
-    const { service, criarPassagem } = montarBancada();
+    const { service, criarPassagem, anunciar } = montarBancada();
 
     await expect(
       service.registrar({
@@ -183,12 +219,15 @@ describe('registrar — 422 barato, antes de escrever', () => {
       response: {
         errors: {
           payloadQr:
-            'payload-somente-codigo: lookup nao suportado nesta rodada',
+            'payload-somente-codigo: o QR traz apenas um codigo de lookup; ' +
+            'digite os campos da etiqueta manualmente ' +
+            '(lookup automatico e rodada futura)',
         },
       },
     });
 
     expect(criarPassagem).not.toHaveBeenCalled();
+    expect(anunciar).not.toHaveBeenCalled();
   });
 });
 
@@ -263,6 +302,39 @@ describe('registrar — peca resolvida pelo QR', () => {
     expect(segundo.passagem.createdAt.getTime()).toBeGreaterThan(
       primeiro.passagem.createdAt.getTime(),
     );
+  });
+});
+
+describe('registrar — anuncio no canal de tempo real', () => {
+  it('should anunciar a passagem com o checkpoint anterior da peca', async () => {
+    // Peca que estava na adesivacao e escaneada na serigrafia: o evento leva
+    // o `from` server-authoritative da animacao.
+    const { service, anunciar } = montarBancada({
+      ultimaPassagemEm: CHECKPOINTS[0],
+    });
+
+    const resultado = await service.registrar({
+      payloadQr: payloadQr(),
+      etapaCodigo: 'serigrafia',
+    });
+
+    expect(anunciar).toHaveBeenCalledTimes(1);
+    expect(anunciar).toHaveBeenCalledWith(resultado, {
+      codigo: 'adesivacao',
+      nome: 'adesivacao',
+      ordem: 1,
+    });
+  });
+
+  it('should anunciar checkpoint anterior null para peca entrando na linha', async () => {
+    const { service, anunciar } = montarBancada();
+
+    const resultado = await service.registrar({
+      payloadQr: payloadQr(),
+      etapaCodigo: 'adesivacao',
+    });
+
+    expect(anunciar).toHaveBeenCalledWith(resultado, null);
   });
 });
 

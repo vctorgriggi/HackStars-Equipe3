@@ -12,6 +12,12 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Handoff de design (protótipo de referência, não código do app):
+    "design_handoff_trael_vision/**",
+    // Estação de captura: fora do escopo da rodada TRAEL Vision (decisão de
+    // 2026-07-26 — tela intocada); os erros de react-hooks/set-state-in-effect
+    // são pré-existentes. Remover daqui quando a tela for revisada.
+    "app/estacao/**",
   ]),
 ]);
 

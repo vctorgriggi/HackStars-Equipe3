@@ -7,6 +7,8 @@ import { Transformador } from '../../../../domain/transformador';
 import {
   FiltroTransformador,
   TransformadorRepository,
+  VinculoClienteTransformador,
+  VinculoLoteTransformador,
 } from '../../transformador.repository';
 import { TransformadorMapper } from '../mappers/transformador.mapper';
 import { IPaginationOptions } from '../../../../../utils/types/pagination-options';
@@ -78,6 +80,84 @@ export class TransformadorRelationalRepository implements TransformadorRepositor
     });
 
     return entity ? TransformadorMapper.toDomain(entity) : null;
+  }
+
+  async findVinculosPorClientes(
+    clienteIds: string[],
+  ): Promise<VinculoClienteTransformador[]> {
+    if (clienteIds.length === 0) {
+      return [];
+    }
+
+    // getRawMany de proposito: so os dois ids atravessam o fio — hidratar a
+    // entity dispararia o eager de cliente e projeto (checklist inteira) para
+    // cada peca da pagina (gap 3).
+    return this.transformadorRepository
+      .createQueryBuilder('transformador')
+      .select('transformador.id', 'transformadorId')
+      .addSelect('cliente.id', 'clienteId')
+      .innerJoin('transformador.clienteVinculado', 'cliente')
+      .where('cliente.id IN (:...clienteIds)', { clienteIds })
+      .getRawMany<VinculoClienteTransformador>();
+  }
+
+  async contarPorProjetos(projetoIds: string[]): Promise<Map<string, number>> {
+    if (projetoIds.length === 0) {
+      return new Map();
+    }
+
+    const linhas = await this.transformadorRepository
+      .createQueryBuilder('transformador')
+      .select('projeto.id', 'projetoId')
+      .addSelect('COUNT(*)', 'total')
+      .innerJoin('transformador.projetoModelo', 'projeto')
+      .where('projeto.id IN (:...projetoIds)', { projetoIds })
+      .groupBy('projeto.id')
+      .getRawMany<{ projetoId: string; total: string }>();
+
+    // COUNT chega como string do driver pg.
+    return new Map(linhas.map((l) => [l.projetoId, Number(l.total)]));
+  }
+
+  async findPedidosPaginados({
+    paginationOptions,
+  }: {
+    paginationOptions: IPaginationOptions;
+  }): Promise<string[]> {
+    // GROUP BY exige offset/limit (SQL cru), nao skip/take (que o TypeORM
+    // traduz para paginacao por entidade e quebra com agregacao).
+    const linhas = await this.transformadorRepository
+      .createQueryBuilder('transformador')
+      .select('transformador.pedido', 'pedido')
+      .where("transformador.pedido IS NOT NULL AND transformador.pedido <> ''")
+      .groupBy('transformador.pedido')
+      .orderBy('MAX(transformador.createdAt)', 'DESC')
+      .addOrderBy('transformador.pedido', 'ASC')
+      .offset((paginationOptions.page - 1) * paginationOptions.limit)
+      .limit(paginationOptions.limit)
+      .getRawMany<{ pedido: string }>();
+
+    return linhas.map((linha) => linha.pedido);
+  }
+
+  async findVinculosPorPedidos(
+    pedidos: string[],
+  ): Promise<VinculoLoteTransformador[]> {
+    if (pedidos.length === 0) {
+      return [];
+    }
+
+    // getRawMany pelo mesmo motivo de findVinculosPorClientes: hidratar a
+    // entity dispararia o eager de cliente e projeto por peca (gap 3).
+    return this.transformadorRepository
+      .createQueryBuilder('transformador')
+      .select('transformador.id', 'transformadorId')
+      .addSelect('transformador.pedido', 'pedido')
+      .addSelect('transformador.cliente', 'cliente')
+      .addSelect('projeto.codigo', 'projetoCodigo')
+      .leftJoin('transformador.projetoModelo', 'projeto')
+      .where('transformador.pedido IN (:...pedidos)', { pedidos })
+      .getRawMany<VinculoLoteTransformador>();
   }
 
   async update(

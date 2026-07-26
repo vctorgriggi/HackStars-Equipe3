@@ -36,6 +36,16 @@ export class CheckpointRelationalRepository implements CheckpointRepository {
     return entities.map((entity) => CheckpointMapper.toDomain(entity));
   }
 
+  async findAll(): Promise<Checkpoint[]> {
+    const entities = await this.checkpointRepository.find({
+      // `id` como desempate estavel: `ordem` nao tem unique (gap 15) e duas
+      // etapas empatadas nao podem trocar de lugar entre duas leituras.
+      order: { ordem: 'ASC', id: 'ASC' },
+    });
+
+    return entities.map((entity) => CheckpointMapper.toDomain(entity));
+  }
+
   async findById(id: Checkpoint['id']): Promise<NullableType<Checkpoint>> {
     const entity = await this.checkpointRepository.findOne({
       where: { id },

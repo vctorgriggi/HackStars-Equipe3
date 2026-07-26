@@ -24,7 +24,10 @@ async function bootstrap() {
     {
       // 'demo': página de demonstração temporária fora do prefixo/versão,
       // para a URL no celular ser só https://<host>/demo (ver src/demo).
-      exclude: ['/', 'demo'],
+      // 'esteira': mesma coisa para a cena de apresentação do telão
+      // (ver src/esteira). 'gate': idem para o modo câmera fixa no celular
+      // montado (ver src/gate). As TRÊS saem juntas depois da demo (gap 13).
+      exclude: ['/', 'demo', 'esteira', 'gate'],
     },
   );
   app.enableVersioning({

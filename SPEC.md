@@ -176,6 +176,10 @@ erDiagram
   confiança e vínculo à foto de origem.
 - Comparação campo a campo na API entre valor esperado e valor lido, com
   veredito por campo em 3 estados: `conforme`, `divergente`, `nao_conferivel`.
+  A comparação é textual exata; a única exceção, medida em 2026-07-26, é o
+  campo de cliente, conferido por contenção de token inteiro — a serigrafia
+  carrega a MARCA e o QR a razão social com código, e a igualdade exata acusava
+  a peça correta.
 - Checklist de campos a conferir carregada do ProjetoModelo da peça (o modelo
   da demo entra seedado); nenhuma lista de campos vive em código.
 - Veredito geral da conferência: `divergente` se qualquer campo divergir; senão
@@ -292,8 +296,16 @@ atrás dessas mesmas fronteiras; engine e portas não mudam.
 4. **Créditos AWS limitados (USD 500)** — chamadas de visão só sob ação
    explícita do operador; sem reprocessamento automático em loop.
 5. **Fonte da verdade única** — o valor esperado vem exclusivamente do payload
-   do QR; sem ERP nesta rodada. Payload real ainda não decodificado (decisão em
-   aberto).
+   do QR; sem ERP nesta rodada. Payload real DECODIFICADO em 2026-07-26 (ver
+   decisões em aberto): o QR da PLACA traz um payload posicional de
+   identificação (projeto, série, patrimônio, potência, classe e data — sem
+   cliente/pedido/seq); o da ETIQUETA é só um código de lookup de 13 dígitos —
+   e como o lookup exige ERP, a peça lida pela etiqueta depende da digitação
+   manual (T3.1). A fonte da verdade do fluxo continua sendo a **etiqueta**: o
+   QR da placa é auto-referente (vive no artefato que `serie-placa` e
+   `patrimonio-placa` conferem), então placa trocada se confirma sozinha e a
+   acusação sai nas chumbadas — a peça é barrada, mas a mensagem aponta o lado
+   errado.
 
 ## Critérios de aceitação
 
@@ -460,13 +472,58 @@ consegue criar Conferencia.
       que produzia um `divergente` falso. Similaridade aproximada fica fora
       por princípio: em número de série, "quase igual" é divergente. Leitura
       fraca vira `nao_conferivel` com a foto anexada (2026-07-25).
-- [ ] **Formato do payload do QR** — decodificar uma etiqueta real para saber
-      se o QR carrega os campos ou só um código de lookup, e se referencia o
-      projeto/modelo (a etiqueta impressa traz o código TPD-408136, então o
-      vínculo peça → ProjetoModelo provavelmente viaja no próprio QR; sem
-      isso, fallback: operador escolhe o modelo no primeiro scan). Se for só
-      código, o MVP precisa de fallback de digitação manual. Afeta T1.1 e
-      T3.1.
+- [x] **Formato do payload do QR** — resolvido por MEDIÇÃO em 2026-07-26
+      (zxing-cpp sobre as fotos de `fotos-demo/`), com uma surpresa: a peça
+      tem DOIS QRs e eles são de naturezas diferentes.
+      **Etiqueta adesiva** (ETIQUETA-1.jpg) → `1001020511056`, 13 dígitos, da
+      mesma família dos EAN-13 impressos ao lado (1001020511049,
+      1001020508827). É **código de lookup**, não payload: o QR que o fluxo do
+      MVP manda ler não carrega campo nenhum. Consequência direta: o fallback
+      de digitação manual da T3.1 vira **necessidade**, não plano B — sem ERP
+      nesta rodada (Won't), não há em que fazer o lookup. O parser marca esse
+      payload como `tipo: 'codigo'` e a API responde 422
+      `payload-somente-codigo`, nunca uma identidade chutada.
+      **Placa de identificação** (PLACA-4.jpg e
+      DIAGONAL-TRASEIRA-DIREITA-2.jpg, mesmo conteúdo nas duas leituras) →
+      **payload posicional de identificação** (projeto, série, patrimônio,
+      potência, classe e data), sem rótulo, linhas separadas por CRLF:
+      `91616 / 19930 / TPD-408136 / 01/06/2026 / 847233 / 1 / 10 / 15 /
+      251328 / 226/13299`. Corroborado pela etiqueta impressa e pela placa da
+      mesma peça: TPD-408136 é o **código de projeto**, 847233 o **número de
+      série**, 251328 o **patrimônio**; 10 e 15 são potência (kVA) e classe
+      (kV) — que continuam FORA de `ORIGENS_DO_ESPERADO`, porque a potência
+      não é valor esperado nesta rodada. Detalhe que vale registrar: **o QR
+      da placa carrega a série CORRETA (847233), enquanto o número IMPRESSO
+      nela é 847833** — o defeito da peça de demo é de impressão, e não
+      contamina o payload; o cenário-âncora segue de pé.
+      O parser (T1.1) ganhou esse formato em 2026-07-26.
+      **Não é payload "completo"**: ele NÃO traz cliente, pedido, seq nem
+      descrição. Consequência medida, e correta: conferência disparada pelo QR
+      da placa **nunca chega a `conforme`** com o seed atual — o obrigatório
+      `cliente-serigrafia-frente` fica `nao_conferivel` com motivo
+      `sem-valor-esperado`, porque não existe valor esperado de onde tirar.
+      A régua não se rebaixa para acomodar o QR menor (inventar esperado é
+      exatamente o falso OK proibido pela regra de ouro); quem lê a placa e
+      quer veredito completo completa cliente/pedido/seq pela etiqueta —
+      digitados, como manda a T3.1.
+      **Limitação de AUTO-REFERÊNCIA**: esse payload vive NA PRÓPRIA PLACA —
+      o artefato que `serie-placa` e `patrimonio-placa` conferem. Se a placa
+      errada for rebitada na peça, a identidade esperada e a marcação conferida
+      saem da MESMA fonte: os campos `*-placa` se confirmam sozinhos e a
+      acusação recai sobre as séries chumbadas, que são as certas. A peça
+      continua barrada (`divergente`/`nao_conferivel` — não é falso OK), mas a
+      mensagem aponta o lado errado do defeito. Por isso a **fonte da verdade
+      do fluxo de conferência continua sendo a ETIQUETA** (constraint 5), e o
+      QR da placa fica registrado como (a) prova de que o vínculo de projeto
+      (TPD) viaja com a peça e (b) entrada aceita pelo parser, com esta
+      limitação documentada. Guardrail de rodada futura (não implementado):
+      payload de origem posicional marcaria sua procedência, e aí `*-placa`
+      não poderia sair `conforme` sem corroboração externa (etiqueta ou ERP).
+      Segue ABERTO, porque a amostra é de UMA peça: o significado das linhas
+      1/2/6/10 (91616, 19930, 1, 226/13299), se as posições são estáveis entre
+      modelos e se a etiqueta de outros clientes também é só lookup —
+      confirmar com a TRAEL. Por isso a detecção do formato é estreita e
+      qualquer linha fora do esperado vira 422, nunca campo chutado.
 - [ ] **Código do ProjetoModelo: TPD ou EPT?** — o desenho da TRAEL traz dois
       números (Projeto TPD-408136, Desenho EPT-163-PI-676) e a etiqueta
       imprime o TPD; o seed usa o EPT. Hoje a demo resolve pelo fallback
@@ -474,12 +531,41 @@ consegue criar Conferencia.
       quebraria a resolução (422 projeto-modelo-indeterminado). Confirmar com
       a TRAEL qual número identifica o projeto e alinhar seed + cascata.
       Afeta T2.1/T6.1 (achado da revisão R2, rodada revisao).
+      **Evidência nova (2026-07-26)**: o TPD-408136 viaja DENTRO do QR da
+      placa (medição acima) — ou seja, é o identificador de projeto que chega
+      junto com a peça, sem ninguém digitar. Recomendação: o `codigo` do
+      ProjetoModelo migrar para `TPD-408136`, e aí a cascata de resolução
+      acerta o projeto pelo QR em vez de depender do fallback "único do
+      banco".
+      **Aviso operacional — não é troca de string**: o seed faz upsert POR
+      `codigo`, então mudar o valor CRIA um segundo ProjetoModelo nos bancos
+      já populados (local e RDS) e passa a devolver 422
+      `projeto-modelo-indeterminado` justo no caminho da demo. A troca exige
+      runbook: `UPDATE` do registro existente nos dois bancos + seed alinhado
+      na mesma leva, pós-demo.
 - [ ] **Em QUAIS vistas cada marcação está** — desde a troca de eixo de
       `fonteFisica` (2026-07-25), a checklist não diz mais "chumbado 1/2/3" e
       sim em qual VISTA cada marcação vive. O mapa do seed foi MEDIDO nas
       fotos reais (docs/visao-ocr.md: série chumbada em topo, lateral direita
       e traseira; patrimônio serigrafado em topo e frente), não lido do
-      desenho — **confirmar face a face com a TRAEL**. Duas perguntas juntas:
+      desenho — **confirmar face a face com a TRAEL**. Mitigação interina
+      (decisão do time, 2026-07-26): `serie-chumbada-traseira` rebaixada a
+      OPCIONAL no seed, porque a "traseira" foi medida numa foto DIAGONAL que
+      enxerga duas faces — pode ser a marcação da lateral vista de ângulo; um
+      obrigatório em posição inexistente tornaria o `conforme` inalcançável
+      para peça correta. Quando legível, ela segue conferida e coerida com as
+      irmãs; a obrigatoriedade das outras duas chumbadas segue cobrando a
+      redundância física. Volta a obrigatória (ou muda de vista) com a
+      resposta da TRAEL. **Mesmo precedente, segunda peça (2026-07-26):
+      `patrimonio-placa` também foi rebaixado a OPCIONAL, porque ele nunca
+      leu em NENHUMA medição real — as duas rodadas de gala do dia e o spike
+      de docs/visao-ocr.md saíram todas com `sem-leitura`, o que levanta a
+      suspeita de que a placa não imprime patrimônio (o número nela é a
+      série)**; pergunta registrada para a TRAEL. Nada se perde na cobertura:
+      o patrimônio da placa continua conferido por `patrimonio-placa-qr`
+      (obrigatório, decodificado do QR da própria placa a 1.0 e sem custo de
+      visão), e o item volta a obrigatório se a TRAEL confirmar a marcação
+      impressa. Duas perguntas juntas:
       (a) o 3× do chumbado é padrão de fábrica (vira esqueleto fixo de
       checklist) ou varia por modelo (segue dado por modelo — a checklist
       suporta os dois)? (b) as vistas medidas são as do desenho ou coincidência

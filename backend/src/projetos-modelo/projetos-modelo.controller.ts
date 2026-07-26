@@ -1,8 +1,11 @@
 import { Controller, Get, Param, UseGuards, Query } from '@nestjs/common';
 import { ProjetosModeloService } from './projetos-modelo.service';
+import { ProjetosModeloConsultasService } from './consultas/projetos-modelo-consultas.service';
+import { ProjetoModeloComContadores } from './consultas/projeto-modelo-com-contadores';
 import {
   ApiBearerAuth,
   ApiOkResponse,
+  ApiOperation,
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
@@ -23,7 +26,10 @@ import { FindAllProjetosModeloDto } from './dto/find-all-projetos-modelo.dto';
   version: '1',
 })
 export class ProjetosModeloController {
-  constructor(private readonly projetosModeloService: ProjetosModeloService) {}
+  constructor(
+    private readonly projetosModeloService: ProjetosModeloService,
+    private readonly projetosModeloConsultasService: ProjetosModeloConsultasService,
+  ) {}
 
   // ESCRITA DESATIVADA (auditoria de superfície, 2026-07-25). A checklist
   // deste registro É a norma que a engine consome: com PATCH aberto, remover
@@ -41,12 +47,17 @@ export class ProjetosModeloController {
   // }
 
   @Get()
+  @ApiOperation({
+    summary:
+      'Lista projetos com contadores derivados no servidor: peças ' +
+      'vinculadas e itens da checklist (total e por etapa)',
+  })
   @ApiOkResponse({
-    type: InfinityPaginationResponse(ProjetoModelo),
+    type: InfinityPaginationResponse(ProjetoModeloComContadores),
   })
   async findAll(
     @Query() query: FindAllProjetosModeloDto,
-  ): Promise<InfinityPaginationResponseDto<ProjetoModelo>> {
+  ): Promise<InfinityPaginationResponseDto<ProjetoModeloComContadores>> {
     const page = query?.page ?? 1;
     let limit = query?.limit ?? 10;
     if (limit > 50) {
@@ -54,7 +65,7 @@ export class ProjetosModeloController {
     }
 
     return infinityPagination(
-      await this.projetosModeloService.findAllWithPagination({
+      await this.projetosModeloConsultasService.listarComContadores({
         paginationOptions: {
           page,
           limit,

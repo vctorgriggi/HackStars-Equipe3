@@ -3,12 +3,15 @@ import { UnprocessableEntityException } from '@nestjs/common';
 import { CamposConferidosService } from '../campos-conferidos/campos-conferidos.service';
 import { Checkpoint } from '../checkpoints/domain/checkpoint';
 import { CheckpointsService } from '../checkpoints/checkpoints.service';
+import { FotoEvidencia } from '../fotos-evidencia/domain/foto-evidencia';
+import { FotosEvidenciaService } from '../fotos-evidencia/fotos-evidencia.service';
 import { ProjetoModelo } from '../projetos-modelo/domain/projeto-modelo';
 import { ProjetosModeloService } from '../projetos-modelo/projetos-modelo.service';
 import { Transformador } from '../transformadores/domain/transformador';
 import { TransformadoresService } from '../transformadores/transformadores.service';
 
 import { ConferenciaExecucaoService } from './conferencia-execucao.service';
+import { FotoDaEvidenciaResposta } from './dto/resumos-compartilhados.dto';
 import { ConferenciaRepository } from './infrastructure/persistence/conferencia.repository';
 
 // Nota de lint: a regra `no-restricted-syntax` do projeto exige que todo `it`
@@ -103,6 +106,18 @@ function transformador(projetoModelo?: ProjetoModelo): Transformador {
   } as Transformador;
 }
 
+/** Registro de evidencia como o banco devolve (url crua, sem assinar). */
+function fotoEvidencia(id: string, fonteFisica: string): FotoEvidencia {
+  return {
+    id,
+    url: `${id}.jpg`,
+    fonteFisica,
+    conferencia: null,
+    createdAt: AGORA,
+    updatedAt: AGORA,
+  };
+}
+
 interface Bancada {
   service: ConferenciaExecucaoService;
   criarTransformador: jest.Mock;
@@ -112,6 +127,7 @@ interface Bancada {
   validarEvidenciasDisponiveis: jest.Mock<Promise<void>, [string[]]>;
   findAllProjetos: jest.Mock;
   findByCodigoProjeto: jest.Mock;
+  findByIdsEvidencias: jest.Mock<Promise<FotoEvidencia[]>, [string[]]>;
 }
 
 function montarBancada(
@@ -119,6 +135,7 @@ function montarBancada(
     projetos?: ProjetoModelo[];
     pecaExistente?: Transformador | null;
     validarEvidenciasDisponiveis?: jest.Mock<Promise<void>, [string[]]>;
+    evidencias?: FotoEvidencia[];
   } = {},
 ): Bancada {
   const projetos = opcoes.projetos ?? [PROJETO_DEMO];
@@ -137,6 +154,13 @@ function montarBancada(
     findByNumeroSerie: jest.fn(() => Promise.resolve(pecaExistente)),
     create: criarTransformador,
     update: atualizarTransformador,
+    // O find-or-create real vincula o cadastro de Cliente pelo texto do QR;
+    // aqui o cadastro e dublado (tem suite propria em transformadores).
+    clienteService: {
+      buscarOuCriarPorNome: jest.fn((nome: string) =>
+        Promise.resolve({ id: 'cliente-1', nome }),
+      ),
+    },
   } as unknown as TransformadoresService;
   const serviceReal = TransformadoresService.prototype;
   transformadorService.lerPayloadDoQr =
@@ -181,12 +205,24 @@ function montarBancada(
     create: criarConferencia,
   } as unknown as ConferenciaRepository;
 
+  // Evidencias que a RESPOSTA cita (o lastro persistido segue por
+  // `criarComVeredito`): leitura pura, um lote so.
+  const evidencias = opcoes.evidencias ?? [];
+  const findByIdsEvidencias = jest.fn<Promise<FotoEvidencia[]>, [string[]]>(
+    (ids) =>
+      Promise.resolve(evidencias.filter((foto) => ids.includes(foto.id))),
+  );
+  const fotosEvidenciaService = {
+    findByIds: findByIdsEvidencias,
+  } as unknown as FotosEvidenciaService;
+
   return {
     service: new ConferenciaExecucaoService(
       transformadorService,
       projetoModeloService,
       checkpointService,
       campoConferidoService,
+      fotosEvidenciaService,
       conferenciaRepository,
     ),
     criarTransformador,
@@ -196,6 +232,7 @@ function montarBancada(
     validarEvidenciasDisponiveis,
     findAllProjetos,
     findByCodigoProjeto,
+    findByIdsEvidencias,
   };
 }
 
@@ -220,7 +257,9 @@ describe('prepararExecucao — 422 barato, antes de escrever e antes da visao', 
       response: {
         errors: {
           payloadQr:
-            'payload-somente-codigo: lookup nao suportado nesta rodada',
+            'payload-somente-codigo: o QR traz apenas um codigo de lookup; ' +
+            'digite os campos da etiqueta manualmente ' +
+            '(lookup automatico e rodada futura)',
         },
       },
     });
@@ -512,6 +551,145 @@ describe('executar — evidencia emprestada recusada antes da escrita (achado A2
   });
 });
 
+describe('executar — a resposta diz DE ONDE a leitura saiu', () => {
+  const FOTO_TOPO = fotoEvidencia('foto-topo', 'topo');
+  const REGIAO = '{"Width":0.12,"Height":0.04,"Left":0.31,"Top":0.62}';
+
+  function leitura(extra: Record<string, unknown> = {}) {
+    return {
+      campo: 'serie-chumbada-topo',
+      valorLido: '847233',
+      confianca: 0.99,
+      corroboracao: 'confirmada' as const,
+      ...extra,
+    };
+  }
+
+  it('should devolver a foto-evidencia e a regiao junto do campo', async () => {
+    const { service } = montarBancada({ evidencias: [FOTO_TOPO] });
+
+    const resultado = await service.executar({
+      payloadQr: payloadQr(),
+      etapaCodigo: 'adesivacao',
+      leituras: [
+        leitura({ fotoEvidenciaId: 'foto-topo', regiaoLeitura: REGIAO }),
+      ],
+    });
+
+    expect(resultado.campos[0]).toMatchObject({
+      campo: 'serie-chumbada-topo',
+      regiaoLeitura: REGIAO,
+      fotoEvidencia: {
+        id: 'foto-topo',
+        url: 'foto-topo.jpg',
+        fonteFisica: 'topo',
+      },
+    });
+  });
+
+  it('should montar a foto como INSTANCIA, sem a qual a url nao e assinada', async () => {
+    // Objeto literal nao carrega metadado de decorator: sob FILE_DRIVER=s3 o
+    // front receberia a key crua do bucket e a evidencia nao abriria.
+    const { service } = montarBancada({ evidencias: [FOTO_TOPO] });
+
+    const resultado = await service.executar({
+      payloadQr: payloadQr(),
+      etapaCodigo: 'adesivacao',
+      leituras: [leitura({ fotoEvidenciaId: 'foto-topo' })],
+    });
+
+    expect(resultado.campos[0].fotoEvidencia).toBeInstanceOf(
+      FotoDaEvidenciaResposta,
+    );
+  });
+
+  it('should lastrear a resposta e o CampoConferido na MESMA leitura', async () => {
+    // Resposta e lastro saindo de resolucoes separadas apontariam o operador
+    // para uma foto que nao e a do veredito.
+    const { service, criarComVeredito } = montarBancada({
+      evidencias: [FOTO_TOPO],
+    });
+
+    const resultado = await service.executar({
+      payloadQr: payloadQr(),
+      etapaCodigo: 'adesivacao',
+      leituras: [
+        leitura({ fotoEvidenciaId: 'foto-topo', regiaoLeitura: REGIAO }),
+      ],
+    });
+
+    expect(criarComVeredito).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nomeCampo: 'serie-chumbada-topo',
+        regiaoLeitura: REGIAO,
+        fotoEvidenciaId: 'foto-topo',
+      }),
+    );
+    expect(resultado.campos[0].fotoEvidencia?.id).toBe('foto-topo');
+    expect(resultado.campos[0].regiaoLeitura).toBe(REGIAO);
+  });
+
+  it('should devolver nulos quando a leitura foi digitada sem foto', async () => {
+    const { service, findByIdsEvidencias } = montarBancada();
+
+    const resultado = await service.executar({
+      payloadQr: payloadQr(),
+      etapaCodigo: 'adesivacao',
+      leituras: [leitura()],
+    });
+
+    expect(resultado.campos[0].fotoEvidencia).toBeNull();
+    expect(resultado.campos[0].regiaoLeitura).toBeNull();
+    // Sem foto citada, nem consulta acontece.
+    expect(findByIdsEvidencias).not.toHaveBeenCalled();
+  });
+
+  it('should devolver fotoEvidencia null quando o id citado nao existe mais', async () => {
+    // Mesma tolerancia de `criarComVeredito`: a evidencia e complementar ao
+    // veredito, e um id velho nao pode derrubar um veredito legitimo.
+    const { service } = montarBancada({ evidencias: [] });
+
+    const resultado = await service.executar({
+      payloadQr: payloadQr(),
+      etapaCodigo: 'adesivacao',
+      leituras: [leitura({ fotoEvidenciaId: 'foto-que-sumiu' })],
+    });
+
+    expect(resultado.campos[0].fotoEvidencia).toBeNull();
+  });
+
+  it('should carregar as evidencias do lote em UMA consulta, sem repetir id', async () => {
+    const { service, findByIdsEvidencias } = montarBancada({
+      evidencias: [FOTO_TOPO, fotoEvidencia('foto-placa', 'placa')],
+    });
+
+    await service.executar({
+      payloadQr: payloadQr(),
+      leituras: [
+        leitura({ fotoEvidenciaId: 'foto-topo' }),
+        {
+          campo: 'patrimonio-serigrafia-frente',
+          valorLido: '251328',
+          confianca: 0.99,
+          fotoEvidenciaId: 'foto-topo',
+        },
+        {
+          campo: 'serie-placa',
+          valorLido: '847233',
+          confianca: 0.99,
+          fotoEvidenciaId: 'foto-placa',
+        },
+      ],
+    });
+
+    expect(findByIdsEvidencias).toHaveBeenCalledTimes(1);
+    expect(findByIdsEvidencias).toHaveBeenCalledWith([
+      'foto-topo',
+      'foto-placa',
+    ]);
+  });
+});
+
 describe('executar — contexto preparado nao e resolvido duas vezes', () => {
   it('should reaproveitar o contexto recebido sem reler projeto nem checklist', async () => {
     const {
@@ -567,5 +745,97 @@ describe('executar — contexto preparado nao e resolvido duas vezes', () => {
     });
 
     expect(criarTransformador).toHaveBeenCalledTimes(1);
+  });
+});
+
+// A FIACAO do modo de comparacao: os testes puros provam a regra, este prova
+// que o `executar` de verdade entrega o mapa de modos a engine. Sem ele,
+// esquecer o `modosPorCampo` na chamada de `conferir` passaria despercebido.
+describe('executar — modo de comparacao chega a engine (cliente-* por contencao)', () => {
+  const RAZAO_SOCIAL =
+    '143091 - Energisa Rondônia Distribuidora de Energia S.A';
+
+  /** Gate onde a serigrafia ja existe: cliente + patrimonio na frente. */
+  const PROJETO_CLIENTE = projeto('EPT-CLIENTE', [
+    {
+      campo: 'cliente-serigrafia-frente',
+      fonteFisica: 'frente',
+      obrigatorio: true,
+      etapa: 'serigrafia',
+    },
+    {
+      campo: 'patrimonio-serigrafia-frente',
+      fonteFisica: 'frente',
+      obrigatorio: true,
+      etapa: 'serigrafia',
+    },
+  ]);
+
+  async function conferirCliente(valorLido: string) {
+    const { service } = montarBancada({ projetos: [PROJETO_CLIENTE] });
+
+    return service.executar({
+      payloadQr: payloadQr({ cliente: RAZAO_SOCIAL }),
+      etapaCodigo: 'serigrafia',
+      leituras: [
+        {
+          campo: 'cliente-serigrafia-frente',
+          valorLido,
+          confianca: 0.9967,
+        },
+        {
+          campo: 'patrimonio-serigrafia-frente',
+          valorLido: '251328',
+          confianca: 0.984,
+        },
+      ],
+    });
+  }
+
+  it('should aprovar a marca serigrafada contra a razao social do QR', async () => {
+    // O divergente FALSO medido no ar em 2026-07-26 (gap 21).
+    const resultado = await conferirCliente('energisa');
+
+    expect(resultado.campos[0]).toMatchObject({
+      campo: 'cliente-serigrafia-frente',
+      veredito: 'conforme',
+    });
+    expect(resultado.conferencia.vereditoGeral).toBe('conforme');
+  });
+
+  it('should seguir acusando cliente que nao esta na etiqueta', async () => {
+    const resultado = await conferirCliente('cemig');
+
+    expect(resultado.campos[0].veredito).toBe('divergente');
+    expect(resultado.conferencia.vereditoGeral).toBe('divergente');
+  });
+
+  it('should gravar o veredito do cliente com o valor CRU lido', async () => {
+    // O modo muda a comparacao, nunca o lastro: o que vai ao banco continua
+    // sendo o texto que a visao leu.
+    const { service, criarComVeredito } = montarBancada({
+      projetos: [PROJETO_CLIENTE],
+    });
+
+    await service.executar({
+      payloadQr: payloadQr({ cliente: RAZAO_SOCIAL }),
+      etapaCodigo: 'serigrafia',
+      leituras: [
+        {
+          campo: 'cliente-serigrafia-frente',
+          valorLido: 'ENERGISA',
+          confianca: 0.9967,
+        },
+      ],
+    });
+
+    expect(criarComVeredito).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nomeCampo: 'cliente-serigrafia-frente',
+        valorEsperado: RAZAO_SOCIAL,
+        valorLido: 'ENERGISA',
+        veredito: 'conforme',
+      }),
+    );
   });
 });

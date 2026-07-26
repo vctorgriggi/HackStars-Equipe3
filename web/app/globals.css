@@ -1,0 +1,139 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens do TRAEL Conferência.
+ *
+ * Duas camadas de propósito:
+ * 1. VARIÁVEIS CSS cruas (`--fundo`, `--conforme`…), que trocam de valor no
+ *    tema escuro — é o único lugar do app que conhece um valor de cor;
+ * 2. `@theme inline`, que expõe cada variável como utilitário do Tailwind 4
+ *    (`bg-fundo`, `text-conforme`, `border-borda`). As telas usam SÓ os
+ *    utilitários: cor literal em componente é o que faz um app ficar
+ *    inconsistente em duas semanas.
+ *
+ * As quatro cores SEMÂNTICAS (conforme / divergente / nao_conferivel /
+ * incoerencia) são as mesmas da página /demo servida pela API — continuidade
+ * visual proposital: quem viu a demo reconhece o veredito antes de ler.
+ * O tema escuro muda o TOM, nunca a semântica (verde é sempre conforme).
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Superfícies neutras, cinza levemente esverdeado (chão de fábrica). */
+  --fundo: #f3f6f4;
+  --superficie: #ffffff;
+  --superficie-2: #e9edeb;
+  --borda: #d5dedb;
+  --borda-forte: #b6c3bf;
+  --conteudo: #14211d;
+  --conteudo-suave: #55635e;
+
+  /* Acento: verde-menta discreto (a cor do tanque TRAEL). */
+  --acento: #0f7a5a;
+  --acento-forte: #0b6047;
+  --acento-fundo: #e2f2ec;
+  --acento-contraste: #ffffff;
+
+  /* Vereditos — fonte única, igual à /demo. */
+  --conforme: #1e6b41;
+  --conforme-fundo: #e8f5ed;
+  --divergente: #b3261e;
+  --divergente-fundo: #fdecea;
+  --nao-conferivel: #8a5a00;
+  --nao-conferivel-fundo: #fff5e0;
+  --incoerencia: #553091;
+  --incoerencia-fundo: #f1ecfb;
+
+  --sombra-cartao:
+    0 1px 2px rgb(20 33 29 / 0.06), 0 1px 3px rgb(20 33 29 / 0.04);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --fundo: #0d1210;
+    --superficie: #161e1b;
+    --superficie-2: #1e2926;
+    --borda: #2c3a36;
+    --borda-forte: #3d514c;
+    --conteudo: #e8efec;
+    --conteudo-suave: #9aaaa4;
+
+    --acento: #4fd6a4;
+    --acento-forte: #6fe4b8;
+    --acento-fundo: #10312a;
+    --acento-contraste: #05231a;
+
+    --conforme: #6ee7a8;
+    --conforme-fundo: #10301f;
+    --divergente: #ff9d94;
+    --divergente-fundo: #3d1512;
+    --nao-conferivel: #f5c45e;
+    --nao-conferivel-fundo: #36260a;
+    --incoerencia: #c3a6f5;
+    --incoerencia-fundo: #241a3a;
+
+    --sombra-cartao: 0 1px 2px rgb(0 0 0 / 0.4), 0 1px 3px rgb(0 0 0 / 0.3);
+  }
+}
+
+@theme inline {
+  --color-fundo: var(--fundo);
+  --color-superficie: var(--superficie);
+  --color-superficie-2: var(--superficie-2);
+  --color-borda: var(--borda);
+  --color-borda-forte: var(--borda-forte);
+  --color-conteudo: var(--conteudo);
+  --color-conteudo-suave: var(--conteudo-suave);
+
+  --color-acento: var(--acento);
+  --color-acento-forte: var(--acento-forte);
+  --color-acento-fundo: var(--acento-fundo);
+  --color-acento-contraste: var(--acento-contraste);
+
+  --color-conforme: var(--conforme);
+  --color-conforme-fundo: var(--conforme-fundo);
+  --color-divergente: var(--divergente);
+  --color-divergente-fundo: var(--divergente-fundo);
+  --color-nao-conferivel: var(--nao-conferivel);
+  --color-nao-conferivel-fundo: var(--nao-conferivel-fundo);
+  --color-incoerencia: var(--incoerencia);
+  --color-incoerencia-fundo: var(--incoerencia-fundo);
+
+  --shadow-cartao: var(--sombra-cartao);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+html {
+  /* O operador usa o celular com luva; nada de zoom acidental engolindo a tela. */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--fundo);
+  color: var(--conteudo);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  /* Área segura de aparelho com notch — a barra inferior não pode cobrir botão. */
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/*
+ * Números de série e patrimônio são LIDOS COMPARANDO dígito a dígito
+ * (847233 × 847833). Largura tabular alinha as colunas e faz a diferença
+ * saltar aos olhos; o tracking maior separa os dígitos.
+ */
+@utility numeros {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: 0.02em;
+}
+
+/* Foco sempre visível: a tela é usada com luva e sob luz forte. */
+:where(a, button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
+}

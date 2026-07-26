@@ -294,9 +294,17 @@ export interface ParPorContraste {
   chave: string;
 }
 
-/** Classes que uma marcacao esperada pode assumir na foto. */
+/**
+ * Classes que uma marcacao esperada pode assumir na foto.
+ *
+ * `indefinido` e `qr` ficam FORA do mapa de proposito, por motivos diferentes:
+ * `indefinido` porque nao ha o que casar (a placa resolve por rotulo), e `qr`
+ * porque ele nem passa por aqui — QR e decodificado localmente
+ * (`qr-imagem.ts`), nao e um numero disputado por dois alvos. Medir o contraste
+ * de um QR responderia "claro-sobre-escuro" e nao significaria nada.
+ */
 const CLASSE_DO_TIPO: Record<
-  Exclude<TipoDeMarcacao, 'indefinido'>,
+  Exclude<TipoDeMarcacao, 'indefinido' | 'qr'>,
   ClasseDeContraste
 > = {
   relevo: 'relevo',

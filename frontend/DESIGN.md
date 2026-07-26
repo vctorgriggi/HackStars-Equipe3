@@ -1,99 +1,111 @@
 # DESIGN.md
 
-> Tokens e convenções visuais do `frontend`. Fonte única dos tokens é
-> `app/globals.css` (bloco `@theme`); este arquivo documenta o porquê e como
+> Tokens e convenções visuais do `frontend`. A fonte única dos tokens é o
+> design system **TRAEL Vision**, vendorizado em `styles/` (tokens CSS) e
+> importado por `app/globals.css`; este arquivo documenta o porquê e como
 > usar — não duplica valor, referencia o nome do token.
 
 Lido junto com @AGENTS.md no início de toda sessão neste diretório.
 
+## Sistema de tokens (TRAEL Vision)
+
+- `styles/trael-vision.css` importa os tokens (cores, tipografia, espaçamento,
+  elevação); `styles/trael-vision.tailwind-v4.css` mapeia-os para utilities
+  (`bg-surface-1`, `text-text-2`, `border-line`, `bg-reading-mismatch-soft`,
+  `text-sm` = escala do DS, `w-sidebar`, `h-topbar`…). **Nunca converter os
+  self-refs `--color-x: var(--color-x)` do `@theme inline` para `@theme`
+  plano** — congelaria a paleta dark no build e mataria o light mode.
+- **Dark é o default** (`:root`); light entra por `[data-theme="light"]` no
+  `<html>`. O atributo é resolvido antes do paint por `app/theme-script.tsx`
+  (localStorage `trael-theme`) e alternado por `lib/stores/theme.ts` — nunca
+  `prefers-color-scheme`, nunca `useState`+`useEffect` (flash).
+- Fontes: Inter + IBM Plex Mono via `next/font/local` (woff2 em `app/fonts/`).
+  `.t-mono` (com `tnum`/`zero`) em todo número de série, ID e timestamp;
+  `.t-caps` em rótulos/eyebrows.
+- Breakpoint do shell: `desk:` = ≥881px (sidebar ↔ navbar inferior). A troca
+  de layout é **sempre CSS** — `matchMedia`/`useMediaQuery` no SSR pisca a
+  versão desktop no celular. Exceção única: a medição do container do mapa da
+  esteira (`tempo-real/_components/use-mapa-layout.ts`), que precisa do scale
+  numérico.
+
 ## Princípio: mobile-first de verdade
 
-O usuário real é o operador de linha com o celular numa mão e a peça (ou a
-câmera) na outra, em chão de fábrica. Escrever a classe sem prefixo pensando
-no celular; `sm:`/`md:`/`lg:` só entram se uma tela realmente precisar de
-layout diferente em desktop — não escrever "pensando grande e encolhendo".
+O operador de linha usa o celular no chão de fábrica; o supervisor usa o
+desktop. Escrever a classe sem prefixo pensando no celular; `desk:` (e os
+`sm:`/`min-[]:` pontuais) só quando a tela realmente muda em desktop.
 
-- **Alvo de toque mínimo 48px** (`h-12`/`min-h-12` ou padding equivalente,
-  `py-3` com texto) em qualquer elemento tocável — o operador pode estar com
-  luva ou o dedo suado.
-- **Ação primária de cada tela é `w-full`**, alto contraste, e fica perto do
-  polegar (fim do fluxo vertical, não escondida no topo).
-- **Coluna única.** Nada de grid/multi-coluna abaixo de `sm` — o layout é uma
-  sequência vertical de passos (ler QR → fotografar → veredito).
+- **Alvo de toque mínimo 48px** em qualquer elemento tocável (a navbar
+  inferior usa 60px).
+- **Ação primária de cada tela é `w-full`** no mobile, alto contraste, perto
+  do polegar.
+- **Coluna única** abaixo de `desk`; as listagens viram cards
+  (`components/ui/data-table.tsx` renderiza os dois e o CSS escolhe).
 
-## Cores semânticas do veredito
+## Cores semânticas
 
-O front nunca calcula veredito (regra de ouro, CLAUDE.md raiz) — só mapeia as
-3 strings que a API devolve para uma cor. Os tokens abaixo são a ÚNICA fonte
-de cor para esse mapeamento; nunca usar `text-green-600`/`text-red-600` etc.
-soltos num componente novo — isso é o que este arquivo existe para evitar.
+### Vereditos de conformidade (regra de ouro, CLAUDE.md raiz)
 
-| Veredito (valor da API) | Token CSS         | Utilities Tailwind                          | Uso                                  |
-| ------------------------ | ------------------ | -------------------------------------------- | ------------------------------------- |
-| `conforme`                | `--color-conforme`         | `bg-conforme`, `text-conforme`, `border-conforme`         | campo/veredito ok                    |
-| `divergente`               | `--color-divergente`       | `bg-divergente`, `text-divergente`, `border-divergente`   | alerta — precisa ser inconfundível (SPEC critério 6) |
-| `nao_conferivel`           | `--color-nao-conferivel`   | `bg-nao-conferivel`, `text-nao-conferivel`, `border-nao-conferivel` | ilegível/baixa confiança — nunca vira `conforme` |
+O front nunca calcula veredito — só mapeia as 3 strings da API para cor. Os
+tokens agora são **aliases** dos reading states do TRAEL Vision (definidos em
+`app/globals.css`):
 
-Se a API algum dia devolver um 4º valor, é bug do contrato, não caso novo de
-cor a inventar no front.
+| Veredito (API)   | Token                    | Alias de                    |
+| ---------------- | ------------------------ | --------------------------- |
+| `conforme`       | `--color-conforme`       | `--color-reading-success`   |
+| `divergente`     | `--color-divergente`     | `--color-reading-mismatch`  |
+| `nao_conferivel` | `--color-nao-conferivel` | `--color-reading-lowconf`   |
 
-## Tipografia
+Em código, o mapa é `VEREDITO_TO_READING` (`lib/domain/types.ts`) e o
+componente é `StatusChip`/`VerditoChip` — nunca `text-green-600` solto.
 
-- `font-sans` (Geist, já configurado) é o padrão; não introduzir outra
-  família sem necessidade.
-- `text-base` (16px) é o mínimo para qualquer texto que o operador precisa
-  ler para decidir uma ação — nada abaixo de `text-sm` em conteúdo decisório
-  (veredito, alerta). `text-sm`/`text-xs` só para metadado auxiliar (timestamp,
-  status técnico).
+### Reading states (status de visão computacional)
 
-## Dark mode
-
-`globals.css` já resolve automaticamente via `prefers-color-scheme` — todo
-token novo (como os de veredito) precisa de valor claro E escuro no mesmo
-lugar. Nunca fixar um hex direto num componente; se a cor não existe como
-token, ela entra em `globals.css` antes de ser usada.
+`pending | processing | success | lowconf | mismatch | validated`, cada um com
+base, `-hc` (overlay de vídeo) e `-soft` (fundo de badge). A fonte única do
+pareamento cor↔status é `lib/domain/status.ts` + `components/ui/chip.tsx`.
+Nunca reutilizar o verde de marca para "sucesso", nem `--viz-*` para status —
+viz é série de gráfico, mesmo quando o hex coincide.
 
 ## Base UI + Motion
 
-`@base-ui/react` e `motion` estão instalados — a partir de agora são a base
-primária de UI, não um extra opcional:
+`@base-ui/react` é a base de qualquer componente com comportamento; `motion`
+anima o que comunica mudança de estado. Já aplicado em:
 
-- **Qualquer componente com comportamento** (modal/dialog, dropdown, select,
-  switch, tabs, tooltip, popover, accordion, etc.) parte do primitivo
-  `@base-ui/react` correspondente, nunca reimplementado à mão (foco, teclado,
-  aria já vêm corretos de lá). Base UI é headless — sem estilo próprio — então
-  ele SEMPRE é estilizado com Tailwind + os tokens semânticos deste arquivo
-  (cores de veredito, tipografia, alvo de toque 48px); nunca a aparência
-  default de outra lib de componentes visuais.
-- Elemento puramente estrutural sem estado complexo (texto, layout, botão
-  simples) continua HTML nativo + Tailwind — Base UI entra quando há
-  comportamento que seria caro/arriscado reimplementar, não em tudo por
-  princípio.
-- **`motion`** é a lib de animação: usar em transições que comunicam mudança
-  de estado (veredito aparecendo, alerta de divergência entrando, troca de
-  etapa/tela, expand/collapse de detalhe) — nunca animação decorativa sem
-  propósito. Respeitar `prefers-reduced-motion` para qualquer animação que não
-  seja essencial ao entendimento.
-- Design permanece responsivo (mobile-first, seção acima) e limpo: tokens
-  semânticos em vez de cor ad-hoc, espaçamento generoso, hierarquia
-  tipográfica clara — animação e componente novo nunca competem com isso.
+- `Popover` (sino de notificações), `Menu` (avatar), `Select` (filtros e
+  vínculo de câmera), `Switch` (toggles), `Slider` (limiar), `Toggle`/
+  `ToggleGroup` (chips de campos, pill switcher), `Form`/`Field` (login).
+- Popups animam com as `data-[starting-style]`/`data-[ending-style]` do
+  próprio Base UI (transições CSS) — sem `motion` para popup.
+- `motion` fica para o sprite da esteira (`animate()` imperativo, duração =
+  distância/240px/s, ease linear) e entradas do login. Charts animam por CSS
+  (`tvGrow`/`tvGrowX` + transição) e respeitam `prefers-reduced-motion` via
+  o bloco em `globals.css` (`[data-tv-anim]`, `.tv-*`).
 
 ## Convenções de componente
 
-Não estamos criando `components/ui` antecipadamente só por criar — três telas
-não justificam uma biblioteca própria ainda (ver CLAUDE.md raiz, "não
-desenhar para requisito hipotético"). Os padrões abaixo são para repetir por
-convenção manual até um padrão real emergir na Fase 3; quando repetir,
-priorizar compor sobre um primitivo Base UI em vez de HTML cru caso o
-componente ganhe estado (aberto/fechado, foco, seleção):
+A regra dos 3+ usos disparou com as 12 telas — `components/` existe:
 
-- **Indicador de status** (como o `apiStatus` em `app/conferencia/page.tsx`):
-  texto colorido pelo token semântico correspondente, nunca cor ad-hoc.
-- **Botão de ação primária**: `w-full`, `min-h-12`, texto `text-base` ou
-  maior.
-- **Estado de carregamento/indisponível**: mesmo padrão de 3 estados já usado
-  (`verificando`/`online`/`offline`) — reaproveitar para permissão de
-  câmera, upload em andamento, etc.
+- `components/ui/` — primitivos sem conhecimento de domínio (chip, data-table,
+  select, toggle, slider, skeleton, empty-state, section-card, icon…).
+- `components/chrome/` — o shell (sidebar, bottom-nav, topbar, sino, avatar,
+  theme-toggle, realtime-driver).
+- `components/charts/` — os 4 gráficos do dashboard (SVG/CSS puros, sem lib).
+- `components/vision/` — componentes de domínio compartilhados entre telas
+  (ex.: banner de alertas).
+- `app/(vision)/<rota>/_components/` — componentes de UMA tela. Promoção para
+  `components/` acontece no **segundo** consumidor, não por antecipação.
 
-Se a Fase 3 repetir o mesmo JSX de badge/botão em 3+ telas, aí sim vira
-componente em `components/` — não antes.
+Ícones: `components/ui/icon.tsx` (SVGs 24×24 stroke 1.8 do protótipo) — não
+adicionar `lucide-react`.
+
+## Dados e estado (resumo; detalhes em lib/)
+
+- Dados de domínio: react-query sobre `lib/data/api.ts` (a costura mock→API).
+  Checkpoints têm UMA query (`['checkpoints']`); nomes de etapa são join no
+  render — é o que faz rename propagar para mapa/funil/filtros/timeline.
+- Esteira: zustand (`lib/stores/realtime.ts`), dirigida pela API — snapshot
+  `GET /api/tempo-real/esteira` + evento Socket.IO `passagem-registrada`
+  (`RealtimeSocketDriver`, namespace `/tempo-real`, nunca forçar
+  `transports`); totais sempre do servidor; selectors de folha retornam
+  primitivos. Sem conexão a esteira congela e o header anuncia.
+- Filtros/período/aba: URL (`searchParams`).

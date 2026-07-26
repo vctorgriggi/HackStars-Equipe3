@@ -1,3 +1,5 @@
+import { ClienteEntity } from '../../../../../clientes/infrastructure/persistence/relational/entities/cliente.entity';
+
 import { ProjetoModeloEntity } from '../../../../../projetos-modelo/infrastructure/persistence/relational/entities/projeto-modelo.entity';
 
 import {
@@ -14,6 +16,9 @@ import { EntityRelationalHelper } from '../../../../../utils/relational-entity-h
   name: 'transformador',
 })
 export class TransformadorEntity extends EntityRelationalHelper {
+  @ManyToOne(() => ClienteEntity, { eager: true, nullable: true })
+  clienteVinculado?: ClienteEntity | null;
+
   @ManyToOne(() => ProjetoModeloEntity, { eager: true, nullable: true })
   projetoModelo?: ProjetoModeloEntity | null;
 

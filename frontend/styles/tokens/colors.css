@@ -1,0 +1,127 @@
+/* ============================================================
+   TRAEL Vision — Color tokens
+   Dark is the default theme (camera-monitoring screens).
+   [data-theme="light"] overrides for daytime / office use.
+   ============================================================ */
+
+:root {
+  /* ---- Brand (institutional, theme-independent) ---- */
+  --color-brand-primary: #006536;      /* verde institucional */
+  --color-brand-primary-600: #00542d;
+  --color-brand-primary-700: #013f22;
+  --color-brand-medium: #5AA646;       /* superfícies secundárias / hover de marca */
+  --color-brand-accent: #8FC73E;       /* verde lima — USE COM PARCIMÔNIA na marca */
+  --color-brand-ink: #04120a;          /* verde quase preto p/ texto sobre lima */
+  --color-brand-on: #ffffff;           /* texto sobre gradiente/verde de marca */
+  --gradient-brand: linear-gradient(100deg, #006536 0%, #2f8a46 55%, #5AA646 100%); 
+
+  /* ============================================================
+     READING STATES — semânticos, DEDICADOS.
+     Nunca reutilizar o verde de marca para "sucesso".
+     Cada estado tem: base (chip/badge), -fg (texto sobre base fraca),
+     -soft (fundo de badge sutil), e -hc (alto contraste p/ overlay em vídeo).
+     ============================================================ */
+
+  /* pendente — neutro */
+  --color-reading-pending: #64748b;
+  --color-reading-pending-hc: #94a3b8;
+
+  /* processando — azul */
+  --color-reading-processing: #2f81f7;
+  --color-reading-processing-hc: #4c9dff;
+
+  /* sucesso / leitura confirmada — LIMA (distinto do institucional) */
+  --color-reading-success: #8FC73E;
+  --color-reading-success-hc: #b7f24a;
+
+  /* baixa confiança — âmbar */
+  --color-reading-lowconf: #e0a12b;
+  --color-reading-lowconf-hc: #ffc247;
+
+  /* divergência — vermelho */
+  --color-reading-mismatch: #e5484d;
+  --color-reading-mismatch-hc: #ff6166;
+
+  /* validado manualmente — violeta/azul distinto */
+  --color-reading-validated: #9a6bf0;
+  --color-reading-validated-hc: #b98cff;
+
+  /* ---- Data-viz sequence (gráficos, timelines) ---- */
+  --viz-1: #2f81f7;
+  --viz-2: #8FC73E;
+  --viz-3: #e0a12b;
+  --viz-4: #9a6bf0;
+  --viz-5: #37c0b4;
+  --viz-6: #e5484d;
+  --viz-grid: var(--border);
+  --viz-track: var(--surface-3);
+}
+
+/* ---------------- DARK (default) ---------------- */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg-base: #0b0f14;
+  --bg-canvas: #0f141b;
+  --surface-1: #151b24;
+  --surface-2: #1c232e;
+  --surface-3: #262f3c;
+  --surface-inset: #0c1117;      /* poços, feeds de câmera */
+
+  --border: #2a3441;
+  --border-strong: #3a4658;
+  --border-focus: #4c9dff;
+
+  --text-1: #e7edf3;
+  --text-2: #a7b2c0;
+  --text-3: #6c7889;
+  --text-inverse: #0b0f14;
+
+  /* aliases de marca resolvidos p/ tema */
+  --brand-surface: #10241a;      /* faixa/painel de marca sutil no escuro */
+  --brand-surface-border: #1c4530;
+
+  /* soft backgrounds dos estados (badges) */
+  --reading-pending-soft: #1c2530;
+  --reading-processing-soft: #10233d;
+  --reading-success-soft: #1d2b12;
+  --reading-lowconf-soft: #2b2210;
+  --reading-mismatch-soft: #2e1315;
+  --reading-validated-soft: #221338;
+
+  --shadow-color: 220 40% 2%;
+}
+
+/* ---------------- LIGHT ---------------- */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg-base: #eef1f4;
+  --bg-canvas: #f5f7f9;
+  --surface-1: #ffffff;
+  --surface-2: #f6f8fa;
+  --surface-3: #eaeef2;
+  --surface-inset: #0c1117;      /* feeds de câmera continuam escuros */
+
+  --border: #d6dde4;
+  --border-strong: #b9c3cd;
+  --border-focus: #2f81f7;
+
+  --text-1: #10151c;
+  --text-2: #47525f;
+  --text-3: #737f8c;
+  --text-inverse: #ffffff;
+
+  --brand-surface: #eef6ec;
+  --brand-surface-border: #cfe6c8;
+
+  --reading-pending-soft: #eef1f5;
+  --reading-processing-soft: #e6f0fe;
+  --reading-success-soft: #eef7dd;
+  --reading-lowconf-soft: #fbf1dd;
+  --reading-mismatch-soft: #fdecec;
+  --reading-validated-soft: #f1e9fd;
+
+  --shadow-color: 220 30% 45%;
+}

@@ -1,5 +1,6 @@
 import { CheckpointsModule } from '../checkpoints/checkpoints.module';
 import { RelationalConferenciaPersistenceModule } from '../conferencias/infrastructure/persistence/relational/relational-persistence.module';
+import { TempoRealModule } from '../tempo-real/tempo-real.module';
 import { TransformadoresModule } from '../transformadores/transformadores.module';
 import {
   // do not remove this comment
@@ -21,6 +22,10 @@ import { RelationalPassagemPersistenceModule } from './infrastructure/persistenc
     // importar `ConferenciasModule` inteiro criaria ciclo com
     // `TransformadoresModule` sem trazer nada que este fluxo use.
     RelationalConferenciaPersistenceModule,
+
+    // Mao UNICA: passagens conhece o tempo real (para anunciar o scan), o
+    // tempo real nao conhece passagens — sem ciclo, sem forwardRef.
+    TempoRealModule,
 
     // do not remove this comment
     RelationalPassagemPersistenceModule,
