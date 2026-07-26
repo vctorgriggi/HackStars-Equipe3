@@ -1,6 +1,8 @@
 # Imagem de produção (App Runner). Diferenças para o Dockerfile de dev:
-# - não copia .env (as variáveis vêm da configuração do serviço; segredo
-#   nenhum entra na imagem);
+# - o `.env` do repo fica FORA da imagem: quem garante isso é o
+#   `.dockerignore` (o `rm -f .env` lá embaixo NÃO bastava — camada Docker é
+#   aditiva e o arquivo continuava recuperável da camada do `COPY .`).
+#   As variáveis reais vêm da configuração do serviço;
 # - CMD roda migration + seed idempotente + start:prod, sem wait-for-it de
 #   containers vizinhos (o banco é o RDS).
 FROM node:24.14.1-alpine

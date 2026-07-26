@@ -2,3 +2,11 @@
 /.data
 /dist
 /files
+
+# SEGREDOS FORA DA IMAGEM (auditoria de 2026-07-25).
+# `Dockerfile.production` faz `COPY . /usr/src/app` e só DEPOIS sobrescreve e
+# apaga o `.env`. Camada Docker é ADITIVA: apagar num passo seguinte não tira o
+# arquivo da camada em que ele entrou — quem puxasse a imagem do ECR recuperava
+# as credenciais AWS reais. A exclusão tem de acontecer AQUI, antes do COPY.
+.env
+.env.*

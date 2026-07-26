@@ -20,9 +20,15 @@ Elastic Beanstalk (mais peças móveis sem ganho no prazo do hackathon).
 
 ## Artefatos no repositório
 
-- `backend/Dockerfile.production` — imagem de produção. Não copia `.env` do
-  repo: as variáveis vêm da configuração do serviço, então **nenhum segredo
-  entra na imagem**.
+- `backend/Dockerfile.production` — imagem de produção. As variáveis vêm da
+  configuração do serviço; o `.env` do repo fica fora da imagem porque
+  **`backend/.dockerignore` o exclui do contexto de build**.
+  Quem garante isso é o `.dockerignore`, não o `rm -f .env` do Dockerfile:
+  camada Docker é aditiva, então apagar o arquivo num passo posterior o
+  mantém recuperável da camada do `COPY .`. Isso vazou credencial real para
+  a imagem até 2026-07-25 (achado da auditoria de documentação; o ECR é
+  privado à conta, então a exposição ficou contida, mas as chaves são as de
+  root — trocá-las está no hardening pós-demo).
 - `backend/startup.production.sh` — `migration:run` → `seed:run:relational`
   (idempotente, upsert por código) → `start:prod`. Sem `wait-for-it`: o banco
   é o RDS; se ele não responder, a migration falha alto e o deploy é marcado
@@ -47,11 +53,13 @@ aws iam create-role --role-name TraelApiInstanceRole \
 # política mínima: s3 (bucket trael), textract, bedrock — ver histórico do git
 aws iam put-role-policy --role-name TraelApiInstanceRole --policy-name TraelApiAcessoServicos --policy-document '...'
 
-# 3. Imagem (App Runner é x86_64 — build cruzado no Mac ARM)
+# 3. Imagem (App Runner é x86_64 — build cruzado no Mac ARM).
+# As flags NÃO são opcionais: sem elas o deploy falha SEM LOG (armadilhas 2 e 3).
 aws ecr get-login-password | docker login --username AWS --password-stdin \
   <conta>.dkr.ecr.us-east-1.amazonaws.com
-docker buildx build --platform linux/amd64 -f Dockerfile.production \
-  -t <conta>.dkr.ecr.us-east-1.amazonaws.com/trael-api:latest --push .
+docker buildx build --platform linux/amd64 --provenance=false --sbom=false \
+  --output type=image,name=<conta>.dkr.ecr.us-east-1.amazonaws.com/trael-api:latest,push=true,oci-mediatypes=false \
+  -f Dockerfile.production .
 
 # 4. Serviço (config gerada a partir do backend/.env; sem chaves AWS dentro)
 aws apprunner create-service --cli-input-json file://apprunner-service.json
@@ -61,10 +69,16 @@ aws apprunner create-service --cli-input-json file://apprunner-service.json
 
 ```bash
 cd backend
-docker buildx build --platform linux/amd64 -f Dockerfile.production \
-  -t <conta>.dkr.ecr.us-east-1.amazonaws.com/trael-api:latest --push .
+docker buildx build --platform linux/amd64 --provenance=false --sbom=false \
+  --output type=image,name=<conta>.dkr.ecr.us-east-1.amazonaws.com/trael-api:latest,push=true,oci-mediatypes=false \
+  -f Dockerfile.production .
 aws apprunner start-deployment --service-arn <arn-do-servico>
 ```
+
+As flags do `buildx` são obrigatórias (armadilhas 2 e 3) e o
+`start-deployment` é um passo separado do `update-service` (armadilha 5) —
+seguir a receita sem elas reproduz exatamente as falhas silenciosas que
+custaram 6 tentativas.
 
 `AutoDeploymentsEnabled` está **desligado** de propósito: push acidental de
 imagem não derruba a demo; o deploy é sempre um ato explícito.
