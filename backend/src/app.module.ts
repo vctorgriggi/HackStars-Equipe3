@@ -59,9 +59,12 @@ import { join } from 'path';
 
 import { CamerasModule } from './cameras/cameras.module';
 
+import { TempoRealModule } from './tempo-real/tempo-real.module';
+
 @Module({
   imports: [
     CamerasModule,
+    TempoRealModule,
     ClientesModule,
     DemoModule,
     EsteiraModule,

@@ -1,29 +1,30 @@
-// Estado da esteira (simulação do WebSocket — trocável por WS real mantendo
-// as actions). Regras do protótipo (tick, linhas 1034–1068):
-//  - tick move 1 unidade aleatória;
-//  - em Ensaios (stage 3), ~18% reprova e volta ao Tanque (stage 2);
-//  - quem sai de Expedição (stage 5) é expedido e uma série nova entra na
-//    Bobinagem;
-//  - mismatch ⇒ linha parada até liberação manual (banner + botão).
+// Estado da esteira de tempo real — dirigido pela API, nunca por simulação.
+// O snapshot (GET /api/tempo-real/esteira) traz etapas reais + ocupação; o
+// evento Socket.IO `passagem-registrada` move a peça e SUBSTITUI os totais
+// pelos do servidor (nunca incrementa: evento perdido é curado pelo próximo
+// e pelo re-snapshot do reconnect). Sem conexão, o estado CONGELA e o header
+// anuncia — movimento inventado numa tela de monitoramento é o análogo do
+// falso OK.
 // Selectors de folha devem retornar PRIMITIVOS (countByStage[i], hot === i)
-// para o tick re-renderizar ≤3 componentes.
+// para um evento re-renderizar ≤3 componentes.
 
 import { create } from "zustand";
 import type {
   EventoEsteira,
   MovimentoEsteira,
   ReadingStatus,
-  Transformador,
   UnidadeEsteira,
 } from "@/lib/domain/types";
+import { VEREDITO_TO_READING } from "@/lib/domain/types";
+import type {
+  EsteiraSnapshotApi,
+  EventoPassagemRegistradaApi,
+} from "@/lib/domain/esteira-api";
+import type { EtapaResumoApi } from "@/lib/domain/transformador-api";
 
-const N_ETAPAS = 6;
 const MAX_EVENTOS = 14;
-export const TICK_MS = 2500;
-const UNIDADES_INICIAIS = 8;
 
-let proxSerie = 847262;
-let proxEventoId = 2;
+let proxEventoId = 1;
 
 function hora(): string {
   return new Date().toLocaleTimeString("pt-BR", {
@@ -31,12 +32,6 @@ function hora(): string {
     minute: "2-digit",
     second: "2-digit",
   });
-}
-
-function contar(unidades: UnidadeEsteira[]): number[] {
-  const c = Array<number>(N_ETAPAS).fill(0);
-  for (const u of unidades) if (u.stage >= 0 && u.stage < N_ETAPAS) c[u.stage]++;
-  return c;
 }
 
 function evento(
@@ -47,132 +42,136 @@ function evento(
   return { id: proxEventoId++, mensagem, serie, status, hora: hora() };
 }
 
+export type EstadoConexao = "conectando" | "conectado" | "reconectando";
+
 interface RealtimeState {
-  iniciado: boolean;
+  /** Etapas REAIS da linha (do snapshot), ordenadas por `ordem`. Referência
+   *  estável: muda só quando um snapshot chega — os índices de
+   *  unidades/countByStage apontam para este array. Vazio = pré-snapshot
+   *  (a tela anuncia "sincronizando", nunca desenha etapas fantasmas). */
+  etapas: EtapaResumoApi[];
   unidades: UnidadeEsteira[];
+  /** Sempre do SERVIDOR (snapshot ou `evento.totais`) — nunca contado aqui. */
   countByStage: number[];
   eventos: EventoEsteira[];
   /** Índice do checkpoint "quente" (recebendo unidade) — anel no mapa. */
   hot: number | null;
   /** Último movimento semântico; o componente do mapa anima o sprite. */
   movimento: MovimentoEsteira | null;
-  linhaParada: boolean;
-  /** Nome da etapa não vive aqui (join via useCheckpoints) — só o índice. */
-  init(transformadores: Transformador[]): void;
-  tick(nomesEtapas: string[]): void;
-  liberarLinha(): void;
+  conexao: EstadoConexao;
+  aplicarSnapshot(snapshot: EsteiraSnapshotApi): void;
+  aplicarPassagem(recebido: EventoPassagemRegistradaApi): void;
+  setConexao(conexao: EstadoConexao): void;
   limparHot(): void;
 }
 
 export const useRealtime = create<RealtimeState>((set, get) => ({
-  iniciado: false,
+  etapas: [],
   unidades: [],
-  countByStage: Array<number>(N_ETAPAS).fill(0),
-  // hora vazia de propósito: hora() no load do módulo diverge entre server e
-  // client e vira mismatch de hidratação; o init() (só client) carimba.
-  eventos: [
-    {
-      id: 1,
-      mensagem: "Conexão estabelecida com a linha 1",
-      serie: "ws://linha-1",
-      status: "success",
-      hora: "",
-    },
-  ],
+  countByStage: [],
+  eventos: [],
   hot: null,
   movimento: null,
-  linhaParada: true,
+  conexao: "conectando",
 
-  init(transformadores) {
-    if (get().iniciado) return;
-    const unidades = transformadores
-      .filter((t) => t.etapaIndex < 5)
-      .slice(0, UNIDADES_INICIAIS)
-      .map((t) => ({ serie: t.serie, stage: t.etapaIndex }));
+  aplicarSnapshot(snapshot) {
+    const etapas: EtapaResumoApi[] = snapshot.checkpoints.map(
+      ({ codigo, nome, ordem }) => ({ codigo, nome, ordem }),
+    );
+    const unidades: UnidadeEsteira[] = snapshot.checkpoints.flatMap(
+      (checkpoint, stage) =>
+        checkpoint.pecas.map((peca) => ({ serie: peca.numeroSerie, stage })),
+    );
+
     set((s) => ({
-      iniciado: true,
+      etapas,
       unidades,
-      countByStage: contar(unidades),
-      eventos: s.eventos.map((e) =>
-        e.hora === "" ? { ...e, hora: hora() } : e,
-      ),
+      countByStage: snapshot.checkpoints.map((c) => c.total),
+      eventos: [
+        evento(
+          `Sincronizado com a linha — ${snapshot.totalNaLinha} na esteira`,
+          "tempo-real",
+          "success",
+        ),
+        ...s.eventos,
+      ].slice(0, MAX_EVENTOS),
     }));
   },
 
-  tick(nomesEtapas) {
-    const { unidades, eventos } = get();
-    if (!unidades.length) return;
-    const us = [...unidades];
-    const i = Math.floor(Math.random() * us.length);
-    const u = { ...us[i] };
-    const novos: EventoEsteira[] = [];
-    let movimento: MovimentoEsteira;
+  aplicarPassagem(recebido) {
+    const { etapas, unidades, eventos, countByStage } = get();
+    const { resultado, checkpointAnterior, totais } = recebido;
+    const serie = resultado.transformador.numeroSerie;
 
-    if (u.stage >= 5) {
-      const novo = { serie: `TR-${proxSerie++}`, stage: 0 };
-      us[i] = novo;
-      novos.push(evento("Expedido para o cliente", u.serie, "success"));
-      novos.push(
-        evento(
-          `Entrou na linha — ${nomesEtapas[0] ?? "Bobinagem"}`,
-          novo.serie,
-          "pending",
-        ),
-      );
-      movimento = { seq: Date.now(), from: 5, to: null, serie: u.serie };
-    } else if (u.stage === 3) {
-      if (Math.random() < 0.18) {
-        u.stage = 2;
-        novos.push(
-          evento(
-            `Ensaio reprovado — retorna ao ${nomesEtapas[2] ?? "Tanque"}`,
-            u.serie,
-            "mismatch",
-          ),
-        );
-        movimento = { seq: Date.now(), from: 3, to: 2, serie: u.serie };
-      } else {
-        u.stage = 4;
-        novos.push(
-          evento(
-            `Ensaio aprovado — segue para ${nomesEtapas[4] ?? "Pintura"}`,
-            u.serie,
-            "success",
-          ),
-        );
-        movimento = { seq: Date.now(), from: 3, to: 4, serie: u.serie };
-      }
-      us[i] = u;
-    } else {
-      const de = u.stage;
-      u.stage++;
-      us[i] = u;
-      novos.push(
-        evento(
-          `Avançou para ${nomesEtapas[u.stage] ?? `etapa ${u.stage + 1}`}`,
-          u.serie,
-          "processing",
-        ),
-      );
-      movimento = { seq: Date.now(), from: de, to: u.stage, serie: u.serie };
+    // Totais SEMPRE se aplicam (são absolutos, casados por código); total
+    // ausente para uma etapa mantém o anterior — ausência não é zero.
+    const totaisPorCodigo = new Map(totais.map((t) => [t.codigo, t.total]));
+    const novoCount = etapas.map(
+      (etapa, i) => totaisPorCodigo.get(etapa.codigo) ?? countByStage[i] ?? 0,
+    );
+
+    const veredito = resultado.ultimaConferencia?.vereditoGeral ?? null;
+    const status: ReadingStatus = veredito
+      ? VEREDITO_TO_READING[veredito]
+      : "processing";
+    const alerta =
+      veredito === "divergente" ? " — última conferência DIVERGENTE" : "";
+
+    const idxNovo = etapas.findIndex(
+      (etapa) => etapa.codigo === resultado.checkpoint.codigo,
+    );
+    if (idxNovo < 0) {
+      // Etapa que a tela não conhece (snapshot ainda não chegou, ou
+      // checkpoint criado depois dele): o feed informa e os totais valem,
+      // mas ausência de informação NUNCA vira movimento inventado.
+      set({
+        countByStage: novoCount,
+        eventos: [
+          evento(`Passou por ${resultado.checkpoint.nome}${alerta}`, serie, status),
+          ...eventos,
+        ].slice(0, MAX_EVENTOS),
+      });
+      return;
     }
 
+    // `from` da viagem: o checkpoint anterior do EVENTO (server-authoritative)
+    // vence; a posição local da série é fallback; sem nenhum dos dois a peça
+    // entra parada no box (sem viagem de origem inventada).
+    const idxAnterior = checkpointAnterior
+      ? etapas.findIndex((etapa) => etapa.codigo === checkpointAnterior.codigo)
+      : -1;
+    const idxLocal = unidades.find((u) => u.serie === serie)?.stage ?? -1;
+    const from = idxAnterior >= 0 ? idxAnterior : idxLocal;
+
+    const novasUnidades = [
+      ...unidades.filter((u) => u.serie !== serie),
+      { serie, stage: idxNovo },
+    ];
+
+    const viagem = from >= 0 && from !== idxNovo;
     set({
-      unidades: us,
-      countByStage: contar(us),
-      eventos: [...novos, ...eventos].slice(0, MAX_EVENTOS),
-      hot: movimento.to ?? movimento.from,
-      movimento,
+      unidades: novasUnidades,
+      countByStage: novoCount,
+      eventos: [
+        evento(`Passou por ${resultado.checkpoint.nome}${alerta}`, serie, status),
+        ...eventos,
+      ].slice(0, MAX_EVENTOS),
+      hot: idxNovo,
+      ...(viagem
+        ? { movimento: { seq: Date.now(), from, to: idxNovo, serie } }
+        : {}),
     });
   },
 
-  liberarLinha() {
+  setConexao(conexao) {
+    if (get().conexao === conexao) return;
+    const aviso: EventoEsteira | null =
+      conexao === "reconectando"
+        ? evento("Conexão com a linha perdida — reconectando", "tempo-real", "lowconf")
+        : null;
     set((s) => ({
-      linhaParada: false,
-      eventos: [
-        evento("Linha liberada pelo operador", "TR-847250", "validated"),
-        ...s.eventos,
-      ].slice(0, MAX_EVENTOS),
+      conexao,
+      eventos: aviso ? [aviso, ...s.eventos].slice(0, MAX_EVENTOS) : s.eventos,
     }));
   },
 

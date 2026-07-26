@@ -1,9 +1,13 @@
-// A COSTURA entre o app e os dados de domínio MOCK. TRANSFORMADORES REAIS
-// migraram para ./transformadores-api.ts (listagem/detalhe integrados à API
-// NestJS via BFF, 2026-07-26) — os acessores de transformador daqui seguem
-// vivos SÓ para as telas ainda mockadas (tempo-real, dashboard, alertas);
-// não os use em tela nova. O restante (Lote/Projeto/Câmera/KPIs/WS) continua
-// mock porque o backend não os tem nesta rodada. Regras estruturais:
+// A COSTURA entre o app e os dados de domínio MOCK. Já saíram daqui, todos
+// via BFF (2026-07-26): TRANSFORMADORES (./transformadores-api.ts), a
+// esteira de TEMPO REAL (Socket.IO + snapshot; driver em
+// components/chrome/realtime-socket-driver.tsx), CLIENTES, PROJETOS, a
+// página de CÂMERAS (./cameras-api.ts) e LOTES (./lotes-api.ts) — os
+// acessores de transformador daqui seguem vivos SÓ para as telas ainda
+// mockadas (dashboard, alertas); não os use em tela nova. O que resta
+// (checkpoints editáveis, câmeras do detalhe de checkpoint, KPIs do
+// dashboard, notificações/config) continua mock porque o backend não os tem
+// nesta rodada. Regras estruturais:
 //  - nenhum acessor devolve NOME de etapa — sempre índice/checkpointId
 //    (nome é join no render via useCheckpoints);
 //  - filtro de listagem NÃO é parâmetro (a page filtra em useMemo) até a
@@ -16,7 +20,6 @@ import type {
   ConfigNotificacoes,
   DashboardData,
   EtapaTimeline,
-  Lote,
   Notificacao,
   PeriodoDashboard,
   Projeto,
@@ -31,7 +34,6 @@ import {
   TEMPOS_POR_ETAPA,
 } from "@/lib/mock/seed/dashboard";
 import { CLIENTES_SEED } from "@/lib/mock/seed/clientes";
-import { LOTES_SEED } from "@/lib/mock/seed/lotes";
 import { PROJETOS_SEED } from "@/lib/mock/seed/projetos";
 import { TRANSFORMADORES_SEED } from "@/lib/mock/seed/transformadores";
 import { getMockState, persistMockState } from "@/lib/mock/store";
@@ -53,11 +55,6 @@ export async function getTransformador(
 export async function getClientes() {
   await delay();
   return CLIENTES_SEED;
-}
-
-export async function getLotes(): Promise<Lote[]> {
-  await delay();
-  return LOTES_SEED;
 }
 
 export async function getProjetos(): Promise<Projeto[]> {

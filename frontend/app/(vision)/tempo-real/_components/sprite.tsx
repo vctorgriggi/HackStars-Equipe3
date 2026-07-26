@@ -30,7 +30,7 @@ export function Sprite({
 
     const { pos } = compact ? CANVAS.compact : CANVAS.desktop;
     const [fx, fy] = centro(pos, movimento.from);
-    const [tx, ty] = destino(pos, movimento.to, compact);
+    const [tx, ty] = destino(pos, movimento.to);
 
     el.style.transform = `translate3d(${fx}px, ${fy}px, 0)`;
     setVisivel(true);

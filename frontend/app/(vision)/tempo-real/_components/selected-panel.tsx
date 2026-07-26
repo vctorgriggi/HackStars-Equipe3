@@ -1,12 +1,13 @@
 "use client";
 
 // Card "Selecionado" ao clicar num checkpoint: etapa, contagem e séries na
-// etapa (com link ao detalhe quando a peça existe no cadastro).
+// etapa. O join é com a API REAL (por numeroSerie) — a esteira anda com
+// séries reais desde o driver socket; peça fora do cadastro vira span sem
+// link, nunca link quebrado.
 
 import Link from "next/link";
 import { useRealtime } from "@/lib/stores/realtime";
-import { useTransformadores } from "@/lib/data/use-transformadores";
-import { fmtKva } from "@/lib/domain/status";
+import { useTransformadoresApi } from "@/lib/data/use-transformadores-api";
 import { Icon } from "@/components/ui/icon";
 
 export function SelectedPanel({
@@ -25,8 +26,8 @@ export function SelectedPanel({
       .join("|"),
   );
   const lista = series ? series.split("|") : [];
-  const { data: transformadores = [] } = useTransformadores();
-  const porSerie = new Map(transformadores.map((t) => [t.serie, t]));
+  const { data: transformadores = [] } = useTransformadoresApi();
+  const porSerie = new Map(transformadores.map((t) => [t.numeroSerie, t]));
 
   return (
     <div className="rounded-lg border border-line bg-surface-1 p-4 shadow-1">
@@ -52,9 +53,9 @@ export function SelectedPanel({
           const conteudo = (
             <>
               <span className="t-mono text-sm text-text-1">{serie}</span>
-              {t && (
+              {t && (t.cliente || t.patrimonio) && (
                 <span className="truncate text-xs text-text-3">
-                  {t.clienteNome} · {fmtKva(t.kva)} kVA
+                  {t.cliente || `patrimônio ${t.patrimonio}`}
                 </span>
               )}
             </>

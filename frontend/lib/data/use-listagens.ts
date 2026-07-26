@@ -8,10 +8,6 @@ export function useClientes() {
   return useQuery({ queryKey: keys.clientes.all, queryFn: api.getClientes });
 }
 
-export function useLotes() {
-  return useQuery({ queryKey: keys.lotes.all, queryFn: api.getLotes });
-}
-
 export function useProjetos() {
   return useQuery({ queryKey: keys.projetos.all, queryFn: api.getProjetos });
 }

@@ -12,10 +12,8 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { PassagensService } from './passagens.service';
-import {
-  PassagemRegistroService,
-  ResultadoRegistroPassagem,
-} from './passagem-registro.service';
+import { PassagemRegistroService } from './passagem-registro.service';
+import { ResultadoRegistroPassagem } from './dto/resultado-registro-passagem.dto';
 import { CreatePassagemDto } from './dto/create-passagem.dto';
 import { RegistrarPassagemDto } from './dto/registrar-passagem.dto';
 import { UpdatePassagemDto } from './dto/update-passagem.dto';

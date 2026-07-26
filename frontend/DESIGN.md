@@ -103,6 +103,9 @@ adicionar `lucide-react`.
 - Dados de domínio: react-query sobre `lib/data/api.ts` (a costura mock→API).
   Checkpoints têm UMA query (`['checkpoints']`); nomes de etapa são join no
   render — é o que faz rename propagar para mapa/funil/filtros/timeline.
-- Esteira: zustand (`lib/stores/realtime.ts`), tick de 2,5s no
-  `RealtimeDriver`; selectors de folha retornam primitivos.
+- Esteira: zustand (`lib/stores/realtime.ts`), dirigida pela API — snapshot
+  `GET /api/tempo-real/esteira` + evento Socket.IO `passagem-registrada`
+  (`RealtimeSocketDriver`, namespace `/tempo-real`, nunca forçar
+  `transports`); totais sempre do servidor; selectors de folha retornam
+  primitivos. Sem conexão a esteira congela e o header anuncia.
 - Filtros/período/aba: URL (`searchParams`).

@@ -6,7 +6,7 @@
 // escolhe — matchMedia no layout piscaria desktop no SSR.
 
 import { BottomNav } from "@/components/chrome/bottom-nav";
-import { RealtimeDriver } from "@/components/chrome/realtime-driver";
+import { RealtimeSocketDriver } from "@/components/chrome/realtime-socket-driver";
 import { Sidebar } from "@/components/chrome/sidebar";
 import { Topbar } from "@/components/chrome/topbar";
 
@@ -25,7 +25,7 @@ export default function VisionLayout({
         </main>
       </div>
       <BottomNav />
-      <RealtimeDriver />
+      <RealtimeSocketDriver />
     </div>
   );
 }

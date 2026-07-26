@@ -43,15 +43,6 @@ export interface Cliente {
   entregues: number;
 }
 
-export interface Lote {
-  id: string; // LT-AAAA-###
-  projetoNome: string;
-  unidades: number;
-  progresso: number; // 0..100
-  status: ReadingStatus;
-  previsao: string;
-}
-
 export interface Projeto {
   id: string;
   nome: string;
@@ -147,7 +138,8 @@ export interface EtapaTimeline {
 
 export interface UnidadeEsteira {
   serie: string;
-  stage: number; // 0..5
+  /** Índice em `etapas` do store realtime (as etapas REAIS do snapshot). */
+  stage: number;
 }
 
 export interface EventoEsteira {
@@ -163,7 +155,6 @@ export interface EventoEsteira {
 export interface MovimentoEsteira {
   seq: number; // muda a cada movimento (chave de efeito)
   from: number;
-  /** null = saiu de Expedição (expedida para fora do mapa). */
-  to: number | null;
+  to: number;
   serie: string;
 }

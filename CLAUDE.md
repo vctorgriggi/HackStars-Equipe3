@@ -46,7 +46,9 @@ não conformidade que chega ao cliente hoje).
 ```
 backend/                  # NestJS (base brocoders/nestjs-boilerplate)
   src/
-    transformadores/      # CRUD Transformador (gerado); recebe o parser do QR (T1.1)
+    transformadores/      # CRUD Transformador (gerado); recebe o parser do QR (T1.1);
+                          #   GET /lotes (consultas/): pecas agrupadas por pedido,
+                          #   contadores e progresso server-side — lote NAO e entidade
     projetos-modelo/      # CRUD ProjetoModelo (gerado); checklist por modelo como dado
     conferencias/         # CRUD Conferencia (gerado); recebe a engine de comparação (T1.2)
     campos-conferidos/    # CRUD CampoConferido (gerado)
@@ -231,6 +233,19 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
   NestJS.
 - Payload do QR é decodificado no front (leitura da câmera) mas interpretado
   na API (parser em `transformadores`) — o front não extrai campos do payload.
+- **Tempo real da esteira** (`backend/src/tempo-real/`): Socket.IO no
+  namespace `/tempo-real` (path default `/socket.io` — o prefixo `api` não se
+  aplica a gateway). Evento único `passagem-registrada`, emitido SÓ por
+  `PassagemRegistroService.registrar()` via `AnuncioPassagemService.anunciar()`
+  (o CRUD `POST /passagens` não emite; anunciar nunca lança — o scan já foi
+  gravado). O evento carrega o MESMO `ResultadoRegistroPassagem` do POST +
+  `checkpointAnterior` (o `from` da animação, server-authoritative) + `totais`
+  ABSOLUTOS de todos os checkpoints — o cliente substitui, nunca incrementa.
+  Estado inicial em `GET /tempo-real/esteira` (posição = última passagem;
+  rebuscado a cada reconnect). Cliente NUNCA força `transports`: no App Runner
+  não há upgrade de WebSocket e o socket.io degrada sozinho para long-polling.
+  A dependência de módulos é de mão única: `PassagensModule` importa
+  `TempoRealModule`, nunca o contrário.
 - `GET /conferencias/plano-de-fotos` é a fonte ÚNICA do recorte por etapa para
   clientes: quais vistas cada gate pede, já com a semântica cumulativa
   aplicada no servidor. Nenhum cliente reimplementa a regra — a `/demo`
@@ -252,7 +267,8 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
   aparece no retorno de um método de controller, ele é classe. As respostas dos
   endpoints do fluxo moram em `conferencias/dto/resultado-execucao*.dto.ts`,
   `conferencias/consultas/veredito-conferencia.ts`,
-  `transformadores/consultas/*.ts` e `passagens/passagem-registro.service.ts`;
+  `transformadores/consultas/*.ts` e
+  `passagens/dto/resultado-registro-passagem.dto.ts`;
   as projeções repetidas (`CheckpointResumo`, `EtapaResumo`,
   `TransformadorResumo`) vivem uma única vez em
   `conferencias/dto/resumos-compartilhados.dto.ts` — nome de schema é global no
@@ -479,6 +495,15 @@ do hackathon:
     Correção proposta (barata, mesmo recorte): luminância ABSOLUTA do entorno
     como quarto sinal — papel é muito mais claro que chapa pintada. Decisão em
     aberto no SPEC.
+
+24. O namespace Socket.IO `/tempo-real` é SEM auth no handshake (decisão
+    2026-07-26): o `frontend/` guarda o JWT em cookie httpOnly que o navegador
+    não lê — token no handshake exigiria expor o JWT ao browser, quebrando o
+    desenho do BFF. O que trafega é contagem, código de etapa e número de
+    série (nada que a `/demo` pública já não mostre), e o gateway só EMITE —
+    não há mensagem de cliente processada. O snapshot HTTP
+    (`GET /tempo-real/esteira`) segue atrás de JWT. Fechar com token no
+    handshake quando a auth for revisada (junto dos gaps 13/17).
 
 ## Decisões em aberto
 
