@@ -180,3 +180,132 @@ describe('conferir — o modo e por campo: o default continua exato', () => {
     expect(resultado.campos[0].veredito).toBe('divergente');
   });
 });
+
+// MODO 'esperado-contido' — o da POTENCIA (2026-07-26).
+//
+// POR QUE ELE EXISTE: o desenho EPT-163-PI-676 manda gravar `1H - 10 kVA` na
+// frente, e o OCR le a face inteira de uma vez, entao o texto que volta traz
+// companhia. Aqui e o ESPERADO que tem de caber no LIDO — o inverso do modo do
+// cliente. Antes desta rodada o campo nao tinha esperado nenhum (a potencia nao
+// e campo do QR) e a engine omitia o item opcional: potencia gravada errada saia
+// em SILENCIO. E marcacao errada e justamente o que a banca vai testar.
+const POTENCIA = 'potencia-serigrafia-frente';
+
+/** O texto que o desenho manda gravar na frente da peca. */
+const POTENCIA_DO_PROJETO = '1H - 10 kVA';
+
+const MODO_POTENCIA: OpcoesEngine = {
+  limiarConfianca: 0.9,
+  modosPorCampo: { [POTENCIA]: 'esperado-contido' },
+};
+
+function vereditoDaPotencia(
+  valorLido: string,
+  confianca = 0.996,
+  esperado = POTENCIA_DO_PROJETO,
+) {
+  const resultado = conferir(
+    [item(POTENCIA)],
+    { [POTENCIA]: esperado },
+    [leitura(POTENCIA, valorLido, confianca)],
+    MODO_POTENCIA,
+  );
+
+  return resultado.campos[0];
+}
+
+describe('conferir — modo esperado-contido: a marcacao do desenho dentro do lido', () => {
+  it('should aceitar a leitura real medida na frente da peca', () => {
+    // '1H-10kVA' @ 0.996: a unidade colada no numero e o hifen sem espacos sao
+    // tipografia, nao dado.
+    expect(vereditoDaPotencia('1H-10kVA').veredito).toBe('conforme');
+  });
+
+  it('should aceitar a mesma marcacao com espacos como o desenho escreve', () => {
+    expect(vereditoDaPotencia('1H - 10 kVA').veredito).toBe('conforme');
+  });
+
+  it('should aceitar o lido que traz MAIS do que a marcacao esperada', () => {
+    // A face inteira numa tirada de OCR: potencia junto de classe e tensao.
+    expect(vereditoDaPotencia('1H - 10 kVA 15 kV').veredito).toBe('conforme');
+  });
+
+  it('should ignorar caixa', () => {
+    expect(vereditoDaPotencia('1h - 10 kva').veredito).toBe('conforme');
+  });
+
+  it('should ACUSAR divergente quando a potencia gravada e outra', () => {
+    // O caso do avaliador: peca serigrafada com a potencia errada.
+    expect(vereditoDaPotencia('20 kVA').veredito).toBe('divergente');
+    expect(vereditoDaPotencia('1H-20kVA').veredito).toBe('divergente');
+    expect(vereditoDaPotencia('1H - 20 kVA').veredito).toBe('divergente');
+  });
+
+  it('should ACUSAR divergente quando a FASE gravada e outra', () => {
+    // O desenho pede a marcacao completa; trocar o 1H tambem e nao conformidade.
+    expect(vereditoDaPotencia('2H - 10 kVA').veredito).toBe('divergente');
+    expect(vereditoDaPotencia('2H-10kVA').veredito).toBe('divergente');
+  });
+
+  it('should acusar divergente quando falta parte da marcacao esperada', () => {
+    // '10 kVA' sozinho nao e a marcacao do desenho — falta o '1H'.
+    expect(vereditoDaPotencia('10 kVA').veredito).toBe('divergente');
+    // E numero sem unidade nao afirma potencia nenhuma.
+    expect(vereditoDaPotencia('10').veredito).toBe('divergente');
+  });
+
+  it('should exigir fronteira de token: 110 kVA nao contem 10 kVA', () => {
+    expect(vereditoDaPotencia('110 kVA', 0.996, '10 kVA').veredito).toBe(
+      'divergente',
+    );
+  });
+
+  it('should exigir os tokens do esperado em sequencia CONSECUTIVA', () => {
+    // Remontar texto fora de ordem seria adivinhacao (mesma regra do cliente).
+    expect(vereditoDaPotencia('10 kVA 1H').veredito).toBe('divergente');
+  });
+
+  it('should recusar leitura sem token nenhum (so pontuacao)', () => {
+    expect(vereditoDaPotencia('- . -').veredito).toBe('divergente');
+  });
+
+  it('should manter o limiar mandando ANTES da comparacao', () => {
+    // Leitura fraca nunca vira conforme, nem batendo com o esperado — e nunca
+    // vira divergente, que e o que mandaria a peca para retrabalho por foto ruim.
+    const campo = vereditoDaPotencia('1H-10kVA', 0.5);
+
+    expect(campo.veredito).toBe('nao_conferivel');
+    expect(campo.motivo).toBe('confianca-abaixo-do-limiar');
+  });
+
+  it('should seguir nao_conferivel quando ninguem leu a frente', () => {
+    const resultado = conferir(
+      [item(POTENCIA)],
+      { [POTENCIA]: POTENCIA_DO_PROJETO },
+      [leitura(POTENCIA, null, null)],
+      MODO_POTENCIA,
+    );
+
+    expect(resultado.campos[0].veredito).toBe('nao_conferivel');
+    expect(resultado.campos[0].motivo).toBe('sem-leitura');
+  });
+
+  it('should NAO afrouxar campo que o mapa nao cita (serie e patrimonio intactos)', () => {
+    // Contraprova do modo mais frouxo da engine: com ele no mapa da potencia, a
+    // serie continua exata — leitura que "contem" o esperado nao aprova.
+    const resultado = conferir(
+      [item('serie-placa', 'placa'), item('patrimonio-placa', 'placa')],
+      { 'serie-placa': '847233', 'patrimonio-placa': '251328' },
+      [
+        leitura('serie-placa', 'N 847233 X', 0.999),
+        leitura('patrimonio-placa', '251328 251329', 0.999),
+      ],
+      MODO_POTENCIA,
+    );
+
+    expect(resultado.campos.map((campo) => campo.veredito)).toEqual([
+      'divergente',
+      'divergente',
+    ]);
+  });
+});

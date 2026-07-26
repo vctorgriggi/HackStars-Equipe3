@@ -719,12 +719,18 @@ export const PAGINA_DEMO = `<!doctype html>
   // carrega. Existe porque repetir o teste é o uso real desta página e
   // reescanear o QR a cada rodada é a fricção que mais custa tempo — o caminho
   // de verdade (e o único que existirá em produção) continua sendo a câmera.
+  // A linha de DESCRIÇÃO é a que a etiqueta real imprime ("TRANSFORMADOR 10kVA
+  // 15kV 1F 240/120V 8660V") e é de onde sai o esperado da potência quando a
+  // checklist do modelo não o declara (o seed declara: '1H - 10 kVA', do
+  // desenho). Sem ela, o campo de potência fica sem esperado e sai omitido —
+  // marcação errada em silêncio.
   var ETIQUETA_DEMO = [
     'Pedido: 68202',
     'Núm. Série: 847233',
     'Seq: 86',
     'Patrimônio: 251328',
     'Cliente: ' + CLIENTE,
+    'Descrição: TRANSFORMADOR 10kVA 15kV 1F 240/120V 8660V',
     'TPD-408136'
   ].join('\\n');
 
@@ -739,7 +745,9 @@ export const PAGINA_DEMO = `<!doctype html>
     'patrimonio-serigrafia-topo': ['251328', 0.985],
     'patrimonio-serigrafia-frente': ['251328', 0.984],
     'cliente-serigrafia-frente': [CLIENTE, 0.972],
-    'potencia-serigrafia-frente': ['10 kVA', 0.985]
+    // A marcação da frente é COMPOSTA no desenho ('1H - 10 kVA') e a leitura
+    // real veio colada, como a serigrafia escreve: '1H-10kVA' @ 0.996.
+    'potencia-serigrafia-frente': ['1H-10kVA', 0.996]
   };
 
   var PRESET_CORRETA = Object.assign({}, PRESET_DEMO, {

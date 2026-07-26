@@ -42,6 +42,7 @@ export class ProjetoModeloSeedService {
     // | patrimonio-serigrafia-frente   | frente           | sim    | serigrafia    |
     // | cliente-serigrafia-frente      | frente           | sim    | serigrafia    |
     // | potencia-serigrafia-frente     | frente           | NAO    | serigrafia    |
+    // |   ^ esperado do PROJETO: '1H - 10 kVA' (esperadoFixo — ver o item)      |
     // | serie-placa                    | placa (close)    | sim    | fixacao-placa |
     // | patrimonio-placa               | placa (close)    | sim    | fixacao-placa |
     // | serie-placa-qr                 | placa (close)    | sim    | fixacao-placa |
@@ -105,6 +106,30 @@ export class ProjetoModeloSeedService {
         fonteFisica: 'frente',
         obrigatorio: false,
         etapa: 'serigrafia',
+        // A MARCAÇÃO DE POTÊNCIA PASSOU A ACUSAR (2026-07-26). Até aqui este
+        // item não tinha valor esperado — a potência não é campo do QR — e a
+        // engine OMITE do resultado o item opcional sem esperado: potência
+        // gravada errada saía em silêncio, no mesmo lugar onde o sistema deveria
+        // gritar (e é a primeira coisa que um avaliador erra de propósito).
+        //
+        // O texto é o do desenho EPT-163-PI-676, confirmado no crop pelo time
+        // hoje: a frente traz `1H - 10 kVA` COMPLETO. O `1H` não existe em
+        // payload nenhum (a descrição da etiqueta diz `1F`, que é outra coisa —
+        // mapear 1F -> 1H seria inventar regra), então a fonte honesta é o
+        // PROJETO, que é o que este registro é. A identidade da peça (série,
+        // patrimônio, cliente) continua vindo SÓ do QR: nenhum desses itens
+        // declara `esperadoFixo`, e é isso que mantém a constraint 5 do SPEC.
+        //
+        // Comparado em modo `esperado-contido` (o prefixo `potencia-` escolhe o
+        // modo, em ORIGENS_DO_ESPERADO): o esperado inteiro tem de aparecer no
+        // lido, porque a face é lida numa tirada só e vem com companhia
+        // (`... 15 kV`). Logo `2H - 10 kVA` e `1H - 20 kVA` são `divergente`.
+        //
+        // Segue OPCIONAL de propósito: sem foto da frente, o campo fica
+        // `nao_conferivel` e não trava o `conforme` (critério 4 do SPEC). COM
+        // leitura divergente, acusa — campo opcional divergente conta no
+        // veredito geral, e é esse o ponto.
+        esperadoFixo: '1H - 10 kVA',
       },
       {
         campo: 'serie-placa',

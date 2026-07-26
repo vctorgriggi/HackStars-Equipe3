@@ -302,8 +302,10 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
   `patrimonio-serigrafia-frente`, `cliente-serigrafia-frente`,
   `potencia-serigrafia-frente`, `serie-placa`, `patrimonio-placa`. O PREFIXO
   (`serie-`, `patrimonio-`, `cliente-`) é contrato: é por ele que
-  `ORIGENS_DO_ESPERADO` acha o valor esperado no QR (`potencia-*` fica de fora
-  de propósito — a potência não vem do QR).
+  `ORIGENS_DO_ESPERADO` acha o valor esperado no QR (`potencia-*` mudou em 2026-07-26:
+  o esperado dela vem do `esperadoFixo` do item da checklist — o desenho
+  define a marcação completa `1H - 10 kVA` — com fallback derivado da
+  `descricao` do payload; comparação por `esperado-contido`).
 - Identificadores estáveis: gates e regras casam por `codigo` (Checkpoint,
   ProjetoModelo), nunca por nome exibido nem por `ordem` — nome e ordem mudam.
 - Boilerplate traz auth/i18n que não usamos nesta rodada: não gastar tempo

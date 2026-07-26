@@ -148,10 +148,25 @@ export function filtrarChecklistPorEtapa(
  * casamento e por prefixo, entao nome novo de posicao continua achando sua
  * origem. Nesta rodada o esperado vem so do QR da etiqueta.
  *
- * 'potencia-*' NAO aparece de proposito: a potencia nao esta no QR — o
- * esperado virá do projeto estruturado no futuro. Sem valor esperado, a engine
- * omite o campo opcional do resultado e marca o obrigatorio como
- * 'nao_conferivel' (motivo 'sem-valor-esperado').
+ * 'potencia-*' ENTROU em 2026-07-26, e a origem dela e a unica que nao e um
+ * campo proprio do QR: a etiqueta imprime a potencia dentro da DESCRICAO
+ * ('TRANSFORMADOR 10kVA 15kV 1F 240/120V 8660V'), e o parser ja entrega esse
+ * texto. Derivar dali respeita a constraint 5 do SPEC — o valor vem do payload,
+ * nao de constante nossa. Descricao ausente (ou sem 'kVA') devolve null e o
+ * comportamento antigo fica intacto: campo opcional omitido, obrigatorio
+ * 'nao_conferivel' com motivo 'sem-valor-esperado'.
+ *
+ * Isto e o FALLBACK, nao a fonte preferida: a marcacao que o desenho manda
+ * gravar na frente e '1H - 10 kVA' COMPLETA, e o '1H' nao existe em payload
+ * nenhum (a descricao traz '1F', que e outra coisa — mapear 1F -> 1H seria
+ * inventar regra). Quem define a marcacao e o PROJETO, entao o esperado
+ * preferido vem do item da checklist ('esperadoFixo', ver
+ * `montarValoresEsperados`); a derivacao pela descricao continua valendo para
+ * checklist antiga, que nao declara nada.
+ *
+ * MOTIVO DE NEGOCIO de a potencia ter deixado de ser omitida: campo sem esperado
+ * sai do resultado, entao potencia gravada errada na peca produzia SILENCIO — e
+ * marcacao errada e o primeiro teste que um avaliador faz.
  *
  * `modo` mora AQUI, no mesmo lugar da origem, porque e a mesma pergunta vista
  * de dois angulos: quem sabe de onde vem o esperado e quem sabe como ele
@@ -180,7 +195,39 @@ const ORIGENS_DO_ESPERADO: {
     ler: (payload) => payload.cliente,
     modo: 'contem-token',
   },
+  {
+    prefixo: 'potencia-',
+    ler: (payload) => potenciaDaDescricao(payload.descricao),
+    modo: 'esperado-contido',
+  },
 ];
+
+/**
+ * Primeira potencia em kVA escrita na DESCRICAO da etiqueta, normalizada para
+ * 'numero + espaco + kVA'.
+ *
+ * Aceita a unidade colada ('10kVA') ou separada ('10 kVA'), em qualquer caixa, e
+ * decimal com virgula ou ponto ('7,5 kVA' — modelo de outra potencia existe). A
+ * PRIMEIRA ocorrencia vence: na descricao real a potencia abre o texto
+ * ('TRANSFORMADOR 10kVA 15kV ...'), e varrer o resto atras de um segundo kVA
+ * seria inventar criterio de desempate.
+ *
+ * A normalizacao existe para o valor esperado sair legivel na resposta e na
+ * coluna `valorEsperado` ('10 kVA', nao '10kVA'); a COMPARACAO nao depende dela
+ * — o modo `esperado-contido` trata as duas grafias como o mesmo dado
+ * (`engine/comparacao.ts`).
+ *
+ * Exportada para teste direto, como as demais regras deste arquivo.
+ */
+export function potenciaDaDescricao(descricao: string | null): string | null {
+  if (descricao === null) {
+    return null;
+  }
+
+  const achado = /(\d+(?:[.,]\d+)?)\s*kva/i.exec(descricao);
+
+  return achado === null ? null : `${achado[1]} kVA`;
+}
 
 // Exportado por ser a validação ÚNICA de item de checklist — a versão que
 // vivia duplicada em conferencia-extracao divergia (não validava `etapa`) e
@@ -200,7 +247,13 @@ export function ehItemChecklist(valor: unknown): valor is ItemChecklist {
     // item cairia calado no ramo "etapa desconhecida". `null` e aceito como
     // "sem etapa" (codificacao natural em JSON — achado BAIXA da revisao) e
     // normalizado para undefined em lerChecklist.
-    (item.etapa == null || typeof item.etapa === 'string')
+    (item.etapa == null || typeof item.etapa === 'string') &&
+    // `esperadoFixo` segue a MESMA politica de `etapa`: opcional (nenhuma
+    // checklist antiga a tem, e todas continuam validas), string quando
+    // presente, `null` aceito como ausencia. Aceitar sem exigir e o que mantem
+    // esta funcao a validacao UNICA do sistema — ela tambem serve a releitura
+    // do veredito e ao plano de fotos, que ignoram a chave.
+    (item.esperadoFixo == null || typeof item.esperadoFixo === 'string')
   );
 }
 
@@ -215,6 +268,20 @@ export function montarValoresEsperados(
   const valoresEsperados: Record<string, string> = {};
 
   for (const item of checklist) {
+    // PRECEDENCIA do esperado declarado pelo MODELO (2026-07-26): quando o item
+    // da checklist traz `esperadoFixo`, ele vence a derivacao por prefixo. Vale
+    // para marcacao que nao e identidade da peca — a potencia da frente, cujo
+    // texto completo ('1H - 10 kVA') sai do desenho e nao existe em payload
+    // nenhum. A identidade (serie, patrimonio, cliente) NAO usa esta porta: o
+    // seed nao declara `esperadoFixo` nesses campos, e declarar seria trocar a
+    // fonte da verdade do QR por um dado editavel — exatamente o que a
+    // constraint 5 do SPEC proibe. O argumento completo esta no tipo
+    // (`ItemChecklist.esperadoFixo`).
+    if (temConteudo(item.esperadoFixo)) {
+      valoresEsperados[item.campo] = item.esperadoFixo;
+      continue;
+    }
+
     const origem = ORIGENS_DO_ESPERADO.find((atual) =>
       item.campo.startsWith(atual.prefixo),
     );
@@ -245,6 +312,11 @@ export function montarValoresEsperados(
  * campo ausente dele. Ficar aqui e o que impede a checklist (dado, hoje varchar
  * sem validacao estrutural — gap 5, e escrita por LLM na Fase 6) de afrouxar a
  * comparacao de um campo `serie-*` sem ninguem perceber.
+ *
+ * O MODO CONTINUA SAINDO DO PREFIXO mesmo quando o esperado vem de
+ * `esperadoFixo`: a checklist escolhe o VALOR, nunca o critério de igualdade.
+ * Campo de prefixo desconhecido com `esperadoFixo` cai no default `exato` — o
+ * criterio mais estrito, que e a falha segura correta aqui.
  */
 export function montarModosDeComparacao(
   checklist: ItemChecklist[],
@@ -697,9 +769,13 @@ export class ConferenciaExecucaoService {
       );
     }
 
-    // etapa: null (aceito pelo guard) vira undefined — downstream só conhece
-    // "string presente" ou "ausente".
-    return bruto.map((item) => ({ ...item, etapa: item.etapa ?? undefined }));
+    // etapa e esperadoFixo: null (aceito pelo guard) vira undefined —
+    // downstream só conhece "string presente" ou "ausente".
+    return bruto.map((item) => ({
+      ...item,
+      etapa: item.etapa ?? undefined,
+      esperadoFixo: item.esperadoFixo ?? undefined,
+    }));
   }
 }
 
