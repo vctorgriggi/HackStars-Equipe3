@@ -19,7 +19,7 @@ import { NextRequest, NextResponse } from "next/server";
 //   (mesmo contrato que a pagina da estacao ja consome)
 // ---------------------------------------------------------------------------
 
-const API_URL = process.env.ESTACAO_API_URL ?? "http://localhost:3001";
+const API_URL = process.env.ESTACAO_API_URL ?? process.env.API_URL ?? "http://localhost:3001";
 const API_EMAIL = process.env.ESTACAO_API_EMAIL ?? "admin@example.com";
 const API_PASSWORD = process.env.ESTACAO_API_PASSWORD ?? "secret";
 
