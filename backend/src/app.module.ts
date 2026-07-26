@@ -46,11 +46,16 @@ import { ExtracaoModule } from './extracao/extracao.module';
 import { DemoModule } from './demo/demo.module';
 
 import { ClientesModule } from './clientes/clientes.module';
+// Temporário, MESMO PRAZO DA /demo (gap 13 do CLAUDE.md): cena de apresentação
+// servida em /esteira, para o telão da demo. Remover os DOIS logo após a
+// apresentação — a página faz login sem guard, como a /demo.
+import { EsteiraModule } from './esteira/esteira.module';
 
 @Module({
   imports: [
     ClientesModule,
     DemoModule,
+    EsteiraModule,
 
     ExtracaoModule,
 
