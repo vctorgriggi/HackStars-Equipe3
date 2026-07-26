@@ -42,14 +42,14 @@ class ExtractorEspiao extends ExtractorPort {
 
 /** Checklist da peca de demo (desenho EPT-163-PI-676). */
 const CHECKLIST: AlvoChecklist[] = [
-  { campo: 'serie-chumbada-1', fonteFisica: 'chumbado-1' },
-  { campo: 'serie-chumbada-2', fonteFisica: 'chumbado-2' },
-  { campo: 'serie-chumbada-3', fonteFisica: 'chumbado-3' },
+  { campo: 'serie-chumbada-topo', fonteFisica: 'topo' },
+  { campo: 'serie-chumbada-lateral-direita', fonteFisica: 'lateral-direita' },
+  { campo: 'serie-chumbada-traseira', fonteFisica: 'traseira' },
   { campo: 'serie-placa', fonteFisica: 'placa' },
   { campo: 'patrimonio-placa', fonteFisica: 'placa' },
-  { campo: 'patrimonio-serigrafia', fonteFisica: 'serigrafia' },
-  { campo: 'cliente-serigrafia', fonteFisica: 'serigrafia' },
-  { campo: 'potencia-serigrafia', fonteFisica: 'serigrafia' },
+  { campo: 'patrimonio-serigrafia-frente', fonteFisica: 'frente' },
+  { campo: 'cliente-serigrafia-frente', fonteFisica: 'frente' },
+  { campo: 'potencia-serigrafia-frente', fonteFisica: 'frente' },
 ];
 
 function foto(
@@ -70,7 +70,7 @@ describe('ExtracaoService — roteamento foto -> campos', () => {
     const service = new ExtracaoService(espiao);
 
     await service.extrairDeFotos(
-      [foto('placa', 'foto-placa'), foto('serigrafia', 'foto-serigrafia')],
+      [foto('placa', 'foto-placa'), foto('frente', 'foto-serigrafia')],
       CHECKLIST,
     );
 
@@ -80,11 +80,11 @@ describe('ExtracaoService — roteamento foto -> campos', () => {
         campos: ['serie-placa', 'patrimonio-placa'],
       },
       {
-        fonteFisica: 'serigrafia',
+        fonteFisica: 'frente',
         campos: [
-          'patrimonio-serigrafia',
-          'cliente-serigrafia',
-          'potencia-serigrafia',
+          'patrimonio-serigrafia-frente',
+          'cliente-serigrafia-frente',
+          'potencia-serigrafia-frente',
         ],
       },
     ]);
@@ -109,12 +109,12 @@ describe('ExtracaoService — roteamento foto -> campos', () => {
     const service = new ExtracaoService(new ExtractorEspiao());
 
     const { leituras } = await service.extrairDeFotos(
-      [foto('chumbado-1', 'foto-chumbado-1')],
+      [foto('topo', 'foto-chumbado-1')],
       CHECKLIST,
     );
 
     expect(leituras).toHaveLength(1);
-    expect(leituras[0].campo).toBe('serie-chumbada-1');
+    expect(leituras[0].campo).toBe('serie-chumbada-topo');
   });
 });
 
@@ -126,8 +126,8 @@ describe('ExtracaoService — uma chamada por foto (constraint 4 do SPEC)', () =
     await service.extrairDeFotos(
       [
         foto('placa', 'foto-placa'),
-        foto('serigrafia', 'foto-serigrafia'),
-        foto('chumbado-1', 'foto-chumbado-1'),
+        foto('frente', 'foto-serigrafia'),
+        foto('topo', 'foto-chumbado-1'),
       ],
       CHECKLIST,
     );
@@ -139,7 +139,7 @@ describe('ExtracaoService — uma chamada por foto (constraint 4 do SPEC)', () =
     const espiao = new ExtractorEspiao();
     const service = new ExtracaoService(espiao);
 
-    await service.extrairDeFotos([foto('serigrafia', 'foto-s')], CHECKLIST);
+    await service.extrairDeFotos([foto('frente', 'foto-s')], CHECKLIST);
 
     expect(espiao.chamadas).toHaveLength(1);
     expect(espiao.chamadas[0].campos).toHaveLength(3);
@@ -163,7 +163,7 @@ describe('ExtracaoService — vinculo com a foto de evidencia', () => {
     const service = new ExtracaoService(new ExtractorEspiao());
 
     const { leituras } = await service.extrairDeFotos(
-      [foto('placa', 'foto-placa'), foto('serigrafia', 'foto-serigrafia')],
+      [foto('placa', 'foto-placa'), foto('frente', 'foto-serigrafia')],
       CHECKLIST,
     );
 
@@ -173,7 +173,7 @@ describe('ExtracaoService — vinculo com a foto de evidencia', () => {
 
     expect(porCampo.get('serie-placa')).toBe('foto-placa');
     expect(porCampo.get('patrimonio-placa')).toBe('foto-placa');
-    expect(porCampo.get('cliente-serigrafia')).toBe('foto-serigrafia');
+    expect(porCampo.get('cliente-serigrafia-frente')).toBe('foto-serigrafia');
   });
 
   it('should carimbar o fotoEvidenciaId mesmo quando o adapter devolve null', async () => {
@@ -317,7 +317,7 @@ describe('ExtracaoService — leitura fora dos alvos', () => {
               fotoEvidenciaId: fonte.fotoEvidenciaId,
             })),
             {
-              campo: 'cliente-serigrafia',
+              campo: 'cliente-serigrafia-frente',
               valorLido: 'Energisa',
               confianca: 0.99,
               regiaoLeitura: null,

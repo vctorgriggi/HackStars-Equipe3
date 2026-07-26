@@ -37,9 +37,14 @@ describe('conferir — regra 1: normalizacao para comparacao', () => {
 
   it('should colapsar espacos internos multiplos antes de comparar', () => {
     const resultado = conferir(
-      [item('cliente-serigrafia', true, 'serigrafia')],
-      { 'cliente-serigrafia': '143091 - Energisa Rondonia' },
-      [leitura('cliente-serigrafia', '143091   -    Energisa  Rondonia')],
+      [item('cliente-serigrafia-frente', true, 'frente')],
+      { 'cliente-serigrafia-frente': '143091 - Energisa Rondonia' },
+      [
+        leitura(
+          'cliente-serigrafia-frente',
+          '143091   -    Energisa  Rondonia',
+        ),
+      ],
       OPCOES,
     );
 
@@ -48,9 +53,9 @@ describe('conferir — regra 1: normalizacao para comparacao', () => {
 
   it('should comparar ignorando caixa alta e baixa', () => {
     const resultado = conferir(
-      [item('cliente-serigrafia', true, 'serigrafia')],
-      { 'cliente-serigrafia': 'Energisa Rondonia' },
-      [leitura('cliente-serigrafia', 'ENERGISA RONDONIA')],
+      [item('cliente-serigrafia-frente', true, 'frente')],
+      { 'cliente-serigrafia-frente': 'Energisa Rondonia' },
+      [leitura('cliente-serigrafia-frente', 'ENERGISA RONDONIA')],
       OPCOES,
     );
 
@@ -84,9 +89,15 @@ describe('conferir — regra 1: normalizacao para comparacao', () => {
 describe('conferir — regra 2a: campo sem valor esperado', () => {
   it('should omitir do resultado o campo opcional sem valor esperado', () => {
     const resultado = conferir(
-      [item('serie-placa'), item('potencia-serigrafia', false, 'serigrafia')],
+      [
+        item('serie-placa'),
+        item('potencia-serigrafia-frente', false, 'frente'),
+      ],
       { 'serie-placa': '847233' },
-      [leitura('serie-placa', '847233'), leitura('potencia-serigrafia', '10')],
+      [
+        leitura('serie-placa', '847233'),
+        leitura('potencia-serigrafia-frente', '10'),
+      ],
       OPCOES,
     );
 
@@ -292,15 +303,15 @@ describe('conferir — regra 2d: comparacao do valor', () => {
 
   it('should repassar fonteFisica, obrigatorio e confianca do par checklist/leitura', () => {
     const resultado = conferir(
-      [item('serie-chumbada-1', true, 'chumbado-1')],
-      { 'serie-chumbada-1': '847233' },
-      [leitura('serie-chumbada-1', '847233', 0.91)],
+      [item('serie-chumbada-topo', true, 'topo')],
+      { 'serie-chumbada-topo': '847233' },
+      [leitura('serie-chumbada-topo', '847233', 0.91)],
       OPCOES,
     );
 
     expect(resultado.campos[0]).toEqual({
-      campo: 'serie-chumbada-1',
-      fonteFisica: 'chumbado-1',
+      campo: 'serie-chumbada-topo',
+      fonteFisica: 'topo',
       obrigatorio: true,
       valorEsperado: '847233',
       valorLido: '847233',
@@ -354,9 +365,15 @@ describe('conferir — regra 4: veredito geral', () => {
 
   it('should ser divergente quando um campo opcional diverge', () => {
     const resultado = conferir(
-      [item('serie-placa'), item('potencia-serigrafia', false, 'serigrafia')],
-      { 'serie-placa': '847233', 'potencia-serigrafia': '10' },
-      [leitura('serie-placa', '847233'), leitura('potencia-serigrafia', '15')],
+      [
+        item('serie-placa'),
+        item('potencia-serigrafia-frente', false, 'frente'),
+      ],
+      { 'serie-placa': '847233', 'potencia-serigrafia-frente': '10' },
+      [
+        leitura('serie-placa', '847233'),
+        leitura('potencia-serigrafia-frente', '15'),
+      ],
       OPCOES,
     );
 
@@ -376,8 +393,11 @@ describe('conferir — regra 4: veredito geral', () => {
 
   it('should manter conforme quando so um campo opcional e nao_conferivel', () => {
     const resultado = conferir(
-      [item('serie-placa'), item('potencia-serigrafia', false, 'serigrafia')],
-      { 'serie-placa': '847233', 'potencia-serigrafia': '10' },
+      [
+        item('serie-placa'),
+        item('potencia-serigrafia-frente', false, 'frente'),
+      ],
+      { 'serie-placa': '847233', 'potencia-serigrafia-frente': '10' },
       [leitura('serie-placa', '847233')],
       OPCOES,
     );
@@ -422,9 +442,9 @@ describe('conferir — regra 4b: conforme exige campo verificado', () => {
     const resultado = conferir(
       [
         item('serie-placa', false),
-        item('potencia-serigrafia', false, 'serigrafia'),
+        item('potencia-serigrafia-frente', false, 'frente'),
       ],
-      { 'serie-placa': '847233', 'potencia-serigrafia': '10 kVA' },
+      { 'serie-placa': '847233', 'potencia-serigrafia-frente': '10 kVA' },
       [],
       OPCOES,
     );
@@ -440,9 +460,9 @@ describe('conferir — regra 4b: conforme exige campo verificado', () => {
     // O caso mais perigoso: a engine omite opcional sem valor esperado, entao
     // o resultado sai com `campos: []` — e antes saia `conforme`.
     const resultado = conferir(
-      [item('potencia-serigrafia', false, 'serigrafia')],
+      [item('potencia-serigrafia-frente', false, 'frente')],
       {},
-      [leitura('potencia-serigrafia', '10 kVA')],
+      [leitura('potencia-serigrafia-frente', '10 kVA')],
       OPCOES,
     );
 
@@ -454,8 +474,11 @@ describe('conferir — regra 4b: conforme exige campo verificado', () => {
     // Contraprova: a guarda nova nao pode rebaixar o caso legitimo do
     // criterio 4 do SPEC (opcional ilegivel nao bloqueia o conforme).
     const resultado = conferir(
-      [item('serie-placa'), item('potencia-serigrafia', false, 'serigrafia')],
-      { 'serie-placa': '847233', 'potencia-serigrafia': '10 kVA' },
+      [
+        item('serie-placa'),
+        item('potencia-serigrafia-frente', false, 'frente'),
+      ],
+      { 'serie-placa': '847233', 'potencia-serigrafia-frente': '10 kVA' },
       [leitura('serie-placa', '847233')],
       OPCOES,
     );
@@ -489,11 +512,11 @@ describe('conferir — regra 2b2: leituras conflitantes', () => {
     // validas se contradizendo, nem da para afirmar que a vencedora e a
     // marcacao do vizinho.
     const resultado = conferir(
-      [item('serie-chumbada-1', true, 'chumbado-1')],
-      { 'serie-chumbada-1': '847233', 'patrimonio-placa': '251328' },
+      [item('serie-chumbada-topo', true, 'topo')],
+      { 'serie-chumbada-topo': '847233', 'patrimonio-placa': '251328' },
       [
         {
-          ...leitura('serie-chumbada-1', '251328', 0.99),
+          ...leitura('serie-chumbada-topo', '251328', 0.99),
           conflitante: true,
           trocado: true,
           campoDaLeitura: 'patrimonio-placa',
@@ -541,27 +564,27 @@ describe('temLastro — politica de confianca compartilhada', () => {
 describe('conferir — regra 5: ordem dos campos', () => {
   it('should devolver os campos na ordem da checklist, nao na ordem das leituras', () => {
     const checklist = [
-      item('serie-chumbada-1', true, 'chumbado-1'),
+      item('serie-chumbada-topo', true, 'topo'),
       item('serie-placa'),
       item('patrimonio-placa'),
     ];
     const resultado = conferir(
       checklist,
       {
-        'serie-chumbada-1': '847233',
+        'serie-chumbada-topo': '847233',
         'serie-placa': '847233',
         'patrimonio-placa': '251328',
       },
       [
         leitura('patrimonio-placa', '251328'),
         leitura('serie-placa', '847233'),
-        leitura('serie-chumbada-1', '847233'),
+        leitura('serie-chumbada-topo', '847233'),
       ],
       OPCOES,
     );
 
     expect(resultado.campos.map((campo) => campo.campo)).toEqual([
-      'serie-chumbada-1',
+      'serie-chumbada-topo',
       'serie-placa',
       'patrimonio-placa',
     ]);
@@ -572,49 +595,57 @@ describe('conferir — teste-ancora: peca de demo EPT-163-PI-676', () => {
   const CLIENTE = '143091 - Energisa Rondônia Distribuidora de Energia S.A';
 
   const checklist: ItemChecklist[] = [
-    { campo: 'serie-chumbada-1', fonteFisica: 'chumbado-1', obrigatorio: true },
-    { campo: 'serie-chumbada-2', fonteFisica: 'chumbado-2', obrigatorio: true },
-    { campo: 'serie-chumbada-3', fonteFisica: 'chumbado-3', obrigatorio: true },
+    { campo: 'serie-chumbada-topo', fonteFisica: 'topo', obrigatorio: true },
+    {
+      campo: 'serie-chumbada-lateral-direita',
+      fonteFisica: 'lateral-direita',
+      obrigatorio: true,
+    },
+    {
+      campo: 'serie-chumbada-traseira',
+      fonteFisica: 'traseira',
+      obrigatorio: true,
+    },
     { campo: 'serie-placa', fonteFisica: 'placa', obrigatorio: true },
     { campo: 'patrimonio-placa', fonteFisica: 'placa', obrigatorio: true },
     {
-      campo: 'patrimonio-serigrafia',
-      fonteFisica: 'serigrafia',
+      campo: 'patrimonio-serigrafia-frente',
+      fonteFisica: 'frente',
       obrigatorio: true,
     },
     {
-      campo: 'cliente-serigrafia',
-      fonteFisica: 'serigrafia',
+      campo: 'cliente-serigrafia-frente',
+      fonteFisica: 'frente',
       obrigatorio: true,
     },
     {
-      campo: 'potencia-serigrafia',
-      fonteFisica: 'serigrafia',
+      campo: 'potencia-serigrafia-frente',
+      fonteFisica: 'frente',
       obrigatorio: false,
     },
   ];
 
   const valoresEsperados: Record<string, string> = {
-    'serie-chumbada-1': '847233',
-    'serie-chumbada-2': '847233',
-    'serie-chumbada-3': '847233',
+    'serie-chumbada-topo': '847233',
+    'serie-chumbada-lateral-direita': '847233',
+    'serie-chumbada-traseira': '847233',
     'serie-placa': '847233',
     'patrimonio-placa': '251328',
-    'patrimonio-serigrafia': '251328',
-    'cliente-serigrafia': CLIENTE,
-    'potencia-serigrafia': '10 kVA',
+    'patrimonio-serigrafia-frente': '251328',
+    'cliente-serigrafia-frente': CLIENTE,
+    'potencia-serigrafia-frente': '10 kVA',
   };
 
   // Todas as leituras corretas com confianca 0.95, exceto a serie da placa
   // (lida como 847833, com confianca alta) e a potencia, que nao foi lida.
   const leituras: LeituraCampo[] = [
-    leitura('serie-chumbada-1', '847233'),
-    leitura('serie-chumbada-2', '847233'),
-    leitura('serie-chumbada-3', '847233'),
+    leitura('serie-chumbada-topo', '847233'),
+    leitura('serie-chumbada-lateral-direita', '847233'),
+    leitura('serie-chumbada-traseira', '847233'),
     leitura('serie-placa', '847833', 0.97),
     leitura('patrimonio-placa', '251328'),
-    leitura('patrimonio-serigrafia', '251328'),
-    leitura('cliente-serigrafia', CLIENTE),
+    leitura('patrimonio-serigrafia-frente', '251328'),
+    leitura('cliente-serigrafia-frente', CLIENTE),
   ];
 
   const resultado = conferir(checklist, valoresEsperados, leituras, {
@@ -639,18 +670,18 @@ describe('conferir — teste-ancora: peca de demo EPT-163-PI-676', () => {
       .map((campo) => campo.campo);
 
     expect(conformes).toEqual([
-      'serie-chumbada-1',
-      'serie-chumbada-2',
-      'serie-chumbada-3',
+      'serie-chumbada-topo',
+      'serie-chumbada-lateral-direita',
+      'serie-chumbada-traseira',
       'patrimonio-placa',
-      'patrimonio-serigrafia',
-      'cliente-serigrafia',
+      'patrimonio-serigrafia-frente',
+      'cliente-serigrafia-frente',
     ]);
   });
 
-  it('should marcar potencia-serigrafia como nao_conferivel sem impedir nada', () => {
+  it('should marcar potencia-serigrafia-frente como nao_conferivel sem impedir nada', () => {
     const potencia = resultado.campos.find(
-      (campo) => campo.campo === 'potencia-serigrafia',
+      (campo) => campo.campo === 'potencia-serigrafia-frente',
     );
 
     expect(potencia).toMatchObject({
@@ -739,13 +770,13 @@ describe('revisão: confiança zero e equivalência Unicode', () => {
     const resultado = conferir(
       [
         {
-          campo: 'cliente-serigrafia',
-          fonteFisica: 'serigrafia',
+          campo: 'cliente-serigrafia-frente',
+          fonteFisica: 'frente',
           obrigatorio: true,
         },
       ],
-      { 'cliente-serigrafia': nfc },
-      [{ campo: 'cliente-serigrafia', valorLido: nfd, confianca: 0.95 }],
+      { 'cliente-serigrafia-frente': nfc },
+      [{ campo: 'cliente-serigrafia-frente', valorLido: nfd, confianca: 0.95 }],
       { limiarConfianca: 0.8 },
     );
     expect(resultado.campos[0].veredito).toBe('conforme');

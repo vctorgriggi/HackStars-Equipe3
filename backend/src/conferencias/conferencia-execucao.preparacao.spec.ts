@@ -49,14 +49,14 @@ const CHECKPOINTS = [
 /** Checklist do EPT-163-PI-676 com as etapas do fluxo. */
 const CHECKLIST_DEMO = [
   {
-    campo: 'serie-chumbada-1',
-    fonteFisica: 'chumbado-1',
+    campo: 'serie-chumbada-topo',
+    fonteFisica: 'topo',
     obrigatorio: true,
     etapa: 'adesivacao',
   },
   {
-    campo: 'patrimonio-serigrafia',
-    fonteFisica: 'serigrafia',
+    campo: 'patrimonio-serigrafia-frente',
+    fonteFisica: 'frente',
     obrigatorio: true,
     etapa: 'serigrafia',
   },
@@ -367,8 +367,8 @@ describe('prepararExecucao — resolucao UNICA de ProjetoModelo (achado 12)', ()
 
     // Cumulativo: adesivacao + serigrafia; a placa ainda nem existe na peca.
     expect(contexto.checklist.map((item) => item.campo)).toEqual([
-      'serie-chumbada-1',
-      'patrimonio-serigrafia',
+      'serie-chumbada-topo',
+      'patrimonio-serigrafia-frente',
     ]);
     expect(contexto.checkpoint?.codigo).toBe('serigrafia');
   });
@@ -382,8 +382,8 @@ describe('executar — nada e gravado sem campo avaliado (achado A1)', () => {
   const SO_OPCIONAL = [
     projeto('SO-OPCIONAL', [
       {
-        campo: 'potencia-serigrafia',
-        fonteFisica: 'serigrafia',
+        campo: 'potencia-serigrafia-frente',
+        fonteFisica: 'frente',
         obrigatorio: false,
       },
     ]),
@@ -397,7 +397,7 @@ describe('executar — nada e gravado sem campo avaliado (achado A1)', () => {
         payloadQr: payloadQr(),
         leituras: [
           {
-            campo: 'potencia-serigrafia',
+            campo: 'potencia-serigrafia-frente',
             valorLido: '10 kVA',
             confianca: 0.99,
           },
@@ -421,7 +421,7 @@ describe('executar — nada e gravado sem campo avaliado (achado A1)', () => {
         payloadQr: payloadQr(),
         leituras: [
           {
-            campo: 'potencia-serigrafia',
+            campo: 'potencia-serigrafia-frente',
             valorLido: '10 kVA',
             confianca: 0.99,
           },
@@ -438,7 +438,7 @@ describe('executar — nada e gravado sem campo avaliado (achado A1)', () => {
 describe('executar — evidencia emprestada recusada antes da escrita (achado A2)', () => {
   function leituraComFoto(fotoEvidenciaId: string) {
     return {
-      campo: 'serie-chumbada-1',
+      campo: 'serie-chumbada-topo',
       valorLido: '847233',
       confianca: 0.99,
       fotoEvidenciaId,
@@ -504,7 +504,7 @@ describe('executar — evidencia emprestada recusada antes da escrita (achado A2
       payloadQr: payloadQr(),
       etapaCodigo: 'adesivacao',
       leituras: [
-        { campo: 'serie-chumbada-1', valorLido: '847233', confianca: 0.99 },
+        { campo: 'serie-chumbada-topo', valorLido: '847233', confianca: 0.99 },
       ],
     });
 
@@ -535,7 +535,11 @@ describe('executar — contexto preparado nao e resolvido duas vezes', () => {
         payloadQr: payloadQr(),
         etapaCodigo: 'adesivacao',
         leituras: [
-          { campo: 'serie-chumbada-1', valorLido: '847233', confianca: 0.99 },
+          {
+            campo: 'serie-chumbada-topo',
+            valorLido: '847233',
+            confianca: 0.99,
+          },
         ],
       },
       contexto,
@@ -558,7 +562,7 @@ describe('executar — contexto preparado nao e resolvido duas vezes', () => {
       payloadQr: payloadQr(),
       etapaCodigo: 'adesivacao',
       leituras: [
-        { campo: 'serie-chumbada-1', valorLido: '847233', confianca: 0.99 },
+        { campo: 'serie-chumbada-topo', valorLido: '847233', confianca: 0.99 },
       ],
     });
 

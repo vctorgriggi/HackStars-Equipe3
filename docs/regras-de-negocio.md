@@ -18,7 +18,7 @@ com prefixo fora dessa lista fica sem valor esperado.
 
 **R2 — `potencia-*` não tem origem, de propósito.** A potência não viaja no QR;
 o esperado dela viria do projeto estruturado, que não existe nesta rodada. Como
-`potencia-serigrafia` é opcional no seed, a engine simplesmente o omite do
+`potencia-serigrafia-frente` é opcional no seed, a engine simplesmente o omite do
 resultado (R15). Mesmo arquivo, comentário sobre `ORIGENS_DO_ESPERADO`.
 
 **R3 — `numeroSerie` é a chave de negócio única da peça.** Coluna `unique: true`
@@ -91,21 +91,47 @@ política de veredito e vive só na checklist — a extração não a enxerga
 (`AlvoChecklist` em `backend/src/extracao/extracao.service.ts` tem apenas
 `campo` e `fonteFisica`). O efeito está em R21 e R22.
 
-**R13 — Valores canônicos de `fonteFisica`: `placa`, `serigrafia`, `chumbado-1`,
-`chumbado-2`, `chumbado-3`, `geral`.** A fonte única em código é a união literal
+**R13 — `fonteFisica` é a VISTA da peça, e os valores canônicos são `base`,
+`topo`, `frente`, `traseira`, `lateral-esquerda`, `lateral-direita`, `placa`,
+`etiqueta`, `geral`.** As seis primeiras são as orientações do desenho técnico;
+`placa` e `etiqueta` são closes (zoom é um eixo separado de orientação: as duas
+ficam sobre uma face, mas o texto é pequeno demais para uma foto de vista
+inteira); `geral` é escape para foto de contexto. O eixo é a vista porque é o
+que uma câmera fixa enxerga em produção — ela vê *a lateral direita*, não "o
+chumbado 2" — e porque a numeração `chumbado-1/2/3` obrigava o operador a
+decidir, sem gabarito, qual posição era a "1". `serigrafia` e `chumbado-N` NÃO
+são fontes físicas: são processos de marcação (tinta, relevo) que aparecem em
+vistas, e vivem no NOME do campo. A fonte única em código é a união literal
 `FonteFisica` em `backend/src/extracao/ports/extractor.port.ts`;
 `backend/src/fotos-evidencia/fonte-fisica.enum.ts` deriva dela com `satisfies`, o
 que quebra a compilação se as duas listas divergirem. Grafia divergente quebra o
 pareamento campo ↔ evidência.
 
-**R14 — Checklist seedada da demo (`EPT-163-PI-676`): 8 campos, 7 obrigatórios.**
-`serie-chumbada-1..3` (fontes `chumbado-1..3`, etapa `adesivacao`),
-`serie-placa` e `patrimonio-placa` (fonte `placa`, etapa `fixacao-placa`),
-`patrimonio-serigrafia` e `cliente-serigrafia` (fonte `serigrafia`, etapa
-`serigrafia`) — todos obrigatórios; e `potencia-serigrafia` (fonte
-`serigrafia`, etapa `serigrafia`), opcional. Em
+**R13a — Uma vista pode declarar mais de um campo alvo, e isso é o ponto.** O
+topo da peça de demo tem série chumbada E patrimônio serigrafado. Antes, com
+`fonteFisica` por marcação, a foto da tampa entrava como `chumbado-1` e
+declarava um alvo só: o Textract lia o patrimônio em tinta preta (alto
+contraste) e o casava com o campo da série chumbada (relevo quase invisível) —
+número errado com confiança alta, medido em campo (docs/visao-ocr.md). Agora a
+mesma foto declara os dois alvos, a heurística sai do caso 1-para-1 e os dois
+campos ficam nulos → `nao_conferivel`. A leitura piorou de propósito: um
+`divergente` falso manda peça boa para retrabalho.
+
+**R14 — Checklist seedada da demo (`EPT-163-PI-676`): 9 campos, 8 obrigatórios.**
+`serie-chumbada-topo` (vista `topo`), `serie-chumbada-lateral-direita` (vista
+`lateral-direita`) e `serie-chumbada-traseira` (vista `traseira`), todos na
+etapa `adesivacao`; `patrimonio-serigrafia-topo` (vista `topo`),
+`patrimonio-serigrafia-frente` e `cliente-serigrafia-frente` (vista `frente`),
+etapa `serigrafia`; `serie-placa` e `patrimonio-placa` (vista `placa`, etapa
+`fixacao-placa`) — todos obrigatórios; e `potencia-serigrafia-frente` (vista
+`frente`, etapa `serigrafia`), opcional. Em
 `backend/src/database/seeds/relational/projeto-modelo/projeto-modelo-seed.service.ts`,
-com upsert por `codigo`.
+com upsert por `codigo`. O mapa vista × marcação foi MEDIDO nas fotos reais e
+está a confirmar contra o desenho (decisão em aberto no SPEC); o patrimônio
+serigrafado aparece em DUAS vistas porque é o que o desenho pede. Nenhum item
+na vista `base`: ela existe no vocabulário (será conferida quando houver
+captura), mas sem foto dela um campo obrigatório ali tornaria o critério 3 do
+SPEC inalcançável.
 
 ## 3. Vereditos
 
@@ -138,8 +164,8 @@ veredito geral, nunca o de um campo.
 **R17 — (a) Sem valor esperado.** Campo **opcional** some do resultado (não
 aparece na resposta nem vira `CampoConferido`). Campo **obrigatório** é
 registrado como `nao_conferivel` com motivo `sem-valor-esperado`. Exemplo: com o
-seed da demo, `potencia-serigrafia` (opcional, sem origem no QR por R2) não
-aparece na resposta do endpoint — o resultado sai com 7 campos, não 8.
+seed da demo, `potencia-serigrafia-frente` (opcional, sem origem no QR por R2) não
+aparece na resposta do endpoint — o resultado sai com 8 campos, não os 9 da checklist.
 
 **R18 — (b) Sem leitura ou leitura vazia.** `nao_conferivel`, motivo
 `sem-leitura`. Vale tanto para leitura ausente quanto para `valorLido` null,
@@ -430,25 +456,26 @@ formatos precisam vir com chave explícita (`projeto:`, `tpd:`, `codigoProjeto:`
 ## 8. A peça de demo
 
 **R52 — Os números da peça (desenho `EPT-163-PI-676`).** Etiqueta (QR) e série
-chumbada nas 3 posições: **847233**. Placa de identificação: **847833** — a peça
+chumbada nas 3 vistas em que está gravada (topo, lateral direita, traseira):
+**847233**. Placa de identificação: **847833** — a peça
 carrega esse defeito de fábrica, e é ele que a demo existe para pegar.
-Patrimônio, na placa e na serigrafia: **251328**. Cliente na serigrafia:
-Energisa Rondônia. Fontes: SPEC.md (problema e critério 2), `LEITURAS_DEMO` no
+Patrimônio, na placa e na serigrafia das vistas topo e frente: **251328**.
+Cliente na serigrafia da frente: Energisa Rondônia. Fontes: SPEC.md (problema e critério 2), `LEITURAS_DEMO` no
 mock e o teste-âncora em
 `backend/src/conferencias/engine/engine-conformidade.spec.ts`.
 
 **R53 — O resultado que o sistema DEVE dar.** `vereditoGeral` = **`divergente`**,
 com **`serie-placa` como o único campo divergente** (esperado `847233`, lido
-`847833`). As três séries chumbadas, os dois patrimônios e o cliente saem
-`conforme`. É o teste-âncora da engine e o critério de aceitação 2 do SPEC.
+`847833`). As três séries chumbadas, os três patrimônios (placa + as duas
+serigrafias) e o cliente saem `conforme`. É o teste-âncora da engine e o critério de aceitação 2 do SPEC.
 
-**R54 — Nessa execução, `potencia-serigrafia` não aparece.** É opcional e não
+**R54 — Nessa execução, `potencia-serigrafia-frente` não aparece.** É opcional e não
 tem valor esperado vindo do QR (R2), então a regra (a) o omite (R17): a resposta
-do endpoint traz **7** campos, não os 8 da checklist. O teste-âncora da engine
+do endpoint traz **8** campos, não os 9 da checklist. O teste-âncora da engine
 injeta um esperado `10 kVA` à mão e por isso ali o campo aparece como
 `nao_conferivel` — o endpoint real não faz isso.
 
-**R55 — Em modo mock, `cliente-serigrafia` só sai `conforme` se o QR trouxer o
+**R55 — Em modo mock, `cliente-serigrafia-frente` só sai `conforme` se o QR trouxer o
 mesmo texto de cliente.** O esperado vem do campo `cliente` do payload (R1) e o
 lido é a string fixa do mock, que é
 `143091 - Energisa Rondônia Distribuidora de Energia S.A` (`LEITURAS_DEMO`);
@@ -518,7 +545,7 @@ supera sinal.
 Depois do laço por campo, `detectarIncoerencias` (`engine/coerencia.ts`, pura)
 agrupa os campos que o QR mandou carregar o mesmo valor (normalizado) e reporta
 os grupos que leram coisas diferentes entre si — as 3 séries chumbadas mais a
-da placa, os dois patrimônios. Agrupar pelo esperado, e não por prefixo de nome
+da placa (4 irmãos), e os 2 patrimônios serigrafados mais o da placa (3). Agrupar pelo esperado, e não por prefixo de nome
 nem por declaração na checklist, faz modelo com 2 ou 4 chumbados funcionar sem
 tocar código. Ficam FORA da comparação: campo sem leitura (ausência nunca é
 discordância), leitura `conflitante` e leitura `trocada` — nenhuma das duas
@@ -540,7 +567,7 @@ confiança) para o humano decidir qual posição re-inspecionar.
 **R64 — Teto de 10 fotos por conferência, ids deduplicados.**
 `MAX_FOTOS_POR_CONFERENCIA = 10` vive no DTO (contrato explícito, não escondido
 no service) porque cada foto é UMA chamada paga de visão: 10 cobre a peça de
-demo (placa + serigrafia + 3 chumbados) com folga para refoto. Id repetido no
+demo (placa, etiqueta e as vistas com marcação) com folga para refoto. Id repetido no
 mesmo request é colapsado antes de qualquer leitura — pagar duas vezes pela
 mesma foto é queimar crédito por engano de digitação.
 

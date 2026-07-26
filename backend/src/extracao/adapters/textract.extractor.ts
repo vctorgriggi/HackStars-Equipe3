@@ -14,6 +14,14 @@ import {
   LeituraExtraida,
   ResultadoExtracao,
 } from '../ports/extractor.port';
+import { ehMarcacaoEmRelevo } from '../ports/marcacao';
+import {
+  CaixaNormalizada,
+  ImagemRecortavel,
+  abrirImagem,
+  areaDaIntersecao,
+  lerCaixa,
+} from './recorte';
 
 /**
  * Adapter Textract (OCR classico) — `DetectDocumentTextCommand`.
@@ -35,11 +43,26 @@ import {
  *    chutar do que entregar serie no lugar de patrimonio (a engine trata
  *    ausencia como `nao_conferivel`; um chute errado viraria `divergente` e
  *    mandaria peca boa para retrabalho);
+ *
+ *    ISSO GANHOU PESO com `fonteFisica` por VISTA: uma vista declara mais de
+ *    um alvo (o topo pede serie chumbada E patrimonio serigrafado), entao a
+ *    foto que so mostra um numero legivel cai fora do caso 1-para-1 e sai
+ *    nula. E o comportamento CORRETO, e e a correcao estrutural do bug medido
+ *    da tampa: com `chumbado-1` como fonte, a mesma foto tinha UM alvo so e o
+ *    patrimonio em tinta preta era casado com o campo da serie chumbada — o
+ *    numero errado entregue com confianca alta. Fixado em
+ *    textract.extractor.spec.ts ("vista com duas marcacoes");
  * 4. `cliente-*` -> linha com mais letras;
  * 5. `potencia-*` -> linha que contem 'kVA'.
  *
  * Prefixo desconhecido sai como leitura nula — o adapter nunca inventa campo
  * fora dos alvos recebidos.
+ *
+ * CORROBORACAO POR RECORTE (2026-07-25): depois da heuristica acima, toda
+ * leitura de marcacao em RELEVO (`ports/marcacao.ts`) e relida em dois
+ * recortes da propria regiao — resolucao nativa, sem filtro. O metodo
+ * `corroborarRelevos` conta o porque com os numeros que o motivaram; o teto de
+ * chamadas por foto continua fixo (3) e sem laco.
  *
  * ACHADOS LIVRES: toda linha `LINE` que a heuristica acima NAO consumiu como
  * leitura de alvo sai em `achadosLivres` (texto cru, confianca do bloco,
@@ -51,6 +74,31 @@ import {
 
 /** Distancia maxima (coordenadas normalizadas) entre numero e rotulo vizinho. */
 const DISTANCIA_MAXIMA_ROTULO = 0.25;
+
+/**
+ * Margens dos recortes de corroboracao, em fracao do lado do bounding box
+ * acrescentada de cada lado. Duas, medidas no spike de 2026-07-25: uma
+ * apertada (contexto minimo) e uma folgada (o dobro do enquadramento).
+ *
+ * Ver `recorte.ts` para o que foi medido e o que foi REPROVADO (ampliar,
+ * filtrar pixel, consenso entre motores diferentes).
+ */
+const MARGENS_DE_CORROBORACAO = [0.5, 1.5];
+
+/**
+ * TETO ABSOLUTO de chamadas de visao por foto (constraint 4 do SPEC): 1 da
+ * foto inteira + 2 recortes. E teto, nao meta — leitura que nao couber no
+ * orcamento sai `nao-confirmada`, que e seguro (nunca vira `conforme` a mais).
+ *
+ * Consequencia deliberada: UMA leitura em relevo por foto e corroborada, na
+ * ordem da checklist. Na peca da TRAEL cada vista tem uma serie chumbada so,
+ * entao o teto nao aperta nada hoje; se um dia apertar, a resposta certa e
+ * mais fotos (uma por marcacao), nao mais chamadas por foto.
+ */
+const MAXIMO_DE_CHAMADAS_POR_FOTO = 1 + MARGENS_DE_CORROBORACAO.length;
+
+/** Valor que faz sentido corroborar por recorte: identificador numerico. */
+const PADRAO_VALOR_CORROBORAVEL = /^\d{6,}$/;
 
 /** Sequencia de digitos considerada candidata a serie/patrimonio. */
 const PADRAO_NUMERO = /\d{6,}/g;
@@ -273,9 +321,13 @@ function resolverNumericos(
     );
   }
 
-  // Passo 2 — sem rotulo. Aceita apenas o caso 1-para-1 (tipico da foto de
-  // chumbado, que so tem o numero gravado). Qualquer outra combinacao fica
-  // nula: chutar qual numero e serie e qual e patrimonio nao e opcao.
+  // Passo 2 — sem rotulo. Aceita apenas o caso 1-para-1: UM numero livre para
+  // UM campo pendente (a vista que carrega uma marcacao numerica so, como a
+  // traseira). Qualquer outra combinacao fica nula: chutar qual numero e serie
+  // e qual e patrimonio nao e opcao. Numa vista com dois alvos (topo: serie
+  // chumbada + patrimonio serigrafado) um unico numero legivel NAO resolve
+  // nada — os dois campos saem nulos e viram `nao_conferivel`, que e o
+  // veredito honesto para "vi uma marcacao das duas e nao sei qual".
   const livres = candidatos.filter(
     (candidato) => !usados.has(candidato) && candidato.familia === null,
   );
@@ -411,6 +463,63 @@ function resolverTextuais(
   }
 }
 
+/**
+ * Valor lido NA REGIAO indicada por `ancora`, dentro dos blocos de um recorte.
+ * Funcao PURA (mesmo espirito de `interpretarBlocos`): e a regra que decide se
+ * um recorte corroborou a leitura, e precisa ser exercitavel sem AWS.
+ *
+ * ANCORAGEM, e nao "algum numero do recorte": o recorte pode conter marcacoes
+ * vizinhas (o topo da peca tem serie chumbada E patrimonio serigrafado), e
+ * aceitar qualquer numero deixaria o vizinho corroborar a leitura errada —
+ * o mesmo bug de troca de campo que a heuristica principal ja evita.
+ * Vence a linha numerica de MAIOR sobreposicao com a ancora; sem sobreposicao,
+ * nenhuma.
+ */
+export function lerValorAncorado(
+  blocos: Block[],
+  ancora: CaixaNormalizada,
+): { valor: string; confianca: number | null } | null {
+  let melhor: {
+    valor: string;
+    confianca: number | null;
+    sobreposicao: number;
+  } | null = null;
+
+  for (const linha of lerLinhas(blocos)) {
+    const numeros = linha.texto.match(new RegExp(PADRAO_NUMERO)) ?? [];
+    if (numeros.length !== 1 || linha.regiao === null) {
+      continue;
+    }
+
+    const caixa = JSON.parse(linha.regiao) as CaixaNormalizada;
+    const sobreposicao = areaDaIntersecao(caixa, ancora);
+    if (sobreposicao <= 0) {
+      continue;
+    }
+
+    if (melhor === null || sobreposicao > melhor.sobreposicao) {
+      melhor = { valor: numeros[0], confianca: linha.confianca, sobreposicao };
+    }
+  }
+
+  return melhor === null
+    ? null
+    : { valor: melhor.valor, confianca: melhor.confianca };
+}
+
+/** Menor confianca do conjunto; `null` (sem lastro) contamina o resultado. */
+export function menorConfianca(valores: (number | null)[]): number | null {
+  return valores.some((valor) => valor === null)
+    ? null
+    : Math.min(...(valores as number[]));
+}
+
+/**
+ * Recorte menor que isto nao vale a chamada: OCR em algumas dezenas de pixels
+ * nao le, e a chamada e paga do mesmo jeito (constraint 4 do SPEC).
+ */
+const MINIMO_PX_DO_RECORTE = 32;
+
 export class TextractExtractor extends ExtractorPort {
   readonly nome = 'textract';
 
@@ -431,15 +540,10 @@ export class TextractExtractor extends ExtractorPort {
       return { leituras: [], achadosLivres: [] };
     }
 
-    // UMA chamada por foto. Sem retry proprio: o retry do SDK ja cobre falha
-    // transitoria e reprocessar imagem em laco e exatamente o risco de custo
-    // que a constraint 4 do SPEC proibe.
-    const resposta = await this.cliente.send(
-      new DetectDocumentTextCommand({
-        Document: { Bytes: new Uint8Array(fonte.imagem) },
-      }),
-    );
-
+    // Chamada 1 de no maximo 3 (teto em MAXIMO_DE_CHAMADAS_POR_FOTO): a foto
+    // inteira. Sem retry proprio — o retry do SDK ja cobre falha transitoria e
+    // reprocessar imagem em laco e o risco de custo que a constraint 4 proibe.
+    const resposta = await this.detectar(fonte.imagem);
     const resultado = interpretarBlocos(resposta.Blocks ?? [], alvos, fonte);
 
     const semLeitura = resultado.leituras
@@ -452,6 +556,209 @@ export class TextractExtractor extends ExtractorPort {
       );
     }
 
-    return resultado;
+    return {
+      ...resultado,
+      leituras: await this.corroborarRelevos(fonte, resultado.leituras),
+    };
   }
+
+  private detectar(imagem: Buffer) {
+    return this.cliente.send(
+      new DetectDocumentTextCommand({
+        Document: { Bytes: new Uint8Array(imagem) },
+      }),
+    );
+  }
+
+  /**
+   * CONSENSO DE RECORTES para marcacao em relevo — o coracao da mudanca de
+   * 2026-07-25.
+   *
+   * O problema medido: na serie CHUMBADA (relevo da cor do tanque) a confianca
+   * do Textract mede ENQUADRAMENTO, nao correcao. Mesmo valor correto, mesma
+   * foto, so mudando a margem: 37,3% a 95,5%. E `847233 @ 84,3%` (certo) contra
+   * `847833 @ 84,6%` (errado) — 0,3 ponto separando verdades opostas. NENHUM
+   * limiar corta essa faixa, entao a saida nao e um numero melhor: e uma
+   * segunda evidencia.
+   *
+   * O que este metodo faz por leitura em relevo: recorta a MESMA regiao do
+   * buffer ORIGINAL com duas margens, na resolucao nativa e sem filtro de
+   * pixel, e rele. Aceita o valor so se os tres textos coincidirem; a confianca
+   * final e a MENOR das tres (a mais pessimista das evidencias).
+   *
+   * Os dois desfechos possiveis quando nao ha consenso, e por que sao
+   * diferentes:
+   * - RECORTE LEU OUTRO VALOR -> `valorLido` vai a NULO. Ha contradicao
+   *   explicita, e uma leitura contradita nao pode nem sustentar `conforme`
+   *   (era o caminho do falso OK). Nunca se escolhe uma vencedora — voto nao
+   *   aprova peca.
+   * - RECORTE NAO LEU NADA NAQUELA REGIAO (ou nem houve recorte: lib ausente,
+   *   env `EXTRACAO_RECORTE=off`, foto sem bounding box, orcamento gasto) ->
+   *   valor PRESERVADO com `corroboracao: 'nao-confirmada'`. Nao ha
+   *   contradicao, so falta de segunda evidencia: rebaixar isso a nulo faria
+   *   uma falha de infraestrutura zerar as leituras boas da peca (e derrubar o
+   *   critorio 3 do SPEC, "conjunto conforme"). A corroboracao NUNCA promove
+   *   nada — quando ela nao roda, o sistema volta exatamente ao que era antes,
+   *   com a diferenca de que a engine se recusa a ACUSAR sem ela
+   *   (`engine/corroboracao.ts`).
+   */
+  private async corroborarRelevos(
+    fonte: FonteImagem,
+    leituras: LeituraExtraida[],
+  ): Promise<LeituraExtraida[]> {
+    if (!leituras.some(exigeCorroboracao)) {
+      return leituras;
+    }
+
+    const imagem = await abrirImagem(fonte.imagem);
+    let orcamento = MAXIMO_DE_CHAMADAS_POR_FOTO - 1;
+    const saida: LeituraExtraida[] = [];
+
+    for (const leitura of leituras) {
+      if (!exigeCorroboracao(leitura)) {
+        saida.push(leitura);
+        continue;
+      }
+
+      const caixa = lerCaixa(leitura.regiaoLeitura);
+
+      if (imagem === null) {
+        saida.push(
+          this.semCorroboracao(fonte, leitura, 'recorte-indisponivel'),
+        );
+        continue;
+      }
+      if (caixa === null) {
+        saida.push(
+          this.semCorroboracao(fonte, leitura, 'leitura-sem-bounding-box'),
+        );
+        continue;
+      }
+      if (!PADRAO_VALOR_CORROBORAVEL.test((leitura.valorLido ?? '').trim())) {
+        saida.push(this.semCorroboracao(fonte, leitura, 'valor-nao-numerico'));
+        continue;
+      }
+      if (orcamento < MARGENS_DE_CORROBORACAO.length) {
+        saida.push(
+          this.semCorroboracao(
+            fonte,
+            leitura,
+            'orcamento-de-chamadas-esgotado',
+          ),
+        );
+        continue;
+      }
+
+      orcamento -= MARGENS_DE_CORROBORACAO.length;
+      saida.push(await this.corroborar(fonte, leitura, imagem, caixa));
+    }
+
+    return saida;
+  }
+
+  /** Marca a leitura como nao corroborada e diz alto por que. */
+  private semCorroboracao(
+    fonte: FonteImagem,
+    leitura: LeituraExtraida,
+    motivo: string,
+  ): LeituraExtraida {
+    this.logger.warn(
+      `leitura-nao-corroborada: ${leitura.campo} em ${fonte.fonteFisica} ` +
+        `(${motivo}); a engine nao vai ACUSAR este campo com esta leitura`,
+    );
+
+    return { ...leitura, corroboracao: 'nao-confirmada' };
+  }
+
+  private async corroborar(
+    fonte: FonteImagem,
+    leitura: LeituraExtraida,
+    imagem: ImagemRecortavel,
+    caixa: CaixaNormalizada,
+  ): Promise<LeituraExtraida> {
+    const esperado = normalizar((leitura.valorLido ?? '').trim());
+    const confiancas: (number | null)[] = [leitura.confianca];
+
+    for (const margem of MARGENS_DE_CORROBORACAO) {
+      const recorte = await imagem.recortar(caixa, margem);
+      if (
+        recorte === null ||
+        recorte.retangulo.width < MINIMO_PX_DO_RECORTE ||
+        recorte.retangulo.height < MINIMO_PX_DO_RECORTE
+      ) {
+        this.logger.warn(
+          `leitura-nao-corroborada: ${leitura.campo} em ${fonte.fonteFisica} ` +
+            `(recorte de margem ${margem} nao produzido ou pequeno demais)`,
+        );
+        return { ...leitura, corroboracao: 'nao-confirmada' };
+      }
+
+      this.logger.debug(
+        `chamada-de-visao: recorte de ${leitura.campo} (margem ${margem}, ` +
+          `${recorte.retangulo.width}x${recorte.retangulo.height} px) na foto ` +
+          `${fonte.fotoEvidenciaId}`,
+      );
+
+      let ancorado: { valor: string; confianca: number | null } | null;
+      try {
+        const resposta = await this.detectar(recorte.imagem);
+        ancorado = lerValorAncorado(
+          resposta.Blocks ?? [],
+          recorte.caixaNoRecorte,
+        );
+      } catch (erro) {
+        // Falha da releitura NAO derruba a leitura original: sem contradicao,
+        // so falta de corroboracao.
+        this.logger.warn(
+          `leitura-nao-corroborada: ${leitura.campo} em ${fonte.fonteFisica} ` +
+            `(recorte de margem ${margem} falhou: ` +
+            `${erro instanceof Error ? erro.message : String(erro)})`,
+        );
+        return { ...leitura, corroboracao: 'nao-confirmada' };
+      }
+
+      if (ancorado === null) {
+        this.logger.warn(
+          `leitura-nao-corroborada: ${leitura.campo} em ${fonte.fonteFisica} ` +
+            `(recorte de margem ${margem} nao leu nada na regiao)`,
+        );
+        return { ...leitura, corroboracao: 'nao-confirmada' };
+      }
+
+      if (normalizar(ancorado.valor) !== esperado) {
+        this.logger.warn(
+          `recortes-discordam: ${leitura.campo} em ${fonte.fonteFisica} leu ` +
+            `"${leitura.valorLido}" na foto inteira e "${ancorado.valor}" no ` +
+            `recorte de margem ${margem}; leitura descartada ` +
+            `(nao_conferivel, nunca uma vencedora eleita)`,
+        );
+        return {
+          ...leitura,
+          valorLido: null,
+          confianca: null,
+          regiaoLeitura: null,
+          corroboracao: 'nao-confirmada',
+        };
+      }
+
+      confiancas.push(ancorado.confianca);
+    }
+
+    return {
+      ...leitura,
+      // A MENOR das tres: a confianca que sobra e a da pior evidencia, nunca a
+      // media (media inventa lastro que nenhuma leitura teve).
+      confianca: menorConfianca(confiancas),
+      corroboracao: 'confirmada',
+    };
+  }
+}
+
+/** Leitura que a politica manda corroborar: marcacao em relevo COM valor. */
+function exigeCorroboracao(leitura: LeituraExtraida): boolean {
+  return (
+    ehMarcacaoEmRelevo(leitura.campo) &&
+    leitura.valorLido !== null &&
+    leitura.valorLido.trim().length > 0
+  );
 }

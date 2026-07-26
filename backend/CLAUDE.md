@@ -39,10 +39,16 @@ depois de gerar, é só cosmético do Swagger.
 
 Não renomeie por causa disso: códigos de erro da API
 (`campo-conferido-imutavel`, `foto-evidencia-inexistente`,
-`projeto-modelo-indeterminado`, …), valores de `fonteFisica`
-(`placa`, `serigrafia`, `chumbado-1..3`, `geral`) e códigos de Checkpoint
-(`adesivacao`, `serigrafia`, `oleo-conferencia`, `fixacao-placa`) são contrato
-consumido por docs, collection e front.
+`projeto-modelo-indeterminado`, …), valores de `fonteFisica` — hoje as VISTAS
+da peça: `base`, `topo`, `frente`, `traseira`, `lateral-esquerda`,
+`lateral-direita`, mais os closes `placa` e `etiqueta` e o escape `geral` — e
+códigos de Checkpoint (`adesivacao`, `serigrafia`, `oleo-conferencia`,
+`fixacao-placa`) são contrato consumido por docs, collection e front.
+
+Atenção: `serigrafia` é código de Checkpoint E aparece dentro de nome de campo
+(`patrimonio-serigrafia-frente`), mas NÃO é mais valor de `fonteFisica` —
+serigrafia é processo de marcação, não vista. Rename cego pelo texto
+`serigrafia` quebra uma das três coisas.
 
 ## Migrations
 

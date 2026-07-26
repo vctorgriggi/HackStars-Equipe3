@@ -5,7 +5,7 @@ import { ItemChecklist, LeituraCampo } from './engine/tipos';
 // Regressao do caso medido em campo (2026-07-25): foto da tampa de cima
 // mostrando o patrimonio SERIGRAFADO (tinta preta) e a serie CHUMBADA
 // (relevo da cor do tanque). O Textract enxergou so a tinta e casou o
-// patrimonio com o campo `serie-chumbada-1` — que virava `divergente`,
+// patrimonio com o campo `serie-chumbada-topo` — que virava `divergente`,
 // acusando uma peca correta.
 
 const LIMIAR = 0.8;
@@ -16,10 +16,10 @@ const PATRIMONIO = '251328';
 const SERIE_DA_PLACA_DEFEITUOSA = '847833';
 
 const ESPERADOS: Record<string, string> = {
-  'serie-chumbada-1': SERIE,
+  'serie-chumbada-topo': SERIE,
   'serie-placa': SERIE,
   'patrimonio-placa': PATRIMONIO,
-  'patrimonio-serigrafia': PATRIMONIO,
+  'patrimonio-serigrafia-frente': PATRIMONIO,
 };
 
 function leitura(
@@ -37,7 +37,7 @@ function item(campo: string, fonteFisica: string): ItemChecklist {
 describe('marcarLeiturasTrocadas', () => {
   it('should marcar a leitura que traz o esperado de OUTRO campo', () => {
     const [marcada] = marcarLeiturasTrocadas(
-      [leitura('serie-chumbada-1', PATRIMONIO)],
+      [leitura('serie-chumbada-topo', PATRIMONIO)],
       ESPERADOS,
       LIMIAR,
     );
@@ -50,7 +50,7 @@ describe('marcarLeiturasTrocadas', () => {
     // qual — e e essa informacao que separa "a foto pegou a marcacao vizinha"
     // (reenquadrar) de "a peca foi gravada com o numero errado" (NC real).
     const [marcada] = marcarLeiturasTrocadas(
-      [leitura('serie-chumbada-1', PATRIMONIO)],
+      [leitura('serie-chumbada-topo', PATRIMONIO)],
       ESPERADOS,
       LIMIAR,
     );
@@ -60,7 +60,7 @@ describe('marcarLeiturasTrocadas', () => {
 
   it('should deixar intacta a leitura que bate com o proprio campo', () => {
     const [marcada] = marcarLeiturasTrocadas(
-      [leitura('serie-chumbada-1', SERIE)],
+      [leitura('serie-chumbada-topo', SERIE)],
       ESPERADOS,
       LIMIAR,
     );
@@ -83,7 +83,7 @@ describe('marcarLeiturasTrocadas', () => {
 
   it('should ignorar leitura vazia ou nula', () => {
     const marcadas = marcarLeiturasTrocadas(
-      [leitura('serie-chumbada-1', null), leitura('serie-placa', '   ')],
+      [leitura('serie-chumbada-topo', null), leitura('serie-placa', '   ')],
       ESPERADOS,
       LIMIAR,
     );
@@ -95,8 +95,8 @@ describe('marcarLeiturasTrocadas', () => {
     // Peca cujo QR traz o mesmo numero nos dois campos: a leitura bate com o
     // proprio campo e a guarda nao tem o que desconfiar.
     const [marcada] = marcarLeiturasTrocadas(
-      [leitura('serie-chumbada-1', SERIE)],
-      { 'serie-chumbada-1': SERIE, 'patrimonio-placa': SERIE },
+      [leitura('serie-chumbada-topo', SERIE)],
+      { 'serie-chumbada-topo': SERIE, 'patrimonio-placa': SERIE },
       LIMIAR,
     );
 
@@ -108,7 +108,7 @@ describe('marcarLeiturasTrocadas', () => {
     // o enquadramento — leitura sem lastro nao afirma nada sobre campo nenhum,
     // nem sobre o vizinho.
     const [marcada] = marcarLeiturasTrocadas(
-      [leitura('serie-chumbada-1', PATRIMONIO, 0.35)],
+      [leitura('serie-chumbada-topo', PATRIMONIO, 0.35)],
       ESPERADOS,
       LIMIAR,
     );
@@ -118,7 +118,13 @@ describe('marcarLeiturasTrocadas', () => {
 
   it('should NAO marcar leitura sem confianca informada', () => {
     const [marcada] = marcarLeiturasTrocadas(
-      [{ campo: 'serie-chumbada-1', valorLido: PATRIMONIO, confianca: null }],
+      [
+        {
+          campo: 'serie-chumbada-topo',
+          valorLido: PATRIMONIO,
+          confianca: null,
+        },
+      ],
       ESPERADOS,
       LIMIAR,
     );
@@ -128,11 +134,11 @@ describe('marcarLeiturasTrocadas', () => {
 });
 
 describe('engine com leitura trocada', () => {
-  const checklist = [item('serie-chumbada-1', 'chumbado-1')];
+  const checklist = [item('serie-chumbada-topo', 'topo')];
 
   it('should virar nao_conferivel com motivo leitura-de-outro-campo', () => {
     const leituras = marcarLeiturasTrocadas(
-      [leitura('serie-chumbada-1', PATRIMONIO)],
+      [leitura('serie-chumbada-topo', PATRIMONIO)],
       ESPERADOS,
       LIMIAR,
     );
@@ -146,7 +152,7 @@ describe('engine com leitura trocada', () => {
 
   it('should levar ate o resultado o campo com que a leitura casou', () => {
     const leituras = marcarLeiturasTrocadas(
-      [leitura('serie-chumbada-1', PATRIMONIO)],
+      [leitura('serie-chumbada-topo', PATRIMONIO)],
       ESPERADOS,
       LIMIAR,
     );
@@ -160,7 +166,7 @@ describe('engine com leitura trocada', () => {
   it('should NUNCA promover a conforme por causa da guarda', () => {
     // A guarda so desconfia: nenhum caminho dela produz `conforme`.
     const leituras = marcarLeiturasTrocadas(
-      [leitura('serie-chumbada-1', PATRIMONIO)],
+      [leitura('serie-chumbada-topo', PATRIMONIO)],
       ESPERADOS,
       LIMIAR,
     );
@@ -191,7 +197,7 @@ describe('engine com leitura trocada', () => {
     // tem de apontar a causa REAL (a foto), senao o operador vai reenquadrar
     // uma marcacao que esta certa.
     const leituras = marcarLeiturasTrocadas(
-      [leitura('serie-chumbada-1', PATRIMONIO, 0.35)],
+      [leitura('serie-chumbada-topo', PATRIMONIO, 0.35)],
       ESPERADOS,
       LIMIAR,
     );

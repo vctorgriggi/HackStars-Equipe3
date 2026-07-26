@@ -18,7 +18,10 @@ import { Transformador } from '../transformadores/domain/transformador';
 
 import { PayloadEtiqueta } from '../transformadores/qr/payload-etiqueta';
 
+import { ehMarcacaoEmRelevo } from '../extracao/ports/marcacao';
+
 import { conferir, normalizar, temLastro } from './engine/engine-conformidade';
+import { temConteudo } from './engine/normalizacao';
 import {
   IncoerenciaEntreCampos,
   ItemChecklist,
@@ -170,8 +173,12 @@ export function filtrarChecklistPorEtapa(
 
 /**
  * De onde sai o valor esperado de cada campo do checklist, por PREFIXO do nome
- * do campo (o sufixo diz a fonte fisica: '-placa', '-serigrafia',
- * '-chumbada-1'...). Nesta rodada o esperado vem so do QR da etiqueta.
+ * do campo. O prefixo diz O QUE o campo carrega ('serie-', 'patrimonio-',
+ * 'cliente-'); o resto do nome diz como foi gravado e em qual VISTA da peca
+ * esta ('serie-chumbada-topo', 'patrimonio-serigrafia-frente', 'serie-placa').
+ * Trocar o eixo de `fonteFisica` para vistas nao mexe aqui de proposito: o
+ * casamento e por prefixo, entao nome novo de posicao continua achando sua
+ * origem. Nesta rodada o esperado vem so do QR da etiqueta.
  *
  * 'potencia-*' NAO aparece de proposito: a potencia nao esta no QR — o
  * esperado virá do projeto estruturado no futuro. Sem valor esperado, a engine
@@ -328,15 +335,18 @@ export class ConferenciaExecucaoService {
     // e rodá-la antes é o que permite recusar um resultado vazio sem deixar
     // Transformador órfão (mesma promessa do achado 8, agora para o AVALIADO).
     const limiarConfianca = dto.limiarConfianca ?? LIMIAR_CONFIANCA_PADRAO;
-    const leituras = dedupeLeituras(
-      dto.leituras.map((leitura) => ({
-        campo: leitura.campo,
-        valorLido: leitura.valorLido ?? null,
-        confianca: leitura.confianca ?? null,
-        regiaoLeitura: leitura.regiaoLeitura ?? null,
-        fotoEvidenciaId: leitura.fotoEvidenciaId ?? null,
-      })),
-      limiarConfianca,
+    const leituras = exigirCorroboracaoDeRelevo(
+      dedupeLeituras(
+        dto.leituras.map((leitura) => ({
+          campo: leitura.campo,
+          valorLido: leitura.valorLido ?? null,
+          confianca: leitura.confianca ?? null,
+          regiaoLeitura: leitura.regiaoLeitura ?? null,
+          fotoEvidenciaId: leitura.fotoEvidenciaId ?? null,
+          corroboracao: leitura.corroboracao,
+        })),
+        limiarConfianca,
+      ),
     );
 
     const valoresEsperados = montarValoresEsperados(checklist, payload);
@@ -673,6 +683,42 @@ export function marcarLeiturasTrocadas(
     return casado === undefined
       ? leitura
       : { ...leitura, trocado: true, campoDaLeitura: casado[0] };
+  });
+}
+
+/**
+ * REGRA "ANTES DE ACUSAR, CONFIRME" aplicada na PORTA DE ENTRADA: toda leitura
+ * de marcação em relevo que chega sem corroboração é tratada como
+ * `nao-confirmada`.
+ *
+ * Por que aqui e não só no adapter: o adapter de visão sabe corroborar, mas ele
+ * não é a única porta por onde leitura entra. O endpoint de leituras digitadas
+ * (`POST /conferencia/executar`, usado pela `/demo` e pelos testes) e o driver
+ * `mock` produzem leituras sem segunda evidência nenhuma. Sem esta linha, a
+ * mesma peça seria ACUSADA por uma porta e não pela outra — e a porta frouxa
+ * seria justamente a que ninguém mede.
+ *
+ * Fail-safe nos dois sentidos: marcar a mais nunca cria `conforme` (só troca
+ * `divergente` por `nao_conferivel`), e leitura VAZIA fica de fora de propósito
+ * — campo que ninguém leu não acusa nada, e o motivo honesto dele continua
+ * sendo `sem-leitura`, não "não corroborada".
+ *
+ * A derivação "isto é relevo" vem do NOME do campo (`ehMarcacaoEmRelevo`), com
+ * a limitação registrada lá: a checklist ainda não declara tipo de marcação.
+ */
+export function exigirCorroboracaoDeRelevo(
+  leituras: LeituraCampo[],
+): LeituraCampo[] {
+  return leituras.map((leitura) => {
+    if (
+      leitura.corroboracao !== undefined ||
+      !temConteudo(leitura.valorLido) ||
+      !ehMarcacaoEmRelevo(leitura.campo)
+    ) {
+      return leitura;
+    }
+
+    return { ...leitura, corroboracao: 'nao-confirmada' };
   });
 }
 

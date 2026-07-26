@@ -8,6 +8,7 @@ import {
 
   ArrayNotEmpty,
   IsArray,
+  IsIn,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -75,6 +76,28 @@ export class LeituraCampoDto {
   @IsOptional()
   @IsString()
   fotoEvidenciaId?: string | null;
+
+  /**
+   * Canal pelo qual a corroboracao por recorte (feita no adapter de visao)
+   * chega a engine: o fluxo com fotos monta ESTE dto a partir de
+   * `LeituraExtraida`. Sem o campo aqui, a segunda evidencia se perderia no
+   * caminho e a leitura chegaria a engine como se ninguem a tivesse conferido.
+   *
+   * FORJAVEL pelo cliente HTTP, como `confianca` (gap 10 do CLAUDE.md) — e
+   * inofensivo na direcao que importa: `confirmada` no maximo LIBERA um
+   * `divergente` (acusacao), nunca produz `conforme`. Alem disso, campo de
+   * relevo que chega SEM este dado e tratado como `nao-confirmada` pela
+   * execucao, entao omitir tambem nao afrouxa nada.
+   */
+  @ApiProperty({
+    required: false,
+    enum: ['confirmada', 'nao-confirmada'],
+    description:
+      'Corroboracao da leitura por releitura de recorte (so marcacao em relevo)',
+  })
+  @IsOptional()
+  @IsIn(['confirmada', 'nao-confirmada'])
+  corroboracao?: 'confirmada' | 'nao-confirmada';
 }
 
 export class ExecutarConferenciaDto {

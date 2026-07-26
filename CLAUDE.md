@@ -150,16 +150,16 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
 - SSL do banco é condicional a `DATABASE_SSL_ENABLED` — RDS exige TLS, o
   Postgres local do docker não suporta; fixar um dos dois quebra o outro.
 - Spike T2.1 executável: `npx ts-node -r tsconfig-paths/register
-  scripts/spike-extracao.ts <dir-fotos>` (fotos nomeadas pela fonte:
-  placa.jpg, chumbado-1.jpg…). Sem credencial, falha com mensagem apontando
-  docs/aws.md.
+  scripts/spike-extracao.ts <dir-fotos>` (fotos nomeadas pela fonte, hoje a
+  vista: topo.jpg, frente.jpg, lateral-direita.jpg, placa.jpg…). Sem
+  credencial, falha com mensagem apontando docs/aws.md.
 - Fonte única em código dos valores de `fonteFisica`: união literal
   `FonteFisica` em extracao/ports/extractor.port.ts; fotos-evidencia deriva
   dela com `satisfies` (divergência quebra a compilação).
 - Nenhuma chamada de visão fora de ação explícita do operador — créditos AWS
   são finitos (SPEC, constraint 4); sem reprocessamento em loop.
-- Leitura retornada pelo adapter sempre carrega: valor, confiança, tipo da
-  fonte física (placa, serigrafia, chumbado 1..3), referência à foto e, quando
+- Leitura retornada pelo adapter sempre carrega: valor, confiança, vista de
+  origem (`fonteFisica`: topo, frente, placa…), referência à foto e, quando
   o serviço fornecer, o bounding box da leitura (`regiaoLeitura`) — dado
   barato agora que habilita a conferência posicional futura.
 - `extrair` devolve `ResultadoExtracao { leituras, achadosLivres }`: dois canais
@@ -193,9 +193,32 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
   bordas (visão, S3, UI) verificam-se manualmente com roteiro do PLAN.
 - Segredos: credenciais AWS só em `backend/.env` (fora do git); nada de
   segredo em variável `NEXT_PUBLIC_*` — todo acesso AWS passa pela API.
-- Valores canônicos de `fonteFisica`: `placa`, `serigrafia`, `chumbado-1..3`.
+- **`fonteFisica` é a VISTA da peça, não a marcação** (mudança de eixo,
+  2026-07-25). Valores canônicos: `base`, `topo`, `frente`, `traseira`,
+  `lateral-esquerda`, `lateral-direita` (as 6 orientações do desenho), mais
+  `placa` e `etiqueta` (closes: **zoom é eixo separado de orientação** — as
+  duas ficam sobre uma face, mas o texto é pequeno e uma foto ampla não as lê)
+  e `geral` (escape, foto de contexto sem vista definida). Por quê: é o que a
+  câmera fixa enxerga em produção (uma câmera vê *a lateral direita*, nunca "o
+  chumbado 2"), é como o desenho técnico se organiza, e elimina a numeração
+  arbitrária `chumbado-1/2/3` — que obrigava o operador a decidir qual posição
+  era a "1", sem gabarito. Efeito colateral desejado: uma vista declara MAIS DE
+  UM alvo (o topo tem série chumbada e patrimônio serigrafado), então a
+  ambiguidade que antes ficava escondida (foto de `chumbado-1` com um alvo só)
+  agora é explícita e vira `nao_conferivel`. `serigrafia` e `chumbado-N` saíram
+  do vocabulário: são PROCESSOS de marcação (tinta, relevo) que aparecem em
+  vistas — eles seguem vivos no NOME do campo (`serie-chumbada-topo`,
+  `patrimonio-serigrafia-frente`).
   A fonte única é a checklist do ProjetoModelo; FotoEvidencia e extração usam
   as mesmas strings (grafia divergente quebra o pareamento campo ↔ evidência).
+- Nome de campo distingue posição pela VISTA, nunca por número:
+  `serie-chumbada-topo`, `serie-chumbada-lateral-direita`,
+  `serie-chumbada-traseira`, `patrimonio-serigrafia-topo`,
+  `patrimonio-serigrafia-frente`, `cliente-serigrafia-frente`,
+  `potencia-serigrafia-frente`, `serie-placa`, `patrimonio-placa`. O PREFIXO
+  (`serie-`, `patrimonio-`, `cliente-`) é contrato: é por ele que
+  `ORIGENS_DO_ESPERADO` acha o valor esperado no QR (`potencia-*` fica de fora
+  de propósito — a potência não vem do QR).
 - Identificadores estáveis: gates e regras casam por `codigo` (Checkpoint,
   ProjetoModelo), nunca por nome exibido nem por `ordem` — nome e ordem mudam.
 - Boilerplate traz auth/i18n que não usamos nesta rodada: não gastar tempo

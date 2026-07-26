@@ -45,24 +45,50 @@ import { ItemChecklist } from './engine/tipos';
 // ANTES de qualquer chamada paga de visao, e a evidencia usada tem de acabar
 // amarrada a conferencia que ela lastreia.
 
-/** Checklist do desenho da peca de demo (EPT-163-PI-676), como no seed. */
+/**
+ * Checklist do desenho da peca de demo (EPT-163-PI-676), como no seed:
+ * `fonteFisica` e a VISTA da peca, e o topo carrega DUAS marcacoes (serie
+ * chumbada e patrimonio serigrafado).
+ */
 const CHECKLIST: ItemChecklist[] = [
-  { campo: 'serie-chumbada-1', fonteFisica: 'chumbado-1', obrigatorio: true },
-  { campo: 'serie-chumbada-2', fonteFisica: 'chumbado-2', obrigatorio: true },
-  { campo: 'serie-chumbada-3', fonteFisica: 'chumbado-3', obrigatorio: true },
-  { campo: 'serie-placa', fonteFisica: 'placa', obrigatorio: true },
-  { campo: 'patrimonio-placa', fonteFisica: 'placa', obrigatorio: true },
+  { campo: 'serie-chumbada-topo', fonteFisica: 'topo', obrigatorio: true },
   {
-    campo: 'patrimonio-serigrafia',
-    fonteFisica: 'serigrafia',
+    campo: 'serie-chumbada-lateral-direita',
+    fonteFisica: 'lateral-direita',
     obrigatorio: true,
   },
-  { campo: 'cliente-serigrafia', fonteFisica: 'serigrafia', obrigatorio: true },
+  {
+    campo: 'serie-chumbada-traseira',
+    fonteFisica: 'traseira',
+    obrigatorio: true,
+  },
+  {
+    campo: 'patrimonio-serigrafia-topo',
+    fonteFisica: 'topo',
+    obrigatorio: true,
+  },
+  {
+    campo: 'patrimonio-serigrafia-frente',
+    fonteFisica: 'frente',
+    obrigatorio: true,
+  },
+  {
+    campo: 'cliente-serigrafia-frente',
+    fonteFisica: 'frente',
+    obrigatorio: true,
+  },
+  { campo: 'serie-placa', fonteFisica: 'placa', obrigatorio: true },
+  { campo: 'patrimonio-placa', fonteFisica: 'placa', obrigatorio: true },
 ];
 
-/** Recorte do gate da adesivacao: so as series chumbadas existem na peca. */
+/**
+ * Recorte do gate da adesivacao: so as series chumbadas existem na peca. O
+ * filtro casa pelo NOME do campo, nao pela vista — desde que `fonteFisica`
+ * virou orientacao, uma vista pode conter marcacoes de etapas diferentes (o
+ * topo tem serie chumbada da adesivacao E patrimonio da serigrafia).
+ */
 const RECORTE_ADESIVACAO = CHECKLIST.filter((item) =>
-  item.fonteFisica.startsWith('chumbado'),
+  item.campo.startsWith('serie-chumbada-'),
 );
 
 const PROJETO_MODELO: ProjetoModelo = {
@@ -83,8 +109,8 @@ const PAYLOAD_QR = JSON.stringify({
 });
 
 const ID_PLACA = '11111111-1111-4111-8111-111111111111';
-const ID_SERIGRAFIA = '22222222-2222-4222-8222-222222222222';
-const ID_CHUMBADO = '44444444-4444-4444-8444-444444444444';
+const ID_FRENTE = '22222222-2222-4222-8222-222222222222';
+const ID_TOPO = '44444444-4444-4444-8444-444444444444';
 
 const CONFERENCIA_CRIADA = { id: 'conferencia-1' } as Conferencia;
 
@@ -134,7 +160,7 @@ function foto(
 
 const EVIDENCIAS_PADRAO: Record<string, FotoEvidencia | null> = {
   [ID_PLACA]: foto(ID_PLACA, 'placa'),
-  [ID_SERIGRAFIA]: foto(ID_SERIGRAFIA, 'serigrafia'),
+  [ID_FRENTE]: foto(ID_FRENTE, 'frente'),
 };
 
 interface Bancada {
@@ -280,14 +306,14 @@ describe('ConferenciaExtracaoService — visao plugada no fluxo', () => {
     const { service, espiao, executar } = montarBancada({
       evidencias: {
         [ID_PLACA]: foto(ID_PLACA, 'placa'),
-        [ID_SERIGRAFIA]: null,
+        [ID_FRENTE]: null,
       },
     });
 
     await expect(
       service.executarComFotos({
         payloadQr: PAYLOAD_QR,
-        fotoEvidenciaIds: [ID_PLACA, ID_SERIGRAFIA],
+        fotoEvidenciaIds: [ID_PLACA, ID_FRENTE],
       }),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
 
@@ -318,7 +344,7 @@ describe('ConferenciaExtracaoService — visao plugada no fluxo', () => {
 
     await service.executarComFotos({
       payloadQr: PAYLOAD_QR,
-      fotoEvidenciaIds: [ID_PLACA, ID_SERIGRAFIA],
+      fotoEvidenciaIds: [ID_PLACA, ID_FRENTE],
     });
 
     expect(espiao.chamadas).toHaveLength(2);
@@ -328,7 +354,7 @@ describe('ConferenciaExtracaoService — visao plugada no fluxo', () => {
       mimeType: 'image/jpeg',
       bytes: 'bytes-placa',
     });
-    expect(espiao.chamadas[1].fonteFisica).toBe('serigrafia');
+    expect(espiao.chamadas[1].fonteFisica).toBe('frente');
   });
 
   it('should chamar a visao uma vez so quando o mesmo id vem repetido', async () => {
@@ -350,7 +376,7 @@ describe('ConferenciaExtracaoService — visao plugada no fluxo', () => {
       payloadQr: PAYLOAD_QR,
       etapaCodigo: 'fixacao-placa',
       limiarConfianca: 0.7,
-      fotoEvidenciaIds: [ID_PLACA, ID_SERIGRAFIA],
+      fotoEvidenciaIds: [ID_PLACA, ID_FRENTE],
     });
 
     expect(executar).toHaveBeenCalledTimes(1);
@@ -375,8 +401,10 @@ describe('ConferenciaExtracaoService — visao plugada no fluxo', () => {
       fotoEvidenciaId: ID_PLACA,
     });
     expect(
-      dto.leituras.find((leitura) => leitura.campo === 'cliente-serigrafia'),
-    ).toMatchObject({ fotoEvidenciaId: ID_SERIGRAFIA });
+      dto.leituras.find(
+        (leitura) => leitura.campo === 'cliente-serigrafia-frente',
+      ),
+    ).toMatchObject({ fotoEvidenciaId: ID_FRENTE });
   });
 
   it('should devolver o resultado do executar somado ao resumo da extracao', async () => {
@@ -384,7 +412,7 @@ describe('ConferenciaExtracaoService — visao plugada no fluxo', () => {
 
     const resultado = await service.executarComFotos({
       payloadQr: PAYLOAD_QR,
-      fotoEvidenciaIds: [ID_PLACA, ID_SERIGRAFIA],
+      fotoEvidenciaIds: [ID_PLACA, ID_FRENTE],
     });
 
     expect(resultado.conferencia.id).toBe('conferencia-1');
@@ -413,7 +441,7 @@ describe('ConferenciaExtracaoService — visao plugada no fluxo', () => {
 
       const resultado = await service.executarComFotos({
         payloadQr: PAYLOAD_QR,
-        fotoEvidenciaIds: [ID_PLACA, ID_SERIGRAFIA],
+        fotoEvidenciaIds: [ID_PLACA, ID_FRENTE],
       });
 
       expect(resultado.extracao.driver).toBe('mock');
@@ -426,7 +454,7 @@ describe('ConferenciaExtracaoService — visao plugada no fluxo', () => {
       // Cenario-ancora do SPEC: a placa mente (847833) e a serigrafia nao.
       expect(porCampo.get('serie-placa')).toBe('847833');
       expect(porCampo.get('patrimonio-placa')).toBe('251328');
-      expect(porCampo.get('patrimonio-serigrafia')).toBe('251328');
+      expect(porCampo.get('patrimonio-serigrafia-frente')).toBe('251328');
     } finally {
       if (anterior === undefined) {
         delete process.env.EXTRACTOR_DRIVER;
@@ -471,7 +499,7 @@ describe('ConferenciaExtracaoService — 422 barato antes da visao (achado 4)', 
       service.executarComFotos({
         payloadQr: PAYLOAD_QR,
         etapaCodigo: 'Serigrafia',
-        fotoEvidenciaIds: [ID_PLACA, ID_SERIGRAFIA],
+        fotoEvidenciaIds: [ID_PLACA, ID_FRENTE],
       }),
     ).rejects.toMatchObject({
       response: { errors: { etapaCodigo: 'etapa-desconhecida: Serigrafia' } },
@@ -556,7 +584,7 @@ describe('ConferenciaExtracaoService — recorte da etapa filtra as fotos (achad
     // placa nao vira chamada — a engine descartaria a leitura de qualquer jeito.
     const { service, espiao, lerConteudoDe } = montarBancada({
       evidencias: {
-        [ID_CHUMBADO]: foto(ID_CHUMBADO, 'chumbado-1'),
+        [ID_TOPO]: foto(ID_TOPO, 'topo'),
         [ID_PLACA]: foto(ID_PLACA, 'placa'),
       },
       checklist: RECORTE_ADESIVACAO,
@@ -566,11 +594,11 @@ describe('ConferenciaExtracaoService — recorte da etapa filtra as fotos (achad
     await service.executarComFotos({
       payloadQr: PAYLOAD_QR,
       etapaCodigo: 'adesivacao',
-      fotoEvidenciaIds: [ID_CHUMBADO, ID_PLACA],
+      fotoEvidenciaIds: [ID_TOPO, ID_PLACA],
     });
 
     expect(espiao.chamadas.map((chamada) => chamada.fonteFisica)).toEqual([
-      'chumbado-1',
+      'topo',
     ]);
     // Byte de foto fora do recorte nem sai do storage.
     expect(lerConteudoDe).toHaveBeenCalledTimes(1);
@@ -579,9 +607,9 @@ describe('ConferenciaExtracaoService — recorte da etapa filtra as fotos (achad
   it('should contar no resumo so o que foi de fato enviado a visao', async () => {
     const { service } = montarBancada({
       evidencias: {
-        [ID_CHUMBADO]: foto(ID_CHUMBADO, 'chumbado-1'),
+        [ID_TOPO]: foto(ID_TOPO, 'topo'),
         [ID_PLACA]: foto(ID_PLACA, 'placa'),
-        [ID_SERIGRAFIA]: foto(ID_SERIGRAFIA, 'serigrafia'),
+        [ID_FRENTE]: foto(ID_FRENTE, 'frente'),
       },
       checklist: RECORTE_ADESIVACAO,
       checkpointCodigo: 'adesivacao',
@@ -590,7 +618,7 @@ describe('ConferenciaExtracaoService — recorte da etapa filtra as fotos (achad
     const resultado = await service.executarComFotos({
       payloadQr: PAYLOAD_QR,
       etapaCodigo: 'adesivacao',
-      fotoEvidenciaIds: [ID_CHUMBADO, ID_PLACA, ID_SERIGRAFIA],
+      fotoEvidenciaIds: [ID_TOPO, ID_PLACA, ID_FRENTE],
     });
 
     expect(resultado.extracao.fotos).toBe(1);
@@ -631,13 +659,13 @@ describe('ConferenciaExtracaoService — evidencia amarrada a conferencia (achad
 
     await service.executarComFotos({
       payloadQr: PAYLOAD_QR,
-      fotoEvidenciaIds: [ID_PLACA, ID_SERIGRAFIA],
+      fotoEvidenciaIds: [ID_PLACA, ID_FRENTE],
     });
 
     expect(vincularAConferencia).toHaveBeenCalledTimes(1);
     expect(vincularAConferencia.mock.calls[0][0]).toEqual([
       ID_PLACA,
-      ID_SERIGRAFIA,
+      ID_FRENTE,
     ]);
     expect(vincularAConferencia.mock.calls[0][1]).toBe(CONFERENCIA_CRIADA);
   });
@@ -647,7 +675,7 @@ describe('ConferenciaExtracaoService — evidencia amarrada a conferencia (achad
     // existir na peca — ela nao lastreou campo nenhum aqui.
     const { service, vincularAConferencia } = montarBancada({
       evidencias: {
-        [ID_CHUMBADO]: foto(ID_CHUMBADO, 'chumbado-1'),
+        [ID_TOPO]: foto(ID_TOPO, 'topo'),
         [ID_PLACA]: foto(ID_PLACA, 'placa'),
       },
       checklist: RECORTE_ADESIVACAO,
@@ -657,10 +685,10 @@ describe('ConferenciaExtracaoService — evidencia amarrada a conferencia (achad
     await service.executarComFotos({
       payloadQr: PAYLOAD_QR,
       etapaCodigo: 'adesivacao',
-      fotoEvidenciaIds: [ID_CHUMBADO, ID_PLACA],
+      fotoEvidenciaIds: [ID_TOPO, ID_PLACA],
     });
 
-    expect(vincularAConferencia.mock.calls[0][0]).toEqual([ID_CHUMBADO]);
+    expect(vincularAConferencia.mock.calls[0][0]).toEqual([ID_TOPO]);
   });
 
   it('should vincular so DEPOIS de a conferencia existir', async () => {
@@ -712,13 +740,13 @@ describe('ConferenciaExtracaoService — achados livres so alarmam', () => {
     // A foto viu um numero a mais, mas ele e o patrimonio que a etiqueta
     // afirma: consistente com a fonte da verdade, nada a alarmar.
     const { service } = montarBancada({
-      evidencias: { [ID_SERIGRAFIA]: foto(ID_SERIGRAFIA, 'serigrafia') },
+      evidencias: { [ID_FRENTE]: foto(ID_FRENTE, 'frente') },
       extractor: espiaoComTextoExtra('251328'),
     });
 
     const resultado = await service.executarComFotos({
       payloadQr: PAYLOAD_QR,
-      fotoEvidenciaIds: [ID_SERIGRAFIA],
+      fotoEvidenciaIds: [ID_FRENTE],
     });
 
     expect(resultado.achadosInconsistentes).toEqual([]);
@@ -728,13 +756,13 @@ describe('ConferenciaExtracaoService — achados livres so alarmam', () => {
 
   it('should alarmar o numero que a visao viu e o QR nao conhece', async () => {
     const { service } = montarBancada({
-      evidencias: { [ID_SERIGRAFIA]: foto(ID_SERIGRAFIA, 'serigrafia') },
+      evidencias: { [ID_FRENTE]: foto(ID_FRENTE, 'frente') },
       extractor: espiaoComTextoExtra('999999'),
     });
 
     const resultado = await service.executarComFotos({
       payloadQr: PAYLOAD_QR,
-      fotoEvidenciaIds: [ID_SERIGRAFIA],
+      fotoEvidenciaIds: [ID_FRENTE],
     });
 
     expect(resultado.achadosInconsistentes).toEqual([
@@ -742,7 +770,7 @@ describe('ConferenciaExtracaoService — achados livres so alarmam', () => {
         texto: '999999',
         ocorrencias: [
           {
-            fotoEvidenciaId: ID_SERIGRAFIA,
+            fotoEvidenciaId: ID_FRENTE,
             confianca: CONFIANCA_MOCK,
             regiaoLeitura: null,
           },
@@ -779,20 +807,20 @@ describe('ConferenciaExtracaoService — achados livres so alarmam', () => {
     // Regra de ferro: achado livre nao entra na engine. As duas execucoes
     // diferem SO no texto extra que a visao viu.
     const semAchado = montarBancada({
-      evidencias: { [ID_SERIGRAFIA]: foto(ID_SERIGRAFIA, 'serigrafia') },
+      evidencias: { [ID_FRENTE]: foto(ID_FRENTE, 'frente') },
     });
     const comAchado = montarBancada({
-      evidencias: { [ID_SERIGRAFIA]: foto(ID_SERIGRAFIA, 'serigrafia') },
+      evidencias: { [ID_FRENTE]: foto(ID_FRENTE, 'frente') },
       extractor: espiaoComTextoExtra('999999'),
     });
 
     const antes = await semAchado.service.executarComFotos({
       payloadQr: PAYLOAD_QR,
-      fotoEvidenciaIds: [ID_SERIGRAFIA],
+      fotoEvidenciaIds: [ID_FRENTE],
     });
     const depois = await comAchado.service.executarComFotos({
       payloadQr: PAYLOAD_QR,
-      fotoEvidenciaIds: [ID_SERIGRAFIA],
+      fotoEvidenciaIds: [ID_FRENTE],
     });
 
     // O que a engine recebe e byte a byte o mesmo...
@@ -813,15 +841,15 @@ describe('ConferenciaExtracaoService — achados livres so alarmam', () => {
   it('should juntar em UM alarme o mesmo texto visto em duas fotos', async () => {
     const { service } = montarBancada({
       evidencias: {
-        [ID_SERIGRAFIA]: foto(ID_SERIGRAFIA, 'serigrafia'),
-        [ID_CHUMBADO]: foto(ID_CHUMBADO, 'chumbado-1'),
+        [ID_FRENTE]: foto(ID_FRENTE, 'frente'),
+        [ID_TOPO]: foto(ID_TOPO, 'topo'),
       },
       extractor: espiaoComTextoExtra('999999'),
     });
 
     const resultado = await service.executarComFotos({
       payloadQr: PAYLOAD_QR,
-      fotoEvidenciaIds: [ID_SERIGRAFIA, ID_CHUMBADO],
+      fotoEvidenciaIds: [ID_FRENTE, ID_TOPO],
     });
 
     expect(resultado.achadosInconsistentes).toHaveLength(1);
@@ -829,7 +857,7 @@ describe('ConferenciaExtracaoService — achados livres so alarmam', () => {
       resultado.achadosInconsistentes[0].ocorrencias.map(
         (ocorrencia) => ocorrencia.fotoEvidenciaId,
       ),
-    ).toEqual([ID_SERIGRAFIA, ID_CHUMBADO]);
+    ).toEqual([ID_FRENTE, ID_TOPO]);
   });
 });
 

@@ -51,10 +51,12 @@ O cenário-âncora é reproduzível **com fotos reais**: `placa.jpeg` entrega
 - **O relevo lê melhor de cima** (`superior`, 99,9%) do que de lado
   (`lateral`, 85,8%): a luz ambiente do teto cria a sombra que define o
   dígito. Em produção, isso vira posicionamento de luminária no gate.
-- **Uma foto pode conter duas fontes físicas** (`lateral` traz placa,
-  chumbado e etiqueta juntos). A heurística do adapter precisa dos campos
-  alvo por foto — é o que o `ExtracaoService` já faz ao filtrar a checklist
-  pela `fonteFisica` da foto.
+- **Uma foto pode conter duas marcações** (`lateral` traz placa, chumbado e
+  etiqueta juntos). A heurística do adapter precisa dos campos alvo por foto —
+  é o que o `ExtracaoService` já faz ao filtrar a checklist pela `fonteFisica`
+  da foto. Este aprendizado é uma das origens da troca de eixo de
+  `fonteFisica` (2026-07-25): ela passou a ser a VISTA da peça, e uma vista
+  declara todos os alvos que moram nela — a ambiguidade fica explícita.
 - **Ambiguidade numérica é real**: em `lateral`, o Textract juntou linhas
   ("TRANSFORMADOR 847833 ORMADOR MONOFÁSICO"). Confirma a decisão do adapter
   de devolver `null` quando não há rótulo que desambigue, em vez de chutar.
@@ -106,13 +108,16 @@ quantidades certas? Sim — inventário medido:
    (vegetal) não. Simbologia é forma, não texto — é caso para o check
    qualitativo de layout (Could, via visão multimodal), não para OCR.
 
-### Refinamento sugerido para a checklist do modelo
+### Refinamento sugerido para a checklist do modelo — APLICADO em 2026-07-25
 
-O seed hoje tem `patrimonio-serigrafia` (um). O desenho pede patrimônio em
-DUAS faces — vale desdobrar em `patrimonio-serigrafia-topo` e
-`patrimonio-serigrafia-lateral` quando a checklist for revisada com a TRAEL,
-porque "faltou o patrimônio da lateral" é uma não conformidade real que hoje
-passaria despercebida.
+O seed tinha `patrimonio-serigrafia` (um só). O desenho pede patrimônio em DUAS
+faces, e "faltou o patrimônio de uma delas" é não conformidade real que passava
+despercebida. Com a troca de eixo de `fonteFisica` (marcação → VISTA da peça), o
+item foi desdobrado em `patrimonio-serigrafia-topo` e
+`patrimonio-serigrafia-frente`, e as três séries chumbadas passaram a
+`serie-chumbada-topo`, `serie-chumbada-lateral-direita` e
+`serie-chumbada-traseira`. As vistas do seed saíram DESTA medição, não do
+desenho — confirmar face a face com a TRAEL (decisão em aberto no SPEC).
 
 ## Custo medido
 
@@ -125,15 +130,19 @@ Cinco fotos reais (3 chumbados, serigrafia, placa) pela API no ar, com
 `EXTRACTOR_DRIVER=textract`. É a primeira medição do fluxo COMPLETO, não do
 spike isolado.
 
+Nomes de campo como estavam na época (`serie-chumbada-1..3`,
+`patrimonio-serigrafia`); a vista medida está entre parênteses, e é dela que
+saíram os nomes atuais.
+
 | Campo | Leitura | Confiança | Veredito |
 | --- | --- | --- | --- |
 | serie-chumbada-1 (topo) | 847233 | 98,8% | conforme |
-| serie-chumbada-2 (lateral) | **847833** | **84,6%** | erro de dígito |
-| serie-chumbada-3 (diagonal) | — | — | sem leitura |
+| serie-chumbada-2 (lateral direita) | **847833** | **84,6%** | erro de dígito |
+| serie-chumbada-3 (diagonal traseira) | — | — | sem leitura |
 | serie-placa | 847833 | 99,9% | divergente (defeito real) |
 | patrimonio-placa | — | — | sem leitura |
-| patrimonio-serigrafia | 251328 | 98,4% | conforme |
-| cliente-serigrafia | energisa | 99,7% | conforme |
+| patrimonio-serigrafia (frente) | 251328 | 98,4% | conforme |
+| cliente-serigrafia (frente) | energisa | 99,7% | conforme |
 
 ### O limiar 0.9 saiu daqui
 

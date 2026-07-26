@@ -55,6 +55,19 @@ export interface LeituraCampo {
    * gravada com o número do campo vizinho" (não conformidade de verdade).
    */
   campoDaLeitura?: string;
+  /**
+   * Fato registrado pelo chamador: esta leitura é de marcação em RELEVO (o
+   * número chumbado no metal) e, portanto, exige uma segunda evidência antes
+   * de ACUSAR a peça. Ausente = não se aplica (tinta, impresso, digitado) e o
+   * campo segue julgado como sempre — é o que preserva o cenário-âncora, em
+   * que a placa IMPRESSA continua `divergente` com uma leitura só.
+   *
+   * `confirmada` = as releituras por recorte devolveram o mesmo valor;
+   * `nao-confirmada` = não houve segunda evidência (ou ela contradisse, e aí o
+   * `valorLido` já vem nulo). A regra que consome isto é
+   * `engine/corroboracao.ts` — ela só REBAIXA `divergente`, nunca promove nada.
+   */
+  corroboracao?: 'confirmada' | 'nao-confirmada';
 }
 
 export interface OpcoesEngine {
@@ -73,7 +86,13 @@ export type MotivoCampo =
   | 'sem-leitura'
   | 'leituras-conflitantes'
   | 'leitura-de-outro-campo'
-  | 'confianca-abaixo-do-limiar';
+  | 'confianca-abaixo-do-limiar'
+  /**
+   * Marcação em relevo cuja leitura não tem segunda evidência: os recortes não
+   * corroboraram, ou uma posição irmã leu outro número. Regra inteira (e o
+   * argumento que a autoriza a rebaixar um `divergente`) em `corroboracao.ts`.
+   */
+  | 'leitura-nao-corroborada';
 
 export interface ResultadoCampo {
   campo: string;

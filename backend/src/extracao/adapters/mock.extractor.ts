@@ -33,15 +33,21 @@ export const CONFIANCA_MOCK = 0.99;
  * (tudo conforme, peca ilegivel), passe o mapa desejado no construtor.
  */
 export const LEITURAS_DEMO: Record<string, string | null> = {
-  'serie-chumbada-1': '847233',
-  'serie-chumbada-2': '847233',
-  'serie-chumbada-3': '847233',
+  // Chaves = os `campo` da checklist seedada (vistas da peca, nao numeracao de
+  // posicao). Uma vista com duas marcacoes (o topo tem serie chumbada E
+  // patrimonio serigrafado) rende DUAS entradas aqui: o mock responde por
+  // campo, entao ele nunca reproduz sozinho a ambiguidade que o Textract vive
+  // — quem fixa esse comportamento e textract.extractor.spec.ts.
+  'serie-chumbada-topo': '847233',
+  'serie-chumbada-lateral-direita': '847233',
+  'serie-chumbada-traseira': '847233',
+  'patrimonio-serigrafia-topo': '251328',
+  'patrimonio-serigrafia-frente': '251328',
+  'cliente-serigrafia-frente':
+    '143091 - Energisa Rondônia Distribuidora de Energia S.A',
+  'potencia-serigrafia-frente': '10 kVA',
   'serie-placa': '847833',
   'patrimonio-placa': '251328',
-  'patrimonio-serigrafia': '251328',
-  'cliente-serigrafia':
-    '143091 - Energisa Rondônia Distribuidora de Energia S.A',
-  'potencia-serigrafia': '10 kVA',
 };
 
 export class MockExtractor extends ExtractorPort {

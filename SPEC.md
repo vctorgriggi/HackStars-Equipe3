@@ -62,13 +62,29 @@ linha, dando rastreabilidade de trânsito.
   subconjunto de campos: no fluxo real da TRAEL a conferência acontece em
   gates parciais (pós-serigrafia e pós-placa), não de uma vez só.
 - **CampoConferido** — um campo comparado: nome (ex.: serie-placa,
-  serie-chumbada-1..3, patrimonio-serigrafia, patrimonio-placa, cliente), valor
+  serie-chumbada-topo, serie-chumbada-lateral-direita, serie-chumbada-traseira,
+  patrimonio-serigrafia-topo, patrimonio-serigrafia-frente, patrimonio-placa,
+  cliente-serigrafia-frente), valor
   esperado (do QR), valor lido (da visão), score de confiança, veredito
   (`conforme` | `divergente` | `nao_conferivel`), referência à FotoEvidencia e
   `regiaoLeitura` opcional (bounding box de onde o valor foi lido na foto —
   matéria-prima da conferência posicional futura, custo zero com Textract).
-- **FotoEvidencia** — foto enviada pelo operador, armazenada com URL e vínculo
-  aos campos extraídos dela.
+  O nome do campo diz o que ele carrega (prefixo `serie-`/`patrimonio-`/
+  `cliente-`, que é por onde o valor esperado do QR é achado), como a marcação
+  foi gravada (`-chumbada-` em relevo, `-serigrafia-` em tinta) e em qual VISTA
+  da peça ela está — nunca por número de posição.
+- **FotoEvidencia** — foto enviada pelo operador, armazenada com URL, a
+  `fonteFisica` que ela mostra e vínculo aos campos extraídos dela.
+  `fonteFisica` é a **VISTA da peça**, não a marcação: `base`, `topo`,
+  `frente`, `traseira`, `lateral-esquerda`, `lateral-direita` (as orientações
+  do desenho técnico), mais `placa` e `etiqueta` — closes, porque zoom é um
+  eixo separado de orientação: as duas ficam sobre uma face, mas o texto é
+  pequeno demais para uma foto de vista inteira — e `geral` como escape. É o
+  eixo que a câmera fixa enxerga em produção (uma câmera vê *a lateral
+  direita*, não "o chumbado 2") e o que elimina a numeração arbitrária de
+  posição. Consequência: uma vista pode conter mais de uma marcação (o topo
+  tem série chumbada e patrimônio serigrafado), e a ambiguidade daí decorrente
+  é resolvida como `nao_conferivel`, nunca por chute.
 - **Checkpoint** — etapa ordenada da linha de produção, com posição na
   sequência e `codigo` estável de máquina (slug único, ex.: `serigrafia`):
   regras de gate casam por ele, nunca por nome exibido nem por ordem. Etapas
@@ -123,7 +139,7 @@ erDiagram
     CAMPO_CONFERIDO {
         uuid id PK
         uuid conferenciaId FK
-        string nomeCampo "serie-placa, serie-chumbada-1..3, patrimonio-placa, patrimonio-serigrafia, cliente-serigrafia"
+        string nomeCampo "serie-placa, serie-chumbada-topo|lateral-direita|traseira, patrimonio-placa, patrimonio-serigrafia-topo|frente, cliente-serigrafia-frente"
         string valorEsperado "do QR"
         string valorLido "da visao; null se ilegivel"
         number confianca "score 0..1 (double precision)"
@@ -134,7 +150,7 @@ erDiagram
     FOTO_EVIDENCIA {
         uuid id PK
         string url
-        string fonteFisica "obrigatoria: placa | serigrafia | chumbado-1..3 | geral"
+        string fonteFisica "vista da peca: base | topo | frente | traseira | lateral-esquerda | lateral-direita | placa | etiqueta | geral"
         uuid conferenciaId FK "opcional"
     }
     PASSAGEM {
@@ -154,7 +170,8 @@ erDiagram
 
 - Ler o QR da etiqueta pelo navegador do celular e decodificar o payload nos
   campos esperados.
-- Upload de fotos da peça (placa, serigrafia, série chumbada nas 3 posições).
+- Upload de fotos da peça por VISTA (topo, frente, traseira, laterais) mais os
+  closes de placa e etiqueta — cada foto pode conter mais de uma marcação.
 - Extração por visão computacional dos valores físicos, cada valor com score de
   confiança e vínculo à foto de origem.
 - Comparação campo a campo na API entre valor esperado e valor lido, com
@@ -274,9 +291,11 @@ atrás dessas mesmas fronteiras; engine e portas não mudam.
 ## Critérios de aceitação
 
 1. Lido o QR da etiqueta e enviadas as fotos da peça de demo, a tela de
-   conferência exibe comparação campo a campo cobrindo: série chumbada (3
-   posições), série da placa, patrimônio da placa, patrimônio serigrafado e
-   cliente — cada valor lido com link para sua foto-evidência.
+   conferência exibe comparação campo a campo cobrindo: série chumbada nas 3
+   vistas em que ela está gravada (topo, lateral direita, traseira), série da
+   placa, patrimônio da placa, patrimônio serigrafado nas 2 vistas do desenho
+   (topo e frente) e cliente — cada valor lido com link para sua
+   foto-evidência.
 2. Com as fotos da peça de demo (placa 847833; etiqueta e chumbado 847233), o
    veredito geral é `divergente` e o único campo apontado como divergente é a
    série da placa.
@@ -326,8 +345,9 @@ aprovar a extração do projeto (uma vez por modelo), corrigir a peça física
 quando um gate acusa, e registrar exceção deliberada (observacao na
 conferência divergente, que libera o avanço com o aceite gravado; com perfis,
 exigirá papel autorizado). A identidade da etapa vem do dispositivo: cada
-câmera é provisionada amarrada ao `codigo` de um Checkpoint E às fontes
-físicas que o seu ponto de vista enxerga (câmera do topo → `chumbado-1`) — o
+câmera é provisionada amarrada ao `codigo` de um Checkpoint E à fonte
+física que o seu ponto de vista enxerga (câmera do topo → `topo`; o eixo de
+`fonteFisica` é a VISTA justamente por isso) — o
 rótulo que o operador dá por foto no MVP vira dado de provisionamento; a
 identificação é a geometria da instalação, nunca análise em runtime. Modelo
 com menos marcações passa no mesmo gate sem reconfigurar câmera: quadro cuja
@@ -434,18 +454,23 @@ consegue criar Conferencia.
       quebraria a resolução (422 projeto-modelo-indeterminado). Confirmar com
       a TRAEL qual número identifica o projeto e alinhar seed + cascata.
       Afeta T2.1/T6.1 (achado da revisão R2, rodada revisao).
-- [ ] **Origem e cardinalidade do chumbado (3×)** — o desenho PDF é o projeto
-      de SERIGRAFIA e não cobre chumbado nem placa; o "série chumbada em 3
-      posições" veio do doc do desafio e da peça física, e hoje vive só no
-      seed. Confirmar com a TRAEL se o 3× é padrão de fábrica (vira esqueleto
-      fixo de checklist) ou varia por modelo (segue dado por modelo — a
-      checklist suporta os dois). Consequência na T6.1: a ingestão do PDF só
+- [ ] **Em QUAIS vistas cada marcação está** — desde a troca de eixo de
+      `fonteFisica` (2026-07-25), a checklist não diz mais "chumbado 1/2/3" e
+      sim em qual VISTA cada marcação vive. O mapa do seed foi MEDIDO nas
+      fotos reais (docs/visao-ocr.md: série chumbada em topo, lateral direita
+      e traseira; patrimônio serigrafado em topo e frente), não lido do
+      desenho — **confirmar face a face com a TRAEL**. Duas perguntas juntas:
+      (a) o 3× do chumbado é padrão de fábrica (vira esqueleto fixo de
+      checklist) ou varia por modelo (segue dado por modelo — a checklist
+      suporta os dois)? (b) as vistas medidas são as do desenho ou coincidência
+      de como a peça de demo foi posicionada? Nada em `base` hoje: a vista
+      existe no vocabulário, mas sem foto dela um item obrigatório ali tornaria
+      o critério 3 inalcançável. Consequência na T6.1: a ingestão do PDF só
       produz os itens de serigrafia; placa e chumbados entram pré-populados
       como esqueleto padrão na tela de revisão (T6.2). Evolução conexa: o
       Textract devolve um bounding box por ocorrência (`regiaoLeitura`, já
       persistido) — N caixas distintas no MESMO quadro provam N posições, o
-      que habilita foto panorâmica satisfazendo mais de um chumbado sem
-      rótulo fino por posição.
+      que habilita uma vista panorâmica satisfazer mais de uma posição.
 - [ ] **Unicidade do patrimônio entre clientes** — padrão do setor: série do
       fabricante é única, patrimônio é numeração do cliente (único por
       cliente). Confirmar com a TRAEL. Consequência já adotada: find-or-create
@@ -464,3 +489,13 @@ consegue criar Conferencia.
 - [x] **Prioridade do alerta de divergência** — resolvido: promovido de Could
       para Should; divergência para a produção até correção, e o alerta é o
       que sustenta essa parada no MVP (2026-07-25).
+- [x] **Eixo de `fonteFisica`: marcação ou vista?** — resolvido: **VISTA da
+      peça** (`base`, `topo`, `frente`, `traseira`, `lateral-esquerda`,
+      `lateral-direita`, mais os closes `placa` e `etiqueta` e o escape
+      `geral`). É o que a câmera fixa enxerga em produção e como o desenho
+      técnico se organiza, e elimina a numeração arbitrária `chumbado-1/2/3`,
+      que o operador tinha de decidir sem gabarito. `serigrafia` e `chumbado-N`
+      saíram do vocabulário — são processos de marcação, não vistas; seguem no
+      NOME do campo. Efeito assumido: vista com duas marcações torna a
+      ambiguidade explícita (`nao_conferivel`) em vez de escondê-la num falso
+      match (2026-07-25).

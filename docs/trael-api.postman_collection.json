@@ -103,7 +103,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"payloadQr\": \"{{payloadQrDemo}}\",\n  \"etapaCodigo\": \"fixacao-placa\",\n  \"leituras\": [\n    { \"campo\": \"serie-chumbada-1\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-chumbada-2\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-chumbada-3\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-placa\", \"valorLido\": \"847833\", \"confianca\": 0.97 },\n    { \"campo\": \"patrimonio-placa\", \"valorLido\": \"251328\", \"confianca\": 0.95 },\n    { \"campo\": \"patrimonio-serigrafia\", \"valorLido\": \"251328\", \"confianca\": 0.96 },\n    { \"campo\": \"cliente-serigrafia\", \"valorLido\": \"143091 - Energisa Rondônia Distribuidora de Energia S.A\", \"confianca\": 0.96 }\n  ]\n}"
+          "raw": "{\n  \"payloadQr\": \"{{payloadQrDemo}}\",\n  \"etapaCodigo\": \"fixacao-placa\",\n  \"leituras\": [\n    { \"campo\": \"serie-chumbada-topo\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-chumbada-lateral-direita\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-chumbada-traseira\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-placa\", \"valorLido\": \"847833\", \"confianca\": 0.97 },\n    { \"campo\": \"patrimonio-placa\", \"valorLido\": \"251328\", \"confianca\": 0.95 },\n    { \"campo\": \"patrimonio-serigrafia-topo\", \"valorLido\": \"251328\", \"confianca\": 0.95 },\n    { \"campo\": \"patrimonio-serigrafia-frente\", \"valorLido\": \"251328\", \"confianca\": 0.96 },\n    { \"campo\": \"cliente-serigrafia-frente\", \"valorLido\": \"143091 - Energisa Rondônia Distribuidora de Energia S.A\", \"confianca\": 0.96 }\n  ]\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/conferencias/executar",
@@ -117,7 +117,7 @@
             "executar"
           ]
         },
-        "description": "A PEÇA DE DEMO: etiqueta e chumbados dizem 847233, a placa foi gravada 847833.\n\nEsperado: 201 com vereditoGeral 'divergente' e o ÚNICO campo divergente sendo serie-placa. O campo opcional potencia-serigrafia é omitido (não tem valor esperado no QR).\n\nTodas as confianças estão acima do limiar padrão 0.9 (medido — ver docs/visao-ocr.md): abaixo dele o campo sai 'nao_conferivel' mesmo com o valor certo.\n\nA resposta traz 'incoerencias': as 3 séries chumbadas e a da placa carregam o mesmo valor esperado e não leram a mesma coisa. Incoerência só rebaixa; aqui o veredito já é 'divergente'.\n\nRodar duas vezes: a peça NÃO deve duplicar (mesmo transformador.id)."
+        "description": "A PEÇA DE DEMO: etiqueta e chumbados dizem 847233, a placa foi gravada 847833.\n\nEsperado: 201 com vereditoGeral 'divergente' e o ÚNICO campo divergente sendo serie-placa. O campo opcional potencia-serigrafia-frente é omitido (não tem valor esperado no QR).\n\nTodas as confianças estão acima do limiar padrão 0.9 (medido — ver docs/visao-ocr.md): abaixo dele o campo sai 'nao_conferivel' mesmo com o valor certo.\n\nA resposta traz 'incoerencias': as 3 séries chumbadas e a da placa carregam o mesmo valor esperado e não leram a mesma coisa. Incoerência só rebaixa; aqui o veredito já é 'divergente'.\n\nRodar duas vezes: a peça NÃO deve duplicar (mesmo transformador.id)."
       }
     },
     {
@@ -136,7 +136,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"payloadQr\": \"{{payloadQrDemo}}\",\n  \"etapaCodigo\": \"fixacao-placa\",\n  \"leituras\": [\n    { \"campo\": \"serie-chumbada-1\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-chumbada-2\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-chumbada-3\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-placa\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"patrimonio-placa\", \"valorLido\": \"251328\", \"confianca\": 0.95 },\n    { \"campo\": \"patrimonio-serigrafia\", \"valorLido\": \"251328\", \"confianca\": 0.95 },\n    { \"campo\": \"cliente-serigrafia\", \"valorLido\": \"143091 - Energisa Rondônia Distribuidora de Energia S.A\", \"confianca\": 0.95 }\n  ]\n}"
+          "raw": "{\n  \"payloadQr\": \"{{payloadQrDemo}}\",\n  \"etapaCodigo\": \"fixacao-placa\",\n  \"leituras\": [\n    { \"campo\": \"serie-chumbada-topo\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-chumbada-lateral-direita\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-chumbada-traseira\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-placa\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"patrimonio-placa\", \"valorLido\": \"251328\", \"confianca\": 0.95 },\n    { \"campo\": \"patrimonio-serigrafia-topo\", \"valorLido\": \"251328\", \"confianca\": 0.95 },\n    { \"campo\": \"patrimonio-serigrafia-frente\", \"valorLido\": \"251328\", \"confianca\": 0.95 },\n    { \"campo\": \"cliente-serigrafia-frente\", \"valorLido\": \"143091 - Energisa Rondônia Distribuidora de Energia S.A\", \"confianca\": 0.95 }\n  ]\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/conferencias/executar",
@@ -242,7 +242,7 @@
               "key": "fonteFisica",
               "value": "placa",
               "type": "text",
-              "description": "placa | serigrafia | chumbado-1 | chumbado-2 | chumbado-3 | geral"
+              "description": "VISTA da peça: base | topo | frente | traseira | lateral-esquerda | lateral-direita | placa | etiqueta | geral"
             }
           ]
         },

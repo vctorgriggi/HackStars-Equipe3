@@ -344,6 +344,11 @@ function paraLeituraDto(leitura: LeituraExtraida): LeituraCampoDto {
     confianca: leitura.confianca,
     regiaoLeitura: leitura.regiaoLeitura,
     fotoEvidenciaId: leitura.fotoEvidenciaId,
+    // Segunda evidencia da leitura em relevo (consenso de recortes, feito no
+    // adapter). Sem esta linha ela se perderia aqui e TODA leitura chumbada
+    // chegaria a engine como nao corroborada — divergencia real de peca nunca
+    // mais seria acusada.
+    corroboracao: leitura.corroboracao,
   };
 }
 

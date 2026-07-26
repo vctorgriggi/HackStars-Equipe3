@@ -34,26 +34,30 @@ function payload(extra: Partial<PayloadEtiqueta> = {}): PayloadEtiqueta {
 describe('montarValoresEsperados — origem do esperado por PREFIXO do campo', () => {
   it('should mandar o numeroSerie do QR para todo campo serie-*', () => {
     const valores = montarValoresEsperados(
-      [item('serie-placa'), item('serie-chumbada-1'), item('serie-chumbada-2')],
+      [
+        item('serie-placa'),
+        item('serie-chumbada-topo'),
+        item('serie-chumbada-lateral-direita'),
+      ],
       payload(),
     );
 
     expect(valores).toEqual({
       'serie-placa': '847233',
-      'serie-chumbada-1': '847233',
-      'serie-chumbada-2': '847233',
+      'serie-chumbada-topo': '847233',
+      'serie-chumbada-lateral-direita': '847233',
     });
   });
 
   it('should mandar patrimonio e cliente para os prefixos correspondentes', () => {
     const valores = montarValoresEsperados(
-      [item('patrimonio-placa'), item('cliente-serigrafia')],
+      [item('patrimonio-placa'), item('cliente-serigrafia-frente')],
       payload(),
     );
 
     expect(valores).toEqual({
       'patrimonio-placa': '251328',
-      'cliente-serigrafia': '143091 - Energisa Rondônia',
+      'cliente-serigrafia-frente': '143091 - Energisa Rondônia',
     });
   });
 
@@ -61,7 +65,7 @@ describe('montarValoresEsperados — origem do esperado por PREFIXO do campo', (
     // A potencia nao viaja no QR. Sem esperado, a engine omite o campo opcional
     // e marca o obrigatorio como nao_conferivel — nunca conforme.
     const valores = montarValoresEsperados(
-      [item('potencia-serigrafia', false)],
+      [item('potencia-serigrafia-frente', false)],
       payload(),
     );
 
@@ -78,7 +82,7 @@ describe('montarValoresEsperados — origem do esperado por PREFIXO do campo', (
     // Etiqueta sem cliente: o campo fica SEM esperado, e nao com esperado
     // vazio. String vazia compararia "igual a nada" e viraria conforme.
     const valores = montarValoresEsperados(
-      [item('cliente-serigrafia'), item('serie-placa')],
+      [item('cliente-serigrafia-frente'), item('serie-placa')],
       payload({ cliente: null }),
     );
 
@@ -87,7 +91,7 @@ describe('montarValoresEsperados — origem do esperado por PREFIXO do campo', (
 
   it('should tratar dado so com espacos como ausente', () => {
     const valores = montarValoresEsperados(
-      [item('cliente-serigrafia')],
+      [item('cliente-serigrafia-frente')],
       payload({ cliente: '   ' }),
     );
 
@@ -96,11 +100,17 @@ describe('montarValoresEsperados — origem do esperado por PREFIXO do campo', (
 
   it('should nao afirmar conforme para campo obrigatorio sem esperado', () => {
     // Ponta a ponta com a engine: a decisao desta funcao chega ao veredito.
-    const checklist = [item('potencia-serigrafia')];
+    const checklist = [item('potencia-serigrafia-frente')];
     const resultado = conferir(
       checklist,
       montarValoresEsperados(checklist, payload()),
-      [{ campo: 'potencia-serigrafia', valorLido: '10 kVA', confianca: 0.99 }],
+      [
+        {
+          campo: 'potencia-serigrafia-frente',
+          valorLido: '10 kVA',
+          confianca: 0.99,
+        },
+      ],
       { limiarConfianca: 0.9 },
     );
 

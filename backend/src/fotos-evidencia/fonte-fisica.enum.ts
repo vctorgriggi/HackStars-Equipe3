@@ -5,12 +5,18 @@ import type { FonteFisica } from '../extracao/ports/extractor.port';
 // `satisfies` abaixo quebra a compilação se as duas listas divergirem.
 // Objeto as-const (não enum — convenção do repo: uniões literais); o nome
 // FonteFisicaEnum é mantido por compatibilidade com DTO/controller/service.
+// Chaves = as VISTAS da peça (eixo novo, 2026-07-25) + os dois closes de zoom
+// (placa, etiqueta) + o escape `geral`. O porquê da mudança de eixo está na
+// união literal, em extracao/ports/extractor.port.ts.
 export const FonteFisicaEnum = {
+  base: 'base',
+  topo: 'topo',
+  frente: 'frente',
+  traseira: 'traseira',
+  lateralEsquerda: 'lateral-esquerda',
+  lateralDireita: 'lateral-direita',
   placa: 'placa',
-  serigrafia: 'serigrafia',
-  chumbado1: 'chumbado-1',
-  chumbado2: 'chumbado-2',
-  chumbado3: 'chumbado-3',
+  etiqueta: 'etiqueta',
   geral: 'geral',
 } as const satisfies Record<string, FonteFisica>;
 

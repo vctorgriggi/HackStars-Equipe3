@@ -41,7 +41,7 @@ function campo(
 ): ResultadoCampo {
   return {
     campo: nome,
-    fonteFisica: opcoes.fonteFisica ?? 'chumbado-1',
+    fonteFisica: opcoes.fonteFisica ?? 'topo',
     obrigatorio: opcoes.obrigatorio ?? true,
     valorEsperado:
       opcoes.valorEsperado === undefined ? SERIE : opcoes.valorEsperado,
@@ -55,9 +55,9 @@ function campo(
 describe('detectarIncoerencias — descoberta do grupo e discordancia', () => {
   it('should nao gerar nada quando as tres posicoes concordam', () => {
     const incoerencias = detectarIncoerencias([
-      campo('serie-chumbada-1', SERIE),
-      campo('serie-chumbada-2', SERIE),
-      campo('serie-chumbada-3', SERIE),
+      campo('serie-chumbada-topo', SERIE),
+      campo('serie-chumbada-lateral-direita', SERIE),
+      campo('serie-chumbada-traseira', SERIE),
     ]);
 
     expect(incoerencias).toEqual([]);
@@ -65,9 +65,9 @@ describe('detectarIncoerencias — descoberta do grupo e discordancia', () => {
 
   it('should acusar a posicao que discorda das irmas (caso medido: 847833 a 84,6%)', () => {
     const incoerencias = detectarIncoerencias([
-      campo('serie-chumbada-1', SERIE, { confianca: 0.988 }),
-      campo('serie-chumbada-2', SERIE, { confianca: 0.988 }),
-      campo('serie-chumbada-3', SERIE_DA_PLACA_DEFEITUOSA, {
+      campo('serie-chumbada-topo', SERIE, { confianca: 0.988 }),
+      campo('serie-chumbada-lateral-direita', SERIE, { confianca: 0.988 }),
+      campo('serie-chumbada-traseira', SERIE_DA_PLACA_DEFEITUOSA, {
         confianca: 0.846,
         veredito: 'nao_conferivel',
         motivo: 'confianca-abaixo-do-limiar',
@@ -77,9 +77,9 @@ describe('detectarIncoerencias — descoberta do grupo e discordancia', () => {
     expect(incoerencias).toHaveLength(1);
     expect(incoerencias[0].valorEsperado).toBe(SERIE);
     expect(incoerencias[0].campos).toEqual([
-      'serie-chumbada-1',
-      'serie-chumbada-2',
-      'serie-chumbada-3',
+      'serie-chumbada-topo',
+      'serie-chumbada-lateral-direita',
+      'serie-chumbada-traseira',
     ]);
     expect(incoerencias[0].valoresLidos).toEqual([
       SERIE,
@@ -89,8 +89,8 @@ describe('detectarIncoerencias — descoberta do grupo e discordancia', () => {
 
   it('should levar confianca e veredito de cada posicao para o humano decidir', () => {
     const [incoerencia] = detectarIncoerencias([
-      campo('serie-chumbada-1', SERIE, { confianca: 0.988 }),
-      campo('serie-chumbada-2', SERIE_DA_PLACA_DEFEITUOSA, {
+      campo('serie-chumbada-topo', SERIE, { confianca: 0.988 }),
+      campo('serie-chumbada-lateral-direita', SERIE_DA_PLACA_DEFEITUOSA, {
         confianca: 0.846,
         veredito: 'nao_conferivel',
         motivo: 'confianca-abaixo-do-limiar',
@@ -99,15 +99,15 @@ describe('detectarIncoerencias — descoberta do grupo e discordancia', () => {
 
     expect(incoerencia.leituras).toEqual([
       {
-        campo: 'serie-chumbada-1',
-        fonteFisica: 'chumbado-1',
+        campo: 'serie-chumbada-topo',
+        fonteFisica: 'topo',
         valorLido: SERIE,
         confianca: 0.988,
         veredito: 'conforme',
       },
       {
-        campo: 'serie-chumbada-2',
-        fonteFisica: 'chumbado-1',
+        campo: 'serie-chumbada-lateral-direita',
+        fonteFisica: 'topo',
         valorLido: SERIE_DA_PLACA_DEFEITUOSA,
         confianca: 0.846,
         veredito: 'nao_conferivel',
@@ -119,9 +119,9 @@ describe('detectarIncoerencias — descoberta do grupo e discordancia', () => {
     // Ausencia nao e discordancia: "nao fotografei essa posicao" nunca pode
     // virar alarme de peca errada.
     const incoerencias = detectarIncoerencias([
-      campo('serie-chumbada-1', SERIE),
-      campo('serie-chumbada-2', SERIE),
-      campo('serie-chumbada-3', null, {
+      campo('serie-chumbada-topo', SERIE),
+      campo('serie-chumbada-lateral-direita', SERIE),
+      campo('serie-chumbada-traseira', null, {
         veredito: 'nao_conferivel',
         motivo: 'sem-leitura',
       }),
@@ -132,8 +132,8 @@ describe('detectarIncoerencias — descoberta do grupo e discordancia', () => {
 
   it('should NAO contar leitura so de espacos como discordancia', () => {
     const incoerencias = detectarIncoerencias([
-      campo('serie-chumbada-1', SERIE),
-      campo('serie-chumbada-2', '   ', {
+      campo('serie-chumbada-topo', SERIE),
+      campo('serie-chumbada-lateral-direita', '   ', {
         veredito: 'nao_conferivel',
         motivo: 'sem-leitura',
       }),
@@ -144,9 +144,9 @@ describe('detectarIncoerencias — descoberta do grupo e discordancia', () => {
 
   it('should nao gerar nada para grupo de um campo so (nao ha irmas)', () => {
     const incoerencias = detectarIncoerencias([
-      campo('cliente-serigrafia', 'energisa', {
+      campo('cliente-serigrafia-frente', 'energisa', {
         valorEsperado: 'Energisa',
-        fonteFisica: 'serigrafia',
+        fonteFisica: 'frente',
       }),
     ]);
 
@@ -155,8 +155,8 @@ describe('detectarIncoerencias — descoberta do grupo e discordancia', () => {
 
   it('should ignorar campo sem valor esperado (sem esperado, sem irmas)', () => {
     const incoerencias = detectarIncoerencias([
-      campo('serie-chumbada-1', SERIE),
-      campo('potencia-serigrafia', '10 kVA', {
+      campo('serie-chumbada-topo', SERIE),
+      campo('potencia-serigrafia-frente', '10 kVA', {
         valorEsperado: null,
         obrigatorio: false,
         veredito: 'nao_conferivel',
@@ -169,7 +169,7 @@ describe('detectarIncoerencias — descoberta do grupo e discordancia', () => {
 
   it('should separar grupos por valor esperado: serie discorda, patrimonio nao', () => {
     const incoerencias = detectarIncoerencias([
-      campo('serie-chumbada-1', SERIE),
+      campo('serie-chumbada-topo', SERIE),
       campo('serie-placa', SERIE_DA_PLACA_DEFEITUOSA, {
         veredito: 'divergente',
         fonteFisica: 'placa',
@@ -178,14 +178,17 @@ describe('detectarIncoerencias — descoberta do grupo e discordancia', () => {
         valorEsperado: PATRIMONIO,
         fonteFisica: 'placa',
       }),
-      campo('patrimonio-serigrafia', PATRIMONIO, {
+      campo('patrimonio-serigrafia-frente', PATRIMONIO, {
         valorEsperado: PATRIMONIO,
-        fonteFisica: 'serigrafia',
+        fonteFisica: 'frente',
       }),
     ]);
 
     expect(incoerencias).toHaveLength(1);
-    expect(incoerencias[0].campos).toEqual(['serie-chumbada-1', 'serie-placa']);
+    expect(incoerencias[0].campos).toEqual([
+      'serie-chumbada-topo',
+      'serie-placa',
+    ]);
   });
 
   it('should acusar tambem o grupo do patrimonio (a regra nao conhece "serie")', () => {
@@ -194,9 +197,9 @@ describe('detectarIncoerencias — descoberta do grupo e discordancia', () => {
         valorEsperado: PATRIMONIO,
         fonteFisica: 'placa',
       }),
-      campo('patrimonio-serigrafia', '251320', {
+      campo('patrimonio-serigrafia-frente', '251320', {
         valorEsperado: PATRIMONIO,
-        fonteFisica: 'serigrafia',
+        fonteFisica: 'frente',
         veredito: 'divergente',
       }),
     ]);
@@ -207,8 +210,8 @@ describe('detectarIncoerencias — descoberta do grupo e discordancia', () => {
 
   it('should agrupar pelo esperado NORMALIZADO (espaco e caixa nao criam grupo novo)', () => {
     const incoerencias = detectarIncoerencias([
-      campo('serie-chumbada-1', SERIE, { valorEsperado: ` ${SERIE} ` }),
-      campo('serie-chumbada-2', SERIE_DA_PLACA_DEFEITUOSA, {
+      campo('serie-chumbada-topo', SERIE, { valorEsperado: ` ${SERIE} ` }),
+      campo('serie-chumbada-lateral-direita', SERIE_DA_PLACA_DEFEITUOSA, {
         veredito: 'divergente',
       }),
     ]);
@@ -218,9 +221,9 @@ describe('detectarIncoerencias — descoberta do grupo e discordancia', () => {
 
   it('should tratar leituras que so diferem por caixa/espaco como concordantes', () => {
     const incoerencias = detectarIncoerencias([
-      campo('cliente-serigrafia', 'Energisa', {
+      campo('cliente-serigrafia-frente', 'Energisa', {
         valorEsperado: 'Energisa',
-        fonteFisica: 'serigrafia',
+        fonteFisica: 'frente',
       }),
       campo('cliente-placa', ' energisa ', {
         valorEsperado: 'Energisa',
@@ -238,8 +241,8 @@ describe('detectarIncoerencias — precedencia com as guardas existentes', () =>
     // discordaram; a sobrevivente e a de maior confianca. Usa-la aqui faria a
     // incoerencia depender do desempate. O campo ja e nao_conferivel.
     const incoerencias = detectarIncoerencias([
-      campo('serie-chumbada-1', SERIE),
-      campo('serie-chumbada-2', SERIE),
+      campo('serie-chumbada-topo', SERIE),
+      campo('serie-chumbada-lateral-direita', SERIE),
       campo('serie-placa', SERIE_DA_PLACA_DEFEITUOSA, {
         fonteFisica: 'placa',
         veredito: 'nao_conferivel',
@@ -254,8 +257,8 @@ describe('detectarIncoerencias — precedencia com as guardas existentes', () =>
     // A marcacao do vizinho lida no lugar errado nao e afirmacao sobre esta
     // posicao: compara-la geraria discordancia fantasma em peca correta.
     const incoerencias = detectarIncoerencias([
-      campo('serie-chumbada-1', SERIE),
-      campo('serie-chumbada-2', PATRIMONIO, {
+      campo('serie-chumbada-topo', SERIE),
+      campo('serie-chumbada-lateral-direita', PATRIMONIO, {
         veredito: 'nao_conferivel',
         motivo: 'leitura-de-outro-campo',
       }),
@@ -266,11 +269,11 @@ describe('detectarIncoerencias — precedencia com as guardas existentes', () =>
 
   it('should manter a incoerencia entre as irmas SOBRANTES quando uma e excluida', () => {
     const incoerencias = detectarIncoerencias([
-      campo('serie-chumbada-1', SERIE),
-      campo('serie-chumbada-2', SERIE_DA_PLACA_DEFEITUOSA, {
+      campo('serie-chumbada-topo', SERIE),
+      campo('serie-chumbada-lateral-direita', SERIE_DA_PLACA_DEFEITUOSA, {
         veredito: 'divergente',
       }),
-      campo('serie-chumbada-3', PATRIMONIO, {
+      campo('serie-chumbada-traseira', PATRIMONIO, {
         veredito: 'nao_conferivel',
         motivo: 'leitura-de-outro-campo',
       }),
@@ -278,8 +281,8 @@ describe('detectarIncoerencias — precedencia com as guardas existentes', () =>
 
     expect(incoerencias).toHaveLength(1);
     expect(incoerencias[0].campos).toEqual([
-      'serie-chumbada-1',
-      'serie-chumbada-2',
+      'serie-chumbada-topo',
+      'serie-chumbada-lateral-direita',
     ]);
   });
 
@@ -287,8 +290,8 @@ describe('detectarIncoerencias — precedencia com as guardas existentes', () =>
     // Diferente de conflitante/trocado, confianca baixa ainda e uma afirmacao
     // sobre ESTA posicao. Excluir aqui apagaria exatamente o sinal medido.
     const incoerencias = detectarIncoerencias([
-      campo('serie-chumbada-1', SERIE),
-      campo('serie-chumbada-2', SERIE_DA_PLACA_DEFEITUOSA, {
+      campo('serie-chumbada-topo', SERIE),
+      campo('serie-chumbada-lateral-direita', SERIE_DA_PLACA_DEFEITUOSA, {
         confianca: 0.35,
         veredito: 'nao_conferivel',
         motivo: 'confianca-abaixo-do-limiar',
@@ -300,13 +303,18 @@ describe('detectarIncoerencias — precedencia com as guardas existentes', () =>
 });
 
 describe('detectarIncoerencias — checklist e dado, nao codigo', () => {
+  // Vistas em que um modelo pode carregar a serie chumbada. A quantidade de
+  // posicoes e dado da checklist, nao constante do codigo — e por isso a lista
+  // aqui e so uma fonte de nomes plausiveis.
+  const VISTAS = ['topo', 'lateral-direita', 'traseira', 'lateral-esquerda'];
+
   function chumbados(quantidade: number, valorDoUltimo: string) {
     return Array.from({ length: quantidade }, (_, indice) =>
       campo(
-        `serie-chumbada-${indice + 1}`,
+        `serie-chumbada-${VISTAS[indice]}`,
         indice === quantidade - 1 ? valorDoUltimo : SERIE,
         {
-          fonteFisica: `chumbado-${indice + 1}`,
+          fonteFisica: VISTAS[indice],
           veredito:
             indice === quantidade - 1 && valorDoUltimo !== SERIE
               ? 'divergente'
@@ -339,9 +347,9 @@ describe('detectarIncoerencias — checklist e dado, nao codigo', () => {
   it('should funcionar com campos nomeados fora da convencao TRAEL', () => {
     // Outro cliente, outros nomes: o grupo sai do valor esperado, nao do nome.
     const incoerencias = detectarIncoerencias([
-      campo('nr-serie-tanque', SERIE, { fonteFisica: 'chumbado-1' }),
+      campo('nr-serie-tanque', SERIE, { fonteFisica: 'topo' }),
       campo('nr-serie-flange', SERIE_DA_PLACA_DEFEITUOSA, {
-        fonteFisica: 'chumbado-2',
+        fonteFisica: 'lateral-direita',
         veredito: 'divergente',
       }),
     ]);
@@ -353,7 +361,7 @@ describe('detectarIncoerencias — checklist e dado, nao codigo', () => {
     // Colisao benigna: se os dois esperados sao o mesmo numero, todas as
     // marcacoes realmente deveriam mostrar esse numero.
     const incoerencias = detectarIncoerencias([
-      campo('serie-chumbada-1', SERIE),
+      campo('serie-chumbada-topo', SERIE),
       campo('patrimonio-placa', SERIE_DA_PLACA_DEFEITUOSA, {
         valorEsperado: SERIE,
         fonteFisica: 'placa',
@@ -363,7 +371,7 @@ describe('detectarIncoerencias — checklist e dado, nao codigo', () => {
 
     expect(incoerencias).toHaveLength(1);
     expect(incoerencias[0].campos).toEqual([
-      'serie-chumbada-1',
+      'serie-chumbada-topo',
       'patrimonio-placa',
     ]);
   });
@@ -387,14 +395,14 @@ describe('conferir — incoerencia no veredito geral', () => {
   }
 
   const CHECKLIST_CHUMBADOS = [
-    item('serie-chumbada-1', 'chumbado-1'),
-    item('serie-chumbada-2', 'chumbado-2'),
-    item('serie-chumbada-3', 'chumbado-3'),
+    item('serie-chumbada-topo', 'topo'),
+    item('serie-chumbada-lateral-direita', 'lateral-direita'),
+    item('serie-chumbada-traseira', 'traseira'),
   ];
   const ESPERADOS_CHUMBADOS = {
-    'serie-chumbada-1': SERIE,
-    'serie-chumbada-2': SERIE,
-    'serie-chumbada-3': SERIE,
+    'serie-chumbada-topo': SERIE,
+    'serie-chumbada-lateral-direita': SERIE,
+    'serie-chumbada-traseira': SERIE,
   };
 
   it('should devolver incoerencias vazio quando as tres posicoes concordam', () => {
@@ -402,9 +410,9 @@ describe('conferir — incoerencia no veredito geral', () => {
       CHECKLIST_CHUMBADOS,
       ESPERADOS_CHUMBADOS,
       [
-        leitura('serie-chumbada-1', SERIE),
-        leitura('serie-chumbada-2', SERIE),
-        leitura('serie-chumbada-3', SERIE),
+        leitura('serie-chumbada-topo', SERIE),
+        leitura('serie-chumbada-lateral-direita', SERIE),
+        leitura('serie-chumbada-traseira', SERIE),
       ],
       { limiarConfianca: LIMIAR },
     );
@@ -418,9 +426,9 @@ describe('conferir — incoerencia no veredito geral', () => {
       CHECKLIST_CHUMBADOS,
       ESPERADOS_CHUMBADOS,
       [
-        leitura('serie-chumbada-1', SERIE, 0.988),
-        leitura('serie-chumbada-2', SERIE, 0.988),
-        leitura('serie-chumbada-3', SERIE_DA_PLACA_DEFEITUOSA, 0.846),
+        leitura('serie-chumbada-topo', SERIE, 0.988),
+        leitura('serie-chumbada-lateral-direita', SERIE, 0.988),
+        leitura('serie-chumbada-traseira', SERIE_DA_PLACA_DEFEITUOSA, 0.846),
       ],
       { limiarConfianca: LIMIAR },
     );
@@ -444,9 +452,9 @@ describe('conferir — incoerencia no veredito geral', () => {
       CHECKLIST_CHUMBADOS,
       ESPERADOS_CHUMBADOS,
       [
-        leitura('serie-chumbada-1', SERIE),
-        leitura('serie-chumbada-2', SERIE),
-        leitura('serie-chumbada-3', SERIE_DA_PLACA_DEFEITUOSA),
+        leitura('serie-chumbada-topo', SERIE),
+        leitura('serie-chumbada-lateral-direita', SERIE),
+        leitura('serie-chumbada-traseira', SERIE_DA_PLACA_DEFEITUOSA),
       ],
       { limiarConfianca: LIMIAR },
     );
@@ -463,15 +471,19 @@ describe('conferir — incoerencia no veredito geral', () => {
     // bloqueia sozinho. Opcional que leu OUTRO NUMERO nao e "opcional
     // ilegivel" — e peca sobre a qual nao se pode afirmar conforme.
     const checklist = [
-      item('serie-chumbada-1', 'chumbado-1'),
-      item('serie-chumbada-2', 'chumbado-2', false),
+      item('serie-chumbada-topo', 'topo'),
+      item('serie-chumbada-lateral-direita', 'lateral-direita', false),
     ];
     const resultado = conferir(
       checklist,
-      { 'serie-chumbada-1': SERIE, 'serie-chumbada-2': SERIE },
+      { 'serie-chumbada-topo': SERIE, 'serie-chumbada-lateral-direita': SERIE },
       [
-        leitura('serie-chumbada-1', SERIE),
-        leitura('serie-chumbada-2', SERIE_DA_PLACA_DEFEITUOSA, 0.5),
+        leitura('serie-chumbada-topo', SERIE),
+        leitura(
+          'serie-chumbada-lateral-direita',
+          SERIE_DA_PLACA_DEFEITUOSA,
+          0.5,
+        ),
       ],
       { limiarConfianca: LIMIAR },
     );
@@ -486,13 +498,16 @@ describe('conferir — incoerencia no veredito geral', () => {
     // Contraprova do teste anterior: ausencia nao gera incoerencia e o
     // criterio 4 do SPEC (opcional ilegivel nao bloqueia) segue valendo.
     const checklist = [
-      item('serie-chumbada-1', 'chumbado-1'),
-      item('serie-chumbada-2', 'chumbado-2', false),
+      item('serie-chumbada-topo', 'topo'),
+      item('serie-chumbada-lateral-direita', 'lateral-direita', false),
     ];
     const resultado = conferir(
       checklist,
-      { 'serie-chumbada-1': SERIE, 'serie-chumbada-2': SERIE },
-      [leitura('serie-chumbada-1', SERIE), leitura('serie-chumbada-2', null)],
+      { 'serie-chumbada-topo': SERIE, 'serie-chumbada-lateral-direita': SERIE },
+      [
+        leitura('serie-chumbada-topo', SERIE),
+        leitura('serie-chumbada-lateral-direita', null),
+      ],
       { limiarConfianca: LIMIAR },
     );
 
@@ -505,44 +520,74 @@ describe('conferir — cenario-ancora com a peca de demonstracao', () => {
   // Peca real: etiqueta e chumbados 847233, placa gravada 847833. A placa
   // DIVERGE de verdade e as irmas concordam entre si — a incoerencia tem de
   // APONTAR a placa, nunca suavizar o divergente para "ruido de OCR".
+  //
+  // Checklist IDENTICA a do seed (EPT-163-PI-676) depois da troca de eixo:
+  // `fonteFisica` e a VISTA, e o patrimonio serigrafado aparece em DUAS delas
+  // (topo e frente). Com isso os dois grupos de irmaos ficam de tamanhos
+  // diferentes — serie tem 4 membros (3 chumbadas + placa), patrimonio tem 3
+  // (2 serigrafias + placa) —, o que e exatamente o que se quer exercitar: a
+  // descoberta do grupo sai do VALOR ESPERADO, nunca de lista em codigo.
   const checklist: ItemChecklist[] = [
-    { campo: 'serie-chumbada-1', fonteFisica: 'chumbado-1', obrigatorio: true },
-    { campo: 'serie-chumbada-2', fonteFisica: 'chumbado-2', obrigatorio: true },
-    { campo: 'serie-chumbada-3', fonteFisica: 'chumbado-3', obrigatorio: true },
-    { campo: 'serie-placa', fonteFisica: 'placa', obrigatorio: true },
-    { campo: 'patrimonio-placa', fonteFisica: 'placa', obrigatorio: true },
+    { campo: 'serie-chumbada-topo', fonteFisica: 'topo', obrigatorio: true },
     {
-      campo: 'patrimonio-serigrafia',
-      fonteFisica: 'serigrafia',
+      campo: 'serie-chumbada-lateral-direita',
+      fonteFisica: 'lateral-direita',
       obrigatorio: true,
     },
+    {
+      campo: 'serie-chumbada-traseira',
+      fonteFisica: 'traseira',
+      obrigatorio: true,
+    },
+    {
+      campo: 'patrimonio-serigrafia-topo',
+      fonteFisica: 'topo',
+      obrigatorio: true,
+    },
+    {
+      campo: 'patrimonio-serigrafia-frente',
+      fonteFisica: 'frente',
+      obrigatorio: true,
+    },
+    { campo: 'serie-placa', fonteFisica: 'placa', obrigatorio: true },
+    { campo: 'patrimonio-placa', fonteFisica: 'placa', obrigatorio: true },
   ];
   const esperados = {
-    'serie-chumbada-1': SERIE,
-    'serie-chumbada-2': SERIE,
-    'serie-chumbada-3': SERIE,
+    'serie-chumbada-topo': SERIE,
+    'serie-chumbada-lateral-direita': SERIE,
+    'serie-chumbada-traseira': SERIE,
+    'patrimonio-serigrafia-topo': PATRIMONIO,
+    'patrimonio-serigrafia-frente': PATRIMONIO,
     'serie-placa': SERIE,
     'patrimonio-placa': PATRIMONIO,
-    'patrimonio-serigrafia': PATRIMONIO,
   };
   const resultado = conferir(
     checklist,
     esperados,
     [
-      { campo: 'serie-chumbada-1', valorLido: SERIE, confianca: 0.999 },
-      { campo: 'serie-chumbada-2', valorLido: SERIE, confianca: 0.998 },
-      { campo: 'serie-chumbada-3', valorLido: SERIE, confianca: 0.967 },
+      { campo: 'serie-chumbada-topo', valorLido: SERIE, confianca: 0.999 },
+      {
+        campo: 'serie-chumbada-lateral-direita',
+        valorLido: SERIE,
+        confianca: 0.998,
+      },
+      { campo: 'serie-chumbada-traseira', valorLido: SERIE, confianca: 0.967 },
+      {
+        campo: 'patrimonio-serigrafia-topo',
+        valorLido: PATRIMONIO,
+        confianca: 0.985,
+      },
+      {
+        campo: 'patrimonio-serigrafia-frente',
+        valorLido: PATRIMONIO,
+        confianca: 0.97,
+      },
       {
         campo: 'serie-placa',
         valorLido: SERIE_DA_PLACA_DEFEITUOSA,
         confianca: 0.998,
       },
       { campo: 'patrimonio-placa', valorLido: PATRIMONIO, confianca: 0.99 },
-      {
-        campo: 'patrimonio-serigrafia',
-        valorLido: PATRIMONIO,
-        confianca: 0.97,
-      },
     ],
     { limiarConfianca: LIMIAR },
   );
@@ -564,9 +609,9 @@ describe('conferir — cenario-ancora com a peca de demonstracao', () => {
     expect(resultado.incoerencias[0]).toMatchObject({
       valorEsperado: SERIE,
       campos: [
-        'serie-chumbada-1',
-        'serie-chumbada-2',
-        'serie-chumbada-3',
+        'serie-chumbada-topo',
+        'serie-chumbada-lateral-direita',
+        'serie-chumbada-traseira',
         'serie-placa',
       ],
       valoresLidos: [SERIE, SERIE_DA_PLACA_DEFEITUOSA],
@@ -579,5 +624,33 @@ describe('conferir — cenario-ancora com a peca de demonstracao', () => {
     );
 
     expect(doPatrimonio).toEqual([]);
+  });
+
+  it('should formar o grupo do patrimonio com as DUAS serigrafias e a placa', () => {
+    // Contraprova do teste acima: o grupo do patrimonio existe (nao e "vazio
+    // por acaso") — basta uma das tres posicoes discordar para ele aparecer,
+    // com os tres membros. Nomes de vista mudam, o agrupamento nao.
+    const [incoerencia] = detectarIncoerencias([
+      campo('patrimonio-serigrafia-topo', PATRIMONIO, {
+        valorEsperado: PATRIMONIO,
+        fonteFisica: 'topo',
+      }),
+      campo('patrimonio-serigrafia-frente', '251320', {
+        valorEsperado: PATRIMONIO,
+        fonteFisica: 'frente',
+        veredito: 'divergente',
+      }),
+      campo('patrimonio-placa', PATRIMONIO, {
+        valorEsperado: PATRIMONIO,
+        fonteFisica: 'placa',
+      }),
+    ]);
+
+    expect(incoerencia.campos).toEqual([
+      'patrimonio-serigrafia-topo',
+      'patrimonio-serigrafia-frente',
+      'patrimonio-placa',
+    ]);
+    expect(incoerencia.valoresLidos).toEqual([PATRIMONIO, '251320']);
   });
 });

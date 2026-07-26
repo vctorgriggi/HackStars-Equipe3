@@ -282,6 +282,34 @@ Depende de: Fase 1 completa.
     projeto (campo parcialmente legível). Ficaram fora da comparação entre
     irmãos as leituras `conflitante` e `trocado` — não afirmam nada sobre a
     posição, e usá-las produziria alarme não determinista.
+- [x] T2.11 — `fonteFisica` passa a ser a VISTA da peça (descoberta desta rodada) · módulo: extracao (+ evidencias, conformidade)
+  - Motivo (decisão do time, 2026-07-25): (1) é o que a câmera fixa enxerga em
+    produção — uma câmera vê *a lateral direita*, nunca "o chumbado 2" — e é
+    como o desenho técnico se organiza; (2) elimina a numeração arbitrária
+    `chumbado-1/2/3`, que obrigava o operador a decidir qual posição era a "1"
+    sem gabarito nenhum.
+  - Feito em 2026-07-25 (agente Opus): união literal `FonteFisica` passou a
+    `base | topo | frente | traseira | lateral-esquerda | lateral-direita |
+    placa | etiqueta | geral` (as 6 primeiras são orientações; `placa` e
+    `etiqueta` continuam porque ZOOM é eixo separado de orientação — são
+    closes com captura própria). Nomes de campo distinguem a posição pela
+    vista (`serie-chumbada-topo`, `patrimonio-serigrafia-frente`), e o seed
+    ganhou o mapa medido nas fotos reais.
+  - Aceitação: `ORIGENS_DO_ESPERADO` casa por PREFIXO e não precisou mudar;
+    `fotos-evidencia` continua derivando a whitelist com `satisfies`; nenhuma
+    migration (a coluna é varchar — o valor é dado, não enum de schema).
+  - Desvio deliberado: uma vista declara MAIS DE UM alvo (o topo tem série
+    chumbada e patrimônio serigrafado), então a foto com um número legível só
+    deixa de casar 1-para-1 e sai `nao_conferivel`. É a correção estrutural do
+    bug medido da tampa (o patrimônio em tinta era lido como a série chumbada):
+    a ambiguidade fica explícita em vez de virar um `divergente` falso. Fixado
+    em `textract.extractor.spec.ts` ("vista com duas marcações").
+  - Desvio 2: o desdobramento do patrimônio serigrafado em DUAS vistas (topo e
+    frente) entrou no seed — é o que o desenho pede (docs/visao-ocr.md), e a
+    checklist antiga tinha um item só; "faltou o patrimônio de uma face" era
+    não conformidade real passando despercebida. Nenhum item em `base`: a
+    vista existe no vocabulário, mas sem foto dela um obrigatório ali tornaria
+    o critério 3 do SPEC inalcançável.
 
 ## Fase 3 — Fluxo de conferência ponta a ponta
 
@@ -388,9 +416,10 @@ demo.
     nunca cria ProjetoModelo direto — sempre passa pela revisão (T6.2).
   - Nota (rodada de análise, 2026-07-25): o PDF é só o projeto de SERIGRAFIA —
     placa e chumbados não nascem dele. A proposta deve vir pré-populada com o
-    esqueleto padrão (serie-chumbada-1..3, serie-placa, patrimonio-placa) e o
-    PDF contribui os itens de serigrafia; origem do 3× é decisão em aberto no
-    SPEC (padrão de fábrica × por modelo).
+    esqueleto padrão (serie-chumbada-topo/-lateral-direita/-traseira,
+    serie-placa, patrimonio-placa) e o PDF contribui os itens de serigrafia;
+    em quais VISTAS cada marcação está é decisão em aberto no SPEC (o mapa do
+    seed foi medido nas fotos, não lido do desenho).
 - [ ] T6.2 — Tela de revisão e aprovação da checklist · módulo: frontend (+ projetos-modelo)
   - Verificação manual: editar um item extraído errado e aprovar; ProjetoModelo
     criado reflete a edição.

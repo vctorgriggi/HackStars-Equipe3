@@ -37,7 +37,7 @@ export const PAGINA_DEMO = `<!doctype html>
     --ambar-fundo: #fff5e0;
     --verde: #1e6b41;
     --verde-fundo: #e8f5ed;
-    /* Coerência entre posições: cor PRÓPRIA, para não ser lida como veredito
+    /* Coerência entre marcações: cor PRÓPRIA, para não ser lida como veredito
        (vermelho = divergente) nem como achado livre (âmbar). */
     --violeta: #553091;
     --violeta-fundo: #f1ecfb;
@@ -208,29 +208,16 @@ export const PAGINA_DEMO = `<!doctype html>
     font-size: 15px;
     cursor: pointer;
   }
-  .botao-foto.grande { min-height: 60px; min-width: 150px; font-size: 16px; font-weight: 600; }
-  .botao-foto.desativado { opacity: .5; cursor: default; font-weight: 400; }
+  .botao-foto.grande { min-height: 60px; min-width: 132px; font-size: 16px; font-weight: 600; }
   .miniatura {
     width: 46px; height: 46px; object-fit: cover;
     border: 1px solid var(--borda); border-radius: 4px; background: #e6e9ec;
   }
-  .item-foto.grupo { display: block; }
-  .cabeca-grupo { display: flex; align-items: center; gap: 10px; }
-  .item-foto.grupo .dica, .item-foto.grupo .contexto { margin-top: 8px; }
-  .item-foto.grupo .contexto { margin-bottom: 0; font-size: 12px; }
-  .tiras { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-  .tira {
-    width: 104px; padding: 6px; text-align: center;
-    border: 1px solid var(--borda); border-radius: 4px; background: #fff;
-  }
-  .tira img {
-    display: block; width: 90px; height: 68px; object-fit: cover;
-    border-radius: 3px; background: #e6e9ec;
-  }
-  .tira .rotulo { display: block; font-size: 12px; color: var(--tinta-fraca); margin: 5px 0; }
-  .tira button {
-    width: 100%; min-height: 44px; padding: 6px; font-size: 13px;
-    background: #fff; color: var(--vermelho); border-color: var(--vermelho);
+  /* Vista com mais de uma marcação: o aviso precisa saltar do resto do cartão,
+     mas sem cor de veredito (não é alarme — é instrução de enquadramento). */
+  .item-foto .multi {
+    display: block; font-size: 12px; font-family: inherit; margin-top: 2px;
+    color: var(--tinta); font-weight: 600;
   }
   .item-leitura { padding: 10px 0; border-bottom: 1px solid var(--borda); }
   .item-leitura:last-child { border-bottom: 0; }
@@ -405,7 +392,8 @@ export const PAGINA_DEMO = `<!doctype html>
 
   <section id="sec-fotos" data-bloqueado="1">
     <h2><span class="num">3</span> Fotografar a peça</h2>
-    <p class="contexto">Em produção a câmera captura sozinha as vistas ao detectar a peça.</p>
+    <p class="contexto">Em produção a câmera captura sozinha as vistas ao detectar a peça. Uma foto por vista: cada cartão diz quais marcações daquela face o sistema vai conferir.</p>
+    <p class="contexto">Vista com <b>mais de uma marcação</b> (o topo tem série chumbada e patrimônio serigrafado): enquadre as duas. Se a visão só conseguir ler um número, o sistema devolve <b>não conferível</b> em vez de adivinhar qual dos dois ele é — é o que impede o patrimônio serigrafado de ser lido como série chumbada.</p>
     <p class="dica" id="fotos-recorte">Escolha uma etapa no passo 1 para ver quais vistas ela confere.</p>
     <div id="lista-fotos"></div>
     <div id="fotos-aviso" class="aviso neutro" hidden></div>
@@ -459,47 +447,68 @@ export const PAGINA_DEMO = `<!doctype html>
 
   var API = '/api/v1';
 
-  var FONTES = ['placa', 'serigrafia', 'chumbado-1', 'chumbado-2', 'chumbado-3', 'geral'];
+  // fonteFisica = QUAL VISTA da peça a foto mostra (não "qual marcação"). As
+  // seis primeiras são orientações; 'placa' e 'etiqueta' são CLOSES (ficam
+  // sobre uma face, mas o texto é pequeno demais para a foto de vista inteira);
+  // 'geral' é escape. Fonte única: src/extracao/ports/extractor.port.ts.
+  var FONTES = [
+    'topo', 'frente', 'traseira', 'lateral-esquerda', 'lateral-direita',
+    'base', 'placa', 'etiqueta', 'geral'
+  ];
 
-  var CAMPOS = [
-    { campo: 'serie-chumbada-1', fonte: 'chumbado-1' },
-    { campo: 'serie-chumbada-2', fonte: 'chumbado-2' },
-    { campo: 'serie-chumbada-3', fonte: 'chumbado-3' },
+  // FALLBACK do modo avançado: a lista real de campos sai da checklist do
+  // ProjetoModelo (ver camposDoFormulario) — esta tabela só cobre o intervalo
+  // entre abrir a página e a checklist chegar da API.
+  var CAMPOS_FALLBACK = [
+    { campo: 'serie-chumbada-topo', fonte: 'topo' },
+    { campo: 'serie-chumbada-lateral-direita', fonte: 'lateral-direita' },
+    { campo: 'serie-chumbada-traseira', fonte: 'traseira' },
+    { campo: 'patrimonio-serigrafia-topo', fonte: 'topo' },
+    { campo: 'patrimonio-serigrafia-frente', fonte: 'frente' },
+    { campo: 'cliente-serigrafia-frente', fonte: 'frente' },
+    { campo: 'potencia-serigrafia-frente', fonte: 'frente' },
     { campo: 'serie-placa', fonte: 'placa' },
-    { campo: 'patrimonio-placa', fonte: 'placa' },
-    { campo: 'patrimonio-serigrafia', fonte: 'serigrafia' },
-    { campo: 'cliente-serigrafia', fonte: 'serigrafia' }
+    { campo: 'patrimonio-placa', fonte: 'placa' }
   ];
 
   var CLIENTE = '143091 - Energisa Rondônia Distribuidora de Energia S.A';
 
+  // Confianças medidas pelo Textract nas fotos reais (docs/visao-ocr.md): o
+  // relevo lê melhor de cima (98,8%) do que de lado (85,8%).
   var PRESET_DEMO = {
-    'serie-chumbada-1': ['847233', 0.993],
-    'serie-chumbada-2': ['847233', 0.921],
-    'serie-chumbada-3': ['847233', 0.967],
+    'serie-chumbada-topo': ['847233', 0.988],
+    'serie-chumbada-lateral-direita': ['847233', 0.858],
+    'serie-chumbada-traseira': ['847233', 0.967],
     'serie-placa': ['847833', 0.999],
     'patrimonio-placa': ['251328', 0.98],
-    'patrimonio-serigrafia': ['251328', 1],
-    'cliente-serigrafia': [CLIENTE, 0.972]
+    'patrimonio-serigrafia-topo': ['251328', 0.985],
+    'patrimonio-serigrafia-frente': ['251328', 0.984],
+    'cliente-serigrafia-frente': [CLIENTE, 0.972],
+    'potencia-serigrafia-frente': ['10 kVA', 0.985]
   };
 
   var PRESET_CORRETA = Object.assign({}, PRESET_DEMO, {
     'serie-placa': ['847233', 0.995]
   });
 
+  // Erro de dígito medido de verdade: o 8 virou 3 numa foto lateral, a 35,4%.
   var PRESET_RUIM = Object.assign({}, PRESET_DEMO, {
-    'serie-chumbada-1': ['347233', 0.354]
+    'serie-chumbada-topo': ['347233', 0.354]
   });
 
-  // FALLBACK do modo avançado: usado só enquanto a checklist do ProjetoModelo
-  // não chegou da API. O recorte de verdade é derivado dos dados (ver
-  // carregarRecorte/camposDaEtapa) — esta tabela é a última escolha, nunca a
-  // primeira.
+  // FALLBACK do recorte por etapa, pelo mesmo motivo do CAMPOS_FALLBACK. O
+  // recorte de verdade é derivado dos dados (ver carregarRecorte/camposDaEtapa)
+  // — esta tabela é a última escolha, nunca a primeira.
+  var CHUMBADAS = ['serie-chumbada-topo', 'serie-chumbada-lateral-direita', 'serie-chumbada-traseira'];
+  var SERIGRAFADAS = CHUMBADAS.concat([
+    'patrimonio-serigrafia-topo', 'patrimonio-serigrafia-frente',
+    'cliente-serigrafia-frente', 'potencia-serigrafia-frente'
+  ]);
   var CAMPOS_POR_ETAPA = {
-    'adesivacao': ['serie-chumbada-1', 'serie-chumbada-2', 'serie-chumbada-3'],
-    'serigrafia': ['serie-chumbada-1', 'serie-chumbada-2', 'serie-chumbada-3', 'patrimonio-serigrafia', 'cliente-serigrafia'],
-    'oleo-conferencia': ['serie-chumbada-1', 'serie-chumbada-2', 'serie-chumbada-3'],
-    'fixacao-placa': CAMPOS.map(function (item) { return item.campo; })
+    'adesivacao': CHUMBADAS,
+    'serigrafia': SERIGRAFADAS,
+    'oleo-conferencia': SERIGRAFADAS,
+    'fixacao-placa': CAMPOS_FALLBACK.map(function (item) { return item.campo; })
   };
 
   var TEXTO_VEREDITO = {
@@ -517,6 +526,9 @@ export const PAGINA_DEMO = `<!doctype html>
     enviando: {},
     falhas: {},
     camera: null,
+    // Último preset aplicado no modo avançado: quando a checklist chega da API
+    // o formulário é remontado com os campos reais, e ele volta preenchido.
+    preset: null,
     // Vindos da API depois do login (null = ainda não carregados/falharam):
     checklist: null,      // itens do ProjetoModelo único
     ordemPorCodigo: null, // codigo do Checkpoint -> ordem
@@ -707,6 +719,10 @@ export const PAGINA_DEMO = `<!doctype html>
       estado.mapaFontes = mapa;
       // atualizarTextoEtapa remonta a lista de fotos com o recorte no lugar.
       atualizarTextoEtapa();
+      // O modo avançado nasceu com a tabela de fallback: refaz o formulário
+      // com os campos reais do projeto e devolve o preset preenchido.
+      montarLeituras();
+      aplicarPreset(estado.preset || PRESET_DEMO);
     }).catch(function (erro) {
       estado.mapaFontes = null;
       montarFotos();
@@ -753,56 +769,12 @@ export const PAGINA_DEMO = `<!doctype html>
     });
   }
 
-  // Os 3 chumbados carregam o MESMO número de propósito: pedir ao operador que
-  // decida qual é o "1" é convenção arbitrária. A página trata as posições como
-  // um grupo e atribui a fonte canônica sozinha — a API continua recebendo
-  // chumbado-1..3 exatamente como antes.
-  function ehChumbado(fonte) { return /^chumbado-\\d+$/.test(fonte); }
-
-  function fontesChumbadas() {
-    return fontesOrdenadas().filter(ehChumbado).sort(function (a, b) {
-      return Number(a.split('-')[1]) - Number(b.split('-')[1]);
-    });
-  }
-
-  // Situação do cartão de grupo: a MELHOR entre as posições (todas nascem na
-  // mesma etapa; se um dia divergirem, a foto que ajuda o gate manda) e a
-  // união dos campos que elas conferem.
-  function situacaoDoGrupo(fontes) {
-    var melhor = null;
-    var campos = [];
-    fontes.forEach(function (fonte) {
-      var info = situacaoDaFonte(fonte);
-      info.campos.forEach(function (campo) {
-        if (campos.indexOf(campo) === -1) { campos.push(campo); }
-      });
-      if (melhor === null || PESO_SITUACAO[info.situacao] < PESO_SITUACAO[melhor.situacao]) {
-        melhor = info;
-      }
-    });
-    return {
-      situacao: melhor ? melhor.situacao : 'indefinido',
-      campos: campos,
-      entraEm: melhor ? melhor.entraEm : null
-    };
-  }
-
-  function proximoSlotLivre(fontes) {
-    for (var i = 0; i < fontes.length; i += 1) {
-      if (!estado.fotos[fontes[i]] && !estado.enviando[fontes[i]]) { return fontes[i]; }
-    }
-    return null;
-  }
-
-  // Fontes viram texto de operador: as posições chumbadas aparecem contadas,
-  // nunca numeradas (a numeração canônica é assunto da API).
+  // Uma vista = um cartão = uma foto. Não existe mais agrupamento nem
+  // numeração: o eixo de fonteFisica é a VISTA da peça, e "qual é o chumbado
+  // 2" — a pergunta sem gabarito que o agrupamento resolvia — deixou de
+  // existir junto com o eixo antigo.
   function resumoDeFontes(lista) {
-    var chumbadas = lista.filter(ehChumbado).length;
-    var partes = lista.filter(function (fonte) { return !ehChumbado(fonte); });
-    if (chumbadas) {
-      partes.push(chumbadas + (chumbadas === 1 ? ' posição chumbada' : ' posições chumbadas'));
-    }
-    return partes.join(', ');
+    return lista.join(', ');
   }
 
   // Ordem de exibição: primeiro as vistas que a etapa confere.
@@ -983,6 +955,15 @@ export const PAGINA_DEMO = `<!doctype html>
       : '';
   }
 
+  // Vista que carrega DUAS marcações ou mais (topo: série chumbada +
+  // patrimônio serigrafado; frente: 3; placa: 2). Dizer isso no cartão é o que
+  // faz o operador enquadrar as duas em vez de fotografar só a que enxergou.
+  function trechoDasMarcacoes(info) {
+    if (!info.campos || info.campos.length < 2) { return ''; }
+    return '<span class="multi">' + info.campos.length +
+      ' marcações nesta vista — enquadre todas</span>';
+  }
+
   function trechoDaMarca(info) {
     var rotulo = rotuloDaSituacao(info);
     return rotulo ? '<span class="marca-etapa">' + esc(rotulo) + '</span>' : '';
@@ -994,99 +975,35 @@ export const PAGINA_DEMO = `<!doctype html>
     return estado.fotos[fonte] ? 'enviada' : 'sem foto';
   }
 
-  // Cartão de UMA fonte (placa, serigrafia, geral): inalterado.
-  function cartaoSimples(fonte, info) {
+  // Cartão de UMA vista: miniatura, o que aquela face alimenta na checklist e
+  // um único botão de captura. A vista é o destino da foto — nada a escolher.
+  function cartaoDaVista(fonte, info) {
     var foto = estado.fotos[fonte];
     return '<div class="' + classeDoCartao(info) + '" data-fonte="' + esc(fonte) + '">' +
       '<img class="miniatura" alt="" ' + (foto && foto.url ? 'src="' + esc(foto.url) + '"' : 'hidden') + '>' +
       '<span class="nome">' + esc(fonte) +
-      trechoDaMarca(info) + trechoDosCampos(info) +
+      trechoDaMarca(info) + trechoDasMarcacoes(info) + trechoDosCampos(info) +
       '<span class="estado envio' + (estado.falhas[fonte] ? ' falhou' : '') + '">' +
       esc(textoDoEnvio(fonte)) + '</span></span>' +
-      '<label class="botao-foto">' + (foto ? 'Refotografar' : 'Fotografar') +
+      '<label class="botao-foto grande">' + (foto ? 'Refotografar' : 'Fotografar') +
       '<input type="file" accept="image/*" capture="environment" hidden></label>' +
       '</div>';
   }
 
-  // Cartão ÚNICO das posições chumbadas: um botão de captura, contador e as
-  // miniaturas já enviadas. O operador nunca escolhe o número da posição.
-  function cartaoChumbados(fontes, info) {
-    var enviadas = fontes.filter(function (fonte) { return !!estado.fotos[fonte]; });
-    var emVoo = fontes.filter(function (fonte) { return !!estado.enviando[fonte]; });
-    var falhadas = fontes.filter(function (fonte) { return !!estado.falhas[fonte]; });
-    var contador = enviadas.length + ' de ' + fontes.length + ' posições fotografadas' +
-      (emVoo.length ? ' · ' + emVoo.length + ' enviando...' : '') +
-      (falhadas.length ? ' · ' + falhadas.length + ' falhou' : '');
-
-    var tiras = enviadas.map(function (fonte, indice) {
-      return '<div class="tira" title="' + esc(fonte) + '">' +
-        '<img alt="" src="' + esc(estado.fotos[fonte].url || '') + '">' +
-        '<span class="rotulo">Posição ' + (indice + 1) + '</span>' +
-        '<button type="button" class="remover" data-fonte="' + esc(fonte) + '">Remover</button>' +
-        '</div>';
-    }).join('');
-
-    var temSlot = proximoSlotLivre(fontes) !== null;
-    var captura = temSlot
-      ? '<label class="botao-foto grande">Fotografar posição' +
-        '<input type="file" accept="image/*" capture="environment" hidden></label>'
-      : '<span class="botao-foto grande desativado">' + fontes.length + ' de ' + fontes.length +
-        ' — remova uma para refazer</span>';
-
-    return '<div class="' + classeDoCartao(info) + ' grupo" data-grupo="chumbados">' +
-      '<div class="cabeca-grupo">' +
-      '<span class="nome">Chumbados — ' + fontes.length + ' posições no metal' +
-      trechoDaMarca(info) + trechoDosCampos(info) +
-      '<span class="estado envio">' + esc(contador) + '</span></span>' +
-      captura +
-      '</div>' +
-      '<p class="dica">Fotografe cada uma das ' + fontes.length + ' posições (topo e laterais). ' +
-      'A numeração é automática — o que importa é que sejam posições diferentes.</p>' +
-      '<p class="contexto">Em produção, cada posição é uma câmera fixa provisionada — ninguém rotula nada.</p>' +
-      (tiras ? '<div class="tiras">' + tiras + '</div>' : '') +
-      '</div>';
-  }
-
   function montarFotos() {
-    var chumbados = fontesChumbadas();
-    var grupoPosto = false;
-
-    var html = fontesOrdenadas().map(function (fonte) {
-      if (ehChumbado(fonte)) {
-        // O grupo ocupa a posição do primeiro chumbado da lista ordenada.
-        if (grupoPosto) { return ''; }
-        grupoPosto = true;
-        return cartaoChumbados(chumbados, situacaoDoGrupo(chumbados));
-      }
-      return cartaoSimples(fonte, situacaoDaFonte(fonte));
+    el('lista-fotos').innerHTML = fontesOrdenadas().map(function (fonte) {
+      return cartaoDaVista(fonte, situacaoDaFonte(fonte));
     }).join('');
-    el('lista-fotos').innerHTML = html;
 
     Array.prototype.forEach.call(el('lista-fotos').querySelectorAll('.item-foto'), function (cartao) {
-      var ehGrupo = cartao.getAttribute('data-grupo') === 'chumbados';
       var entrada = cartao.querySelector('input[type=file]');
-      if (entrada) {
-        entrada.addEventListener('change', function (evento) {
-          var arquivos = evento.target.files;
-          if (!arquivos || !arquivos.length) { return; }
-          Array.prototype.forEach.call(arquivos, function (arquivo) {
-            // No grupo, o destino é o menor slot canônico livre — decidido
-            // aqui, nunca pelo operador.
-            var destino = ehGrupo
-              ? proximoSlotLivre(fontesChumbadas())
-              : cartao.getAttribute('data-fonte');
-            if (!destino) {
-              aviso('fotos-aviso', 'As posições chumbadas já estão preenchidas — remova uma para refazer.', 'neutro');
-              return;
-            }
-            enviarFoto(destino, arquivo);
-          });
-        });
-      }
-      Array.prototype.forEach.call(cartao.querySelectorAll('.remover'), function (botao) {
-        botao.addEventListener('click', function () {
-          removerFoto(botao.getAttribute('data-fonte'));
-        });
+      if (!entrada) { return; }
+      entrada.addEventListener('change', function (evento) {
+        var arquivos = evento.target.files;
+        if (!arquivos || !arquivos.length) { return; }
+        // Uma foto por vista: se o operador escolher várias, a última vale —
+        // refotografar substitui, nunca acumula slot escondido.
+        enviarFoto(cartao.getAttribute('data-fonte'), arquivos[arquivos.length - 1]);
       });
     });
   }
@@ -1123,17 +1040,6 @@ export const PAGINA_DEMO = `<!doctype html>
       .then(encerrar);
   }
 
-  // Remoção é LOCAL: solta o slot para a próxima captura e tira a foto desta
-  // conferência. A evidência já enviada continua no storage — nenhuma rota
-  // nova, nenhuma mudança de contrato.
-  function removerFoto(fonte) {
-    delete estado.fotos[fonte];
-    delete estado.falhas[fonte];
-    montarFotos();
-    atualizarBotaoExtrair();
-    aviso('fotos-aviso', 'Posição liberada — a próxima foto ocupa o lugar dela.', 'neutro');
-  }
-
   function fotosEnviadas() {
     return fontesOrdenadas().filter(function (fonte) { return !!estado.fotos[fonte]; });
   }
@@ -1151,14 +1057,24 @@ export const PAGINA_DEMO = `<!doctype html>
 
   // --- G. Modo avançado: leituras digitadas -------------------------------
 
+  // Os campos do formulário são os da checklist REAL do projeto (mesma fonte
+  // do passo 3); a tabela literal só cobre o intervalo até a API responder.
+  // Assim um campo novo no seed aparece aqui sem tocar esta página.
+  function camposDoFormulario() {
+    if (!estado.checklist || !estado.checklist.length) { return CAMPOS_FALLBACK; }
+    return estado.checklist.map(function (item) {
+      return { campo: item.campo, fonte: item.fonteFisica };
+    });
+  }
+
   function montarLeituras() {
-    var html = CAMPOS.map(function (item) {
+    var html = camposDoFormulario().map(function (item) {
       var id = 'leitura-' + item.campo;
       return '<div class="item-leitura" data-campo="' + esc(item.campo) + '" data-fonte="' + esc(item.fonte) + '">' +
         '<div class="cabeca"><label for="' + esc(id) + '">' +
         '<input type="checkbox" id="' + esc(id) + '" checked>' +
         '<span><span class="campo">' + esc(item.campo) + '</span>' +
-        '<span class="fonte"> — fonte: ' + esc(item.fonte) + '</span></span>' +
+        '<span class="fonte"> — vista: ' + esc(item.fonte) + '</span></span>' +
         '</label></div>' +
         '<div class="campos">' +
         '<input class="valor" type="text" inputmode="text" autocapitalize="none" spellcheck="false" placeholder="valor lido">' +
@@ -1173,8 +1089,10 @@ export const PAGINA_DEMO = `<!doctype html>
   }
 
   function aplicarPreset(preset) {
-    CAMPOS.forEach(function (item) {
+    estado.preset = preset;
+    camposDoFormulario().forEach(function (item) {
       var linha = linhaDoCampo(item.campo);
+      if (!linha) { return; }
       var valores = preset[item.campo];
       linha.querySelector('input[type=checkbox]').checked = true;
       linha.querySelector('.valor').value = valores ? valores[0] : '';
@@ -1211,8 +1129,10 @@ export const PAGINA_DEMO = `<!doctype html>
       return;
     }
     var permitidos = camposDaEtapa(estado.etapa);
-    CAMPOS.forEach(function (item) {
-      linhaDoCampo(item.campo).querySelector('input[type=checkbox]').checked =
+    camposDoFormulario().forEach(function (item) {
+      var linha = linhaDoCampo(item.campo);
+      if (!linha) { return; }
+      linha.querySelector('input[type=checkbox]').checked =
         permitidos.indexOf(item.campo) !== -1;
     });
     aviso('avancado-aviso', 'Campos ajustados para a etapa ' + estado.etapa + '.', 'neutro');
@@ -1220,9 +1140,9 @@ export const PAGINA_DEMO = `<!doctype html>
 
   function coletarLeituras() {
     var leituras = [];
-    CAMPOS.forEach(function (item) {
+    camposDoFormulario().forEach(function (item) {
       var linha = linhaDoCampo(item.campo);
-      if (!linha.querySelector('input[type=checkbox]').checked) { return; }
+      if (!linha || !linha.querySelector('input[type=checkbox]').checked) { return; }
       var valor = linha.querySelector('.valor').value.trim();
       var confBruta = linha.querySelector('.conf').value.trim();
       var leitura = {
@@ -1272,11 +1192,12 @@ export const PAGINA_DEMO = `<!doctype html>
     return texto.charAt(0).toUpperCase() + texto.slice(1);
   }
 
-  // Incoerência entre posições irmãs: a série é gravada várias vezes DE
-  // PROPÓSITO, e discordância entre elas é o sinal que a comparação campo a
-  // campo perde. Aqui só se EXIBE o que a API mandou: nenhuma leitura é eleita
-  // vencedora, nada é reordenado por confiança (ranking sugeriria voto) e
-  // nenhum veredito é recalculado.
+  // Incoerência entre campos irmãos: a série é gravada em VÁRIAS VISTAS de
+  // propósito (topo, lateral direita, traseira, mais a placa), e discordância
+  // entre elas é o sinal que a comparação campo a campo perde. Aqui só se
+  // EXIBE o que a API mandou: nenhuma leitura é eleita vencedora, nada é
+  // reordenado por confiança (ranking sugeriria voto) e nenhum veredito é
+  // recalculado.
   function blocoDasIncoerencias(incoerencias) {
     if (!incoerencias || !incoerencias.length) { return ''; }
 
@@ -1290,7 +1211,7 @@ export const PAGINA_DEMO = `<!doctype html>
           '<span class="campo-cru">' + esc(leitura.campo) + '</span></span>' +
           '<span class="selo v-' + esc(leitura.veredito) + '">' + esc(leitura.veredito) + '</span>' +
           '</div>' +
-          '<div class="detalhe">fonte ' + esc(leitura.fonteFisica) + ' · leu <span class="mono">' +
+          '<div class="detalhe">vista ' + esc(leitura.fonteFisica) + ' · leu <span class="mono">' +
           esc(leitura.valorLido === null ? '(sem leitura)' : leitura.valorLido) +
           '</span> · confiança ' + esc(formatarPercentual(leitura.confianca)) + '</div>';
         if (url) {
@@ -1309,12 +1230,12 @@ export const PAGINA_DEMO = `<!doctype html>
     }).join('');
 
     return '<div class="bloco-coerencia">' +
-      '<div class="titulo-coerencia">Posições que deveriam ter o mesmo número não concordam</div>' +
-      '<p class="explica">O número de série é gravado em várias posições da peça de propósito — ' +
-      'as posições chumbadas e a placa têm de carregar o mesmo número. Elas discordarem indica ' +
-      'gravação errada na peça OU leitura ruim da foto: <b>vá às fotos e confira posição por ' +
-      'posição</b>. Nenhuma leitura é eleita correta aqui — não existe voto de maioria; a ' +
-      'incoerência só impede o veredito conforme, nunca aprova nada.</p>' +
+      '<div class="titulo-coerencia">Marcações que deveriam mostrar o mesmo número não concordam</div>' +
+      '<p class="explica">A mesma informação é gravada em vistas diferentes da peça de propósito — ' +
+      'a série chumbada no topo, na lateral direita e na traseira, mais a da placa, têm de carregar ' +
+      'o mesmo número. Elas discordarem indica gravação errada na peça OU leitura ruim da foto: ' +
+      '<b>vá às fotos e confira vista por vista</b>. Nenhuma leitura é eleita correta aqui — não ' +
+      'existe voto de maioria; a incoerência só impede o veredito conforme, nunca aprova nada.</p>' +
       grupos + '</div>';
   }
 
@@ -1417,7 +1338,7 @@ export const PAGINA_DEMO = `<!doctype html>
         '<dt>esperado</dt><dd class="mono">' + esc(campo.valorEsperado === null ? '(sem valor esperado)' : campo.valorEsperado) + '</dd>' +
         '<dt>lido</dt><dd class="mono">' + esc(campo.valorLido === null ? '(sem leitura)' : campo.valorLido) + '</dd>' +
         '<dt>confiança</dt><dd>' + esc(formatarConfianca(campo.confianca)) + '</dd>' +
-        '<dt>fonte</dt><dd>' + esc(campo.fonteFisica) + (campo.obrigatorio ? ' (obrigatório)' : ' (opcional)') + '</dd>';
+        '<dt>vista</dt><dd>' + esc(campo.fonteFisica) + (campo.obrigatorio ? ' (obrigatório)' : ' (opcional)') + '</dd>';
       if (campo.motivo) {
         bloco += '<dt>motivo</dt><dd>' + esc(campo.motivo) + '</dd>';
       }

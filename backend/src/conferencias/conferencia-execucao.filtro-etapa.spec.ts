@@ -25,16 +25,21 @@ function item(
   return { campo, fonteFisica, obrigatorio, ...(etapa ? { etapa } : {}) };
 }
 
-/** Checklist do EPT-163-PI-676 (peca de demo), como o seed a grava. */
+/**
+ * Checklist do EPT-163-PI-676 (peca de demo), na MESMA ordem em que o seed a
+ * grava — `fonteFisica` e a VISTA da peca, e o patrimonio serigrafado aparece
+ * em DUAS vistas (topo e frente), como o desenho pede.
+ */
 const CHECKLIST_DEMO: ItemChecklist[] = [
-  item('serie-chumbada-1', 'adesivacao', true, 'chumbado-1'),
-  item('serie-chumbada-2', 'adesivacao', true, 'chumbado-2'),
-  item('serie-chumbada-3', 'adesivacao', true, 'chumbado-3'),
+  item('serie-chumbada-topo', 'adesivacao', true, 'topo'),
+  item('serie-chumbada-lateral-direita', 'adesivacao', true, 'lateral-direita'),
+  item('serie-chumbada-traseira', 'adesivacao', true, 'traseira'),
+  item('patrimonio-serigrafia-topo', 'serigrafia', true, 'topo'),
+  item('patrimonio-serigrafia-frente', 'serigrafia', true, 'frente'),
+  item('cliente-serigrafia-frente', 'serigrafia', true, 'frente'),
+  item('potencia-serigrafia-frente', 'serigrafia', false, 'frente'),
   item('serie-placa', 'fixacao-placa', true, 'placa'),
   item('patrimonio-placa', 'fixacao-placa', true, 'placa'),
-  item('patrimonio-serigrafia', 'serigrafia', true, 'serigrafia'),
-  item('cliente-serigrafia', 'serigrafia', true, 'serigrafia'),
-  item('potencia-serigrafia', 'serigrafia', false, 'serigrafia'),
 ];
 
 function campos(itens: ItemChecklist[]): string[] {
@@ -46,9 +51,9 @@ describe('filtrarChecklistPorEtapa — recorte cumulativo por etapa', () => {
     const recorte = filtrarChecklistPorEtapa(CHECKLIST_DEMO, 1, ORDENS);
 
     expect(campos(recorte.itens)).toEqual([
-      'serie-chumbada-1',
-      'serie-chumbada-2',
-      'serie-chumbada-3',
+      'serie-chumbada-topo',
+      'serie-chumbada-lateral-direita',
+      'serie-chumbada-traseira',
     ]);
     expect(recorte.etapasDesconhecidas).toEqual([]);
   });
@@ -57,12 +62,13 @@ describe('filtrarChecklistPorEtapa — recorte cumulativo por etapa', () => {
     const recorte = filtrarChecklistPorEtapa(CHECKLIST_DEMO, 2, ORDENS);
 
     expect(campos(recorte.itens)).toEqual([
-      'serie-chumbada-1',
-      'serie-chumbada-2',
-      'serie-chumbada-3',
-      'patrimonio-serigrafia',
-      'cliente-serigrafia',
-      'potencia-serigrafia',
+      'serie-chumbada-topo',
+      'serie-chumbada-lateral-direita',
+      'serie-chumbada-traseira',
+      'patrimonio-serigrafia-topo',
+      'patrimonio-serigrafia-frente',
+      'cliente-serigrafia-frente',
+      'potencia-serigrafia-frente',
     ]);
   });
 
@@ -79,12 +85,13 @@ describe('filtrarChecklistPorEtapa — recorte cumulativo por etapa', () => {
     const recorte = filtrarChecklistPorEtapa(CHECKLIST_DEMO, 3, ORDENS);
 
     expect(campos(recorte.itens)).toEqual([
-      'serie-chumbada-1',
-      'serie-chumbada-2',
-      'serie-chumbada-3',
-      'patrimonio-serigrafia',
-      'cliente-serigrafia',
-      'potencia-serigrafia',
+      'serie-chumbada-topo',
+      'serie-chumbada-lateral-direita',
+      'serie-chumbada-traseira',
+      'patrimonio-serigrafia-topo',
+      'patrimonio-serigrafia-frente',
+      'cliente-serigrafia-frente',
+      'potencia-serigrafia-frente',
     ]);
   });
 
@@ -98,14 +105,17 @@ describe('filtrarChecklistPorEtapa — recorte cumulativo por etapa', () => {
   it('should incluir sempre o item sem etapa, mesmo no primeiro gate', () => {
     // Compatibilidade com checklist antiga (gravada antes do campo `etapa`).
     const checklist = [
-      item('serie-chumbada-1', 'adesivacao', true, 'chumbado-1'),
+      item('serie-chumbada-topo', 'adesivacao', true, 'topo'),
       item('serie-placa', 'fixacao-placa'),
       item('campo-legado'),
     ];
 
     const recorte = filtrarChecklistPorEtapa(checklist, 1, ORDENS);
 
-    expect(campos(recorte.itens)).toEqual(['serie-chumbada-1', 'campo-legado']);
+    expect(campos(recorte.itens)).toEqual([
+      'serie-chumbada-topo',
+      'campo-legado',
+    ]);
   });
 
   it('should tratar etapa vazia como item sem etapa', () => {
@@ -123,7 +133,7 @@ describe('filtrarChecklistPorEtapa — recorte cumulativo por etapa', () => {
     // Dado de checklist inconsistente nao pode derrubar a conferencia nem
     // fazer campo obrigatorio sumir do gate (falso OK).
     const checklist = [
-      item('serie-chumbada-1', 'adesivacao', true, 'chumbado-1'),
+      item('serie-chumbada-topo', 'adesivacao', true, 'topo'),
       item('serie-placa', 'etapa-inexistente'),
       item('patrimonio-placa', 'etapa-inexistente'),
     ];
@@ -131,7 +141,7 @@ describe('filtrarChecklistPorEtapa — recorte cumulativo por etapa', () => {
     const recorte = filtrarChecklistPorEtapa(checklist, 1, ORDENS);
 
     expect(campos(recorte.itens)).toEqual([
-      'serie-chumbada-1',
+      'serie-chumbada-topo',
       'serie-placa',
       'patrimonio-placa',
     ]);

@@ -99,19 +99,24 @@ curl -s -X POST http://localhost:3001/api/v1/conferencias/executar \
     "payloadQr": "{\"numeroSerie\":\"847233\",\"patrimonio\":\"251328\",\"cliente\":\"143091 - Energisa Rondônia Distribuidora de Energia S.A\",\"codigoProjeto\":\"EPT-163-PI-676\"}",
     "etapaCodigo": "fixacao-placa",
     "leituras": [
-      { "campo": "serie-chumbada-1",  "valorLido": "847233",       "confianca": 0.96 },
+      { "campo": "serie-chumbada-topo", "valorLido": "847233",     "confianca": 0.96 },
       { "campo": "serie-placa",       "valorLido": "847833",       "confianca": 0.98 },
       { "campo": "patrimonio-placa",  "valorLido": "251328",       "confianca": 0.95 },
-      { "campo": "cliente-serigrafia","valorLido": "143091 - Energisa Rondônia Distribuidora de Energia S.A", "confianca": 0.93 }
+      { "campo": "cliente-serigrafia-frente","valorLido": "143091 - Energisa Rondônia Distribuidora de Energia S.A", "confianca": 0.93 }
     ]
   }'
 ```
 
 Resultado esperado: `vereditoGeral: "divergente"`, com `serie-placa` como o
 único campo `divergente`. Os campos obrigatórios do checklist sem leitura neste
-exemplo abreviado (`serie-chumbada-2/3`, `patrimonio-serigrafia`) voltam
-`nao_conferivel` — enviando as 7 leituras completas, o resultado é exatamente o
+exemplo abreviado (`serie-chumbada-lateral-direita`, `serie-chumbada-traseira`,
+`patrimonio-serigrafia-topo`, `patrimonio-serigrafia-frente`) voltam
+`nao_conferivel` — enviando as 8 leituras completas, o resultado é exatamente o
 critério de aceitação 2 do SPEC.
+
+O nome do campo diz a VISTA em que a marcação está (`-topo`,
+`-lateral-direita`, `-traseira`, `-frente`), nunca um número de posição: é o
+mesmo eixo de `fonteFisica` das fotos, e é o que uma câmera fixa enxerga.
 
 ## Ver funcionando (celular ou navegador)
 

@@ -62,8 +62,8 @@ describe('dedupeLeituras', () => {
   it('should mesmo valor com caixa/espaço diferentes NÃO é conflito (normalização da engine)', () => {
     const resultado = dedupeLeituras(
       [
-        leitura('cliente-serigrafia', 'ENERGISA', 0.97),
-        leitura('cliente-serigrafia', ' energisa ', 0.93),
+        leitura('cliente-serigrafia-frente', 'ENERGISA', 0.97),
+        leitura('cliente-serigrafia-frente', ' energisa ', 0.93),
       ],
       LIMIAR,
     );
@@ -74,8 +74,8 @@ describe('dedupeLeituras', () => {
   it('should leitura abaixo do limiar discordando é ruído: não veta a leitura válida', () => {
     const resultado = dedupeLeituras(
       [
-        leitura('serie-chumbada-1', '847233', 0.999),
-        leitura('serie-chumbada-1', '841233', 0.354),
+        leitura('serie-chumbada-topo', '847233', 0.999),
+        leitura('serie-chumbada-topo', '841233', 0.354),
       ],
       LIMIAR,
     );

@@ -110,10 +110,12 @@ describe('interpretarBlocos — ambiguidade nao vira chute', () => {
   });
 
   it('should aceitar o unico numero quando ha exatamente um campo pendente', () => {
+    // Vista que carrega UMA marcacao numerica so (a traseira, no desenho da
+    // peca de demo): 1 numero livre para 1 campo pendente resolve.
     const [leitura] = ler(
       [linha('847233', 0.5)],
-      [{ campo: 'serie-chumbada-1' }],
-      foto('chumbado-1'),
+      [{ campo: 'serie-chumbada-traseira' }],
+      foto('traseira'),
     );
 
     expect(leitura.valorLido).toBe('847233');
@@ -123,11 +125,74 @@ describe('interpretarBlocos — ambiguidade nao vira chute', () => {
   it('should ignorar sequencia com menos de seis digitos', () => {
     const [leitura] = ler(
       [linha('12345', 0.5)],
-      [{ campo: 'serie-chumbada-1' }],
-      foto('chumbado-1'),
+      [{ campo: 'serie-chumbada-traseira' }],
+      foto('traseira'),
     );
 
     expect(leitura.valorLido).toBeNull();
+  });
+});
+
+// A REGRESSAO QUE ESTA SUITE FIXA (bug medido da tampa, docs/visao-ocr.md):
+// com `fonteFisica` por marcacao, a foto do topo entrava como `chumbado-1` e
+// declarava UM alvo so; o Textract enxergava apenas o patrimonio SERIGRAFADO
+// (tinta preta, alto contraste) e o casava com o campo da serie CHUMBADA
+// (relevo, quase invisivel) — numero errado entregue com confianca alta.
+//
+// Com `fonteFisica` por VISTA, a mesma foto declara os DOIS alvos que moram
+// naquela face, o caso deixa de ser 1-para-1 e a leitura sai NULA. Campo nulo
+// vira `nao_conferivel` na engine, que e a resposta honesta para "vi uma
+// marcacao das duas e nao sei qual". PIORAR a leitura aqui e o objetivo: o
+// falso `divergente` mandava peca boa para retrabalho.
+describe('interpretarBlocos — vista com duas marcacoes (topo)', () => {
+  const ALVOS_TOPO: CampoAlvo[] = [
+    { campo: 'serie-chumbada-topo' },
+    { campo: 'patrimonio-serigrafia-topo' },
+  ];
+
+  it('should recusar os dois campos quando a vista mostra UM numero sem rotulo', () => {
+    const leituras = porCampo(
+      ler([linha('251328', 0.4)], ALVOS_TOPO, foto('topo')),
+    );
+
+    expect(leituras.get('serie-chumbada-topo')?.valorLido).toBeNull();
+    expect(leituras.get('patrimonio-serigrafia-topo')?.valorLido).toBeNull();
+  });
+
+  it('should devolver o numero recusado como achado livre, nao como leitura', () => {
+    // O alarme de consistencia continua vendo o que a heuristica nao ousou
+    // afirmar — recusar leitura nao e jogar informacao fora.
+    const { achadosLivres } = interpretarBlocos(
+      [linha('251328', 0.4)],
+      ALVOS_TOPO,
+      foto('topo'),
+    );
+
+    expect(achadosLivres.map((achado) => achado.texto)).toEqual(['251328']);
+  });
+
+  it('should recusar tambem quando os DOIS numeros aparecem sem rotulo', () => {
+    const leituras = ler(
+      [linha('847233', 0.3), linha('251328', 0.6)],
+      ALVOS_TOPO,
+      foto('topo'),
+    );
+
+    expect(leituras.every((leitura) => leitura.valorLido === null)).toBe(true);
+  });
+
+  it('should resolver a vista de duas marcacoes quando ha rotulo que desambigua', () => {
+    // O rotulo e a unica evidencia que autoriza a leitura: com ele, a foto do
+    // topo entrega o patrimonio e a serie chumbada segue pendente (a peca a
+    // tem em relevo, e o OCR nao a leu).
+    const leituras = porCampo(
+      ler([linha('PATRIMONIO 251328', 0.4)], ALVOS_TOPO, foto('topo')),
+    );
+
+    expect(leituras.get('patrimonio-serigrafia-topo')?.valorLido).toBe(
+      '251328',
+    );
+    expect(leituras.get('serie-chumbada-topo')?.valorLido).toBeNull();
   });
 });
 
@@ -141,26 +206,30 @@ describe('interpretarBlocos — campos textuais', () => {
           linha('PATRIMONIO 251328', 0.5),
         ],
         [
-          { campo: 'patrimonio-serigrafia' },
-          { campo: 'cliente-serigrafia' },
-          { campo: 'potencia-serigrafia' },
+          { campo: 'patrimonio-serigrafia-frente' },
+          { campo: 'cliente-serigrafia-frente' },
+          { campo: 'potencia-serigrafia-frente' },
         ],
-        foto('serigrafia'),
+        foto('frente'),
       ),
     );
 
-    expect(leituras.get('cliente-serigrafia')?.valorLido).toBe(
+    expect(leituras.get('cliente-serigrafia-frente')?.valorLido).toBe(
       '143091 - Energisa Rondonia',
     );
-    expect(leituras.get('potencia-serigrafia')?.valorLido).toBe('10 kVA');
-    expect(leituras.get('patrimonio-serigrafia')?.valorLido).toBe('251328');
+    expect(leituras.get('potencia-serigrafia-frente')?.valorLido).toBe(
+      '10 kVA',
+    );
+    expect(leituras.get('patrimonio-serigrafia-frente')?.valorLido).toBe(
+      '251328',
+    );
   });
 
   it('should devolver potencia nula quando nenhuma linha tem kVA', () => {
     const [leitura] = ler(
       [linha('ENERGISA', 0.2)],
-      [{ campo: 'potencia-serigrafia' }],
-      foto('serigrafia'),
+      [{ campo: 'potencia-serigrafia-frente' }],
+      foto('frente'),
     );
 
     expect(leitura.valorLido).toBeNull();
@@ -180,8 +249,8 @@ describe('interpretarBlocos — contrato da leitura', () => {
   it('should carimbar o fotoEvidenciaId e a regiao lida em toda leitura com valor', () => {
     const [leitura] = ler(
       [linha('847233', 0.5, 0.2)],
-      [{ campo: 'serie-chumbada-1' }],
-      foto('chumbado-1'),
+      [{ campo: 'serie-chumbada-traseira' }],
+      foto('traseira'),
     );
 
     expect(leitura.fotoEvidenciaId).toBe('foto-1');
@@ -196,8 +265,8 @@ describe('interpretarBlocos — contrato da leitura', () => {
   it('should ignorar bloco que nao e LINE', () => {
     const [leitura] = ler(
       [{ ...linha('847233', 0.5), BlockType: 'WORD' }],
-      [{ campo: 'serie-chumbada-1' }],
-      foto('chumbado-1'),
+      [{ campo: 'serie-chumbada-traseira' }],
+      foto('traseira'),
     );
 
     expect(leitura.valorLido).toBeNull();
@@ -209,8 +278,8 @@ describe('interpretarBlocos — contrato da leitura', () => {
 
     const [leitura] = ler(
       [bloco],
-      [{ campo: 'serie-chumbada-1' }],
-      foto('chumbado-1'),
+      [{ campo: 'serie-chumbada-traseira' }],
+      foto('traseira'),
     );
 
     expect(leitura.valorLido).toBe('847233');
@@ -274,8 +343,8 @@ describe('interpretarBlocos — achados livres (texto nao consumido)', () => {
   it('should carimbar confianca, regiao e foto de origem no achado', () => {
     const { achadosLivres } = interpretarBlocos(
       [linha('847999', 0.6, 0.4)],
-      [{ campo: 'cliente-serigrafia' }],
-      foto('serigrafia'),
+      [{ campo: 'cliente-serigrafia-frente' }],
+      foto('frente'),
     );
 
     expect(achadosLivres).toHaveLength(1);
@@ -295,8 +364,8 @@ describe('interpretarBlocos — achados livres (texto nao consumido)', () => {
 
     const { achadosLivres } = interpretarBlocos(
       [bloco],
-      [{ campo: 'cliente-serigrafia' }],
-      foto('serigrafia'),
+      [{ campo: 'cliente-serigrafia-frente' }],
+      foto('frente'),
     );
 
     // Zero diz "sem lastro" — achado livre so alerta, nunca vira veredito.

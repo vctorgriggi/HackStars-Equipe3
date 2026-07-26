@@ -1,4 +1,5 @@
 import { detectarIncoerencias } from './coerencia';
+import { aplicarRegraDeCorroboracao } from './corroboracao';
 import { normalizar, temConteudo } from './normalizacao';
 import {
   ItemChecklist,
@@ -100,7 +101,11 @@ export function conferir(
       continue;
     }
 
-    // (b) sem leitura ou leitura vazia.
+    // (b) sem leitura ou leitura vazia. Quando a leitura chegou marcada como
+    // NAO CORROBORADA e mesmo assim veio vazia, foi o adapter que a anulou —
+    // os recortes da mesma regiao leram numeros diferentes (`recortes-discordam`).
+    // O motivo separa "ninguem fotografou esta posicao" de "li e me contradisse",
+    // que sao idas diferentes ate a peca.
     if (!temConteudo(valorLido)) {
       campos.push(
         montarCampo(
@@ -109,7 +114,9 @@ export function conferir(
           valorLido,
           confianca,
           'nao_conferivel',
-          'sem-leitura',
+          leitura?.corroboracao === 'nao-confirmada'
+            ? 'leitura-nao-corroborada'
+            : 'sem-leitura',
         ),
       );
       continue;
@@ -194,13 +201,29 @@ export function conferir(
   // POS-PROCESSAMENTO (fora do laco, derivado do resultado por campo): campos
   // que o QR manda carregar o MESMO valor e nao leram a mesma coisa. Regra
   // inteira e o porque de cada exclusao em `coerencia.ts`.
-  const incoerencias = detectarIncoerencias(campos);
+  //
+  // ORDEM, e ela importa: a coerencia sai PRIMEIRO porque a regra de
+  // corroboracao consome a discordancia entre irmaos (item iii). Depois de
+  // rebaixar, a coerencia e RECALCULADA — os grupos nao mudam (agrupam por
+  // valor esperado e valor lido, nunca por veredito), mas cada leitura do grupo
+  // carrega o veredito do seu campo, e ele so agora e final.
+  const incoerenciasIniciais = detectarIncoerencias(campos);
+  const camposFinais = aplicarRegraDeCorroboracao(
+    campos,
+    incoerenciasIniciais,
+    leituras,
+  );
+  const incoerencias = detectarIncoerencias(camposFinais);
 
   // Precedencia: divergente > nao_conferivel (so obrigatorio bloqueia, OU ha
   // incoerencia entre irmaos, OU nenhum campo foi de fato verificado) >
-  // conforme.
-  const temDivergente = campos.some((campo) => campo.veredito === 'divergente');
-  const temObrigatorioNaoConferivel = campos.some(
+  // conforme. Agregada DEPOIS do rebaixamento: o ultimo `divergente` da
+  // conferencia pode ter virado `nao_conferivel` aqui, e o veredito geral
+  // precisa acompanhar (continua sem passar — so muda a mensagem).
+  const temDivergente = camposFinais.some(
+    (campo) => campo.veredito === 'divergente',
+  );
+  const temObrigatorioNaoConferivel = camposFinais.some(
     (campo) => campo.obrigatorio && campo.veredito === 'nao_conferivel',
   );
   // `conforme` e uma AFIRMACAO sobre a peca, e afirmacao exige verificacao:
@@ -210,7 +233,9 @@ export function conferir(
   // de opcionais SEM valor esperado saia `conforme` com `campos: []`, o falso
   // OK perfeito. Hoje o seed nao alcanca isso (toda etapa tem obrigatorio), mas
   // a checklist e DADO: a Fase 6 vai escreve-la com um LLM.
-  const temConforme = campos.some((campo) => campo.veredito === 'conforme');
+  const temConforme = camposFinais.some(
+    (campo) => campo.veredito === 'conforme',
+  );
 
   let vereditoGeral: Veredito = 'conforme';
   if (temDivergente) {
@@ -232,5 +257,5 @@ export function conferir(
     vereditoGeral = 'nao_conferivel';
   }
 
-  return { vereditoGeral, campos, incoerencias };
+  return { vereditoGeral, campos: camposFinais, incoerencias };
 }
