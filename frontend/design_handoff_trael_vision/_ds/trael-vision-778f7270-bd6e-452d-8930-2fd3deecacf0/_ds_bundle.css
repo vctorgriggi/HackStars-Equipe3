@@ -1,0 +1,282 @@
+/* TRAEL Vision — folha única gerada por .design-sync/prepare-pkg.mjs.
+   Concatenação verbatim dos tokens na ordem de styles/trael-vision.css.
+   NÃO editar: a fonte da verdade é trael-vision-tokens/styles/. */
+
+/* ==== ./tokens/fonts.css ==== */
+/* ============================================================
+   TRAEL Vision — Webfonts
+   Inter + IBM Plex Mono via Google Fonts.
+   SUBSTITUIÇÃO: usando os arquivos oficiais do Google Fonts CDN.
+   Se a TRAEL possuir arquivos de fonte licenciados próprios,
+   substituir os src abaixo pelos .woff2 locais em assets/fonts/.
+   ============================================================ */
+
+/* @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap') — removido: as fontes vão embarcadas (fonts.local.css) */
+
+/* ==== ./tokens/colors.css ==== */
+/* ============================================================
+   TRAEL Vision — Color tokens
+   Dark is the default theme (camera-monitoring screens).
+   [data-theme="light"] overrides for daytime / office use.
+   ============================================================ */
+
+:root {
+  /* ---- Brand (institutional, theme-independent) ---- */
+  --color-brand-primary: #006536;      /* verde institucional */
+  --color-brand-primary-600: #00542d;
+  --color-brand-primary-700: #013f22;
+  --color-brand-medium: #5AA646;       /* superfícies secundárias / hover de marca */
+  --color-brand-accent: #8FC73E;       /* verde lima — USE COM PARCIMÔNIA na marca */
+  --color-brand-ink: #04120a;          /* verde quase preto p/ texto sobre lima */
+  --color-brand-on: #ffffff;           /* texto sobre gradiente/verde de marca */
+  --gradient-brand: linear-gradient(100deg, #006536 0%, #2f8a46 55%, #5AA646 100%); 
+
+  /* ============================================================
+     READING STATES — semânticos, DEDICADOS.
+     Nunca reutilizar o verde de marca para "sucesso".
+     Cada estado tem: base (chip/badge), -fg (texto sobre base fraca),
+     -soft (fundo de badge sutil), e -hc (alto contraste p/ overlay em vídeo).
+     ============================================================ */
+
+  /* pendente — neutro */
+  --color-reading-pending: #64748b;
+  --color-reading-pending-hc: #94a3b8;
+
+  /* processando — azul */
+  --color-reading-processing: #2f81f7;
+  --color-reading-processing-hc: #4c9dff;
+
+  /* sucesso / leitura confirmada — LIMA (distinto do institucional) */
+  --color-reading-success: #8FC73E;
+  --color-reading-success-hc: #b7f24a;
+
+  /* baixa confiança — âmbar */
+  --color-reading-lowconf: #e0a12b;
+  --color-reading-lowconf-hc: #ffc247;
+
+  /* divergência — vermelho */
+  --color-reading-mismatch: #e5484d;
+  --color-reading-mismatch-hc: #ff6166;
+
+  /* validado manualmente — violeta/azul distinto */
+  --color-reading-validated: #9a6bf0;
+  --color-reading-validated-hc: #b98cff;
+
+  /* ---- Data-viz sequence (gráficos, timelines) ---- */
+  --viz-1: #2f81f7;
+  --viz-2: #8FC73E;
+  --viz-3: #e0a12b;
+  --viz-4: #9a6bf0;
+  --viz-5: #37c0b4;
+  --viz-6: #e5484d;
+  --viz-grid: var(--border);
+  --viz-track: var(--surface-3);
+}
+
+/* ---------------- DARK (default) ---------------- */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg-base: #0b0f14;
+  --bg-canvas: #0f141b;
+  --surface-1: #151b24;
+  --surface-2: #1c232e;
+  --surface-3: #262f3c;
+  --surface-inset: #0c1117;      /* poços, feeds de câmera */
+
+  --border: #2a3441;
+  --border-strong: #3a4658;
+  --border-focus: #4c9dff;
+
+  --text-1: #e7edf3;
+  --text-2: #a7b2c0;
+  --text-3: #6c7889;
+  --text-inverse: #0b0f14;
+
+  /* aliases de marca resolvidos p/ tema */
+  --brand-surface: #10241a;      /* faixa/painel de marca sutil no escuro */
+  --brand-surface-border: #1c4530;
+
+  /* soft backgrounds dos estados (badges) */
+  --reading-pending-soft: #1c2530;
+  --reading-processing-soft: #10233d;
+  --reading-success-soft: #1d2b12;
+  --reading-lowconf-soft: #2b2210;
+  --reading-mismatch-soft: #2e1315;
+  --reading-validated-soft: #221338;
+
+  --shadow-color: 220 40% 2%;
+}
+
+/* ---------------- LIGHT ---------------- */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg-base: #eef1f4;
+  --bg-canvas: #f5f7f9;
+  --surface-1: #ffffff;
+  --surface-2: #f6f8fa;
+  --surface-3: #eaeef2;
+  --surface-inset: #0c1117;      /* feeds de câmera continuam escuros */
+
+  --border: #d6dde4;
+  --border-strong: #b9c3cd;
+  --border-focus: #2f81f7;
+
+  --text-1: #10151c;
+  --text-2: #47525f;
+  --text-3: #737f8c;
+  --text-inverse: #ffffff;
+
+  --brand-surface: #eef6ec;
+  --brand-surface-border: #cfe6c8;
+
+  --reading-pending-soft: #eef1f5;
+  --reading-processing-soft: #e6f0fe;
+  --reading-success-soft: #eef7dd;
+  --reading-lowconf-soft: #fbf1dd;
+  --reading-mismatch-soft: #fdecec;
+  --reading-validated-soft: #f1e9fd;
+
+  --shadow-color: 220 30% 45%;
+}
+
+/* ==== ./tokens/typography.css ==== */
+/* ============================================================
+   TRAEL Vision — Typography tokens
+   Inter (sans técnica) + IBM Plex Mono (números de série, IDs,
+   timestamps — desambigua 0/O, 1/I/l via features).
+   ============================================================ */
+
+:root {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  /* fluid-free, desktop-first fixed scale */
+  --text-2xs: 10px;
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-md: 13px;   /* corpo padrão em UI densa */
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-xl: 19px;
+  --text-2xl: 24px;
+  --text-3xl: 30px;
+  --text-4xl: 38px;
+
+  --leading-tight: 1.15;
+  --leading-snug: 1.35;
+  --leading-normal: 1.5;
+
+  --tracking-tight: -0.01em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.02em;
+  --tracking-caps: 0.08em;   /* rótulos em maiúsculas / eyebrows */
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* features que travam a legibilidade numérica em mono */
+  --mono-features: "tnum" 1, "zero" 1, "ss01" 1, "cv01" 1; 
+}
+
+/* helper classes que os specimens / kits podem usar diretamente */
+.t-mono {
+  font-family: var(--font-mono);
+  font-feature-settings: var(--mono-features);
+  font-variant-ligatures: none;
+  letter-spacing: 0;
+}
+.t-caps {
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  font-weight: var(--weight-semibold);
+}
+
+/* ==== ./tokens/spacing.css ==== */
+/* ============================================================
+   TRAEL Vision — Spacing, radii, sizing (escala base 4px)
+   ============================================================ */
+
+:root {
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* raios — industrial sóbrio, cantos discretos */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-pill: 999px;
+
+  /* alturas de controle em UI densa */
+  --control-sm: 24px;
+  --control-md: 30px;
+  --control-lg: 36px;
+
+  /* layout do shell */
+  --sidebar-w: 248px;
+  --sidebar-w-collapsed: 60px;
+  --topbar-h: 52px;
+  --row-h: 40px;          /* linha de tabela densa */
+}
+
+/* ==== ./tokens/elevation.css ==== */
+/* ============================================================
+   TRAEL Vision — Elevation, focus, motion
+   Sombras discretas (software de monitoramento, não marketing).
+   ============================================================ */
+
+:root {
+  --shadow-1: 0 1px 2px hsl(var(--shadow-color) / 0.30);
+  --shadow-2: 0 2px 6px hsl(var(--shadow-color) / 0.35), 0 1px 2px hsl(var(--shadow-color) / 0.30);
+  --shadow-3: 0 8px 24px hsl(var(--shadow-color) / 0.45), 0 2px 6px hsl(var(--shadow-color) / 0.30);
+  --shadow-pop: 0 12px 40px hsl(var(--shadow-color) / 0.55);
+  --shadow-inset: inset 0 1px 0 hsl(var(--shadow-color) / 0.20);
+
+  --ring-focus: 0 0 0 2px var(--bg-canvas), 0 0 0 4px var(--border-focus);
+  --ring-focus-tight: 0 0 0 2px var(--border-focus);
+
+  /* motion — funcional, curto, sem bounce */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1); 
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1); 
+  --dur-fast: 90ms; 
+  --dur-base: 150ms; 
+  --dur-slow: 240ms; 
+
+  /* overlay chrome sobre vídeo de câmera */
+  --overlay-scrim: linear-gradient(180deg, rgba(6,10,14,0) 0%, rgba(6,10,14,0.72) 100%); 
+  --overlay-chip-bg: rgba(6,10,14,0.78);
+}
+
+/* ==== ./tokens/base.css ==== */
+/* ============================================================
+   TRAEL Vision — light base resets (opt-in, safe for specimens)
+   ============================================================ */
+
+.trael-root,
+body.trael {
+  background: var(--bg-canvas);
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.trael-root *,
+body.trael * { box-sizing: border-box; }

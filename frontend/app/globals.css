@@ -1,35 +1,141 @@
+/* Ordem dos imports é load-bearing: tokens do DS definem as vars em :root
+   ANTES do @theme inline (trael-vision.tailwind-v4.css) referenciá-las.
+   Nenhuma regra pode vir antes dos @import (CSS descarta o resto em silêncio). */
 @import "tailwindcss";
+@import "../styles/trael-vision.css";
+@import "../styles/trael-vision.tailwind-v4.css";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --conforme: #16a34a;
-  --divergente: #dc2626;
-  --nao-conferivel: #d97706;
+  /* next/font (app/layout.tsx) supera as pilhas literais de
+     tokens/typography.css — mesma especificidade, declaração posterior vence. */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-ibm-plex-mono), ui-monospace, "SF Mono", Menlo,
+    Consolas, monospace;
+
+  /* Tokens de veredito da regra de ouro (DESIGN.md) = ALIAS dos reading
+     states do TRAEL Vision, nunca hex próprio. O front continua só mapeando
+     as 3 strings da API para cor. */
+  --color-conforme: var(--color-reading-success);
+  --color-divergente: var(--color-reading-mismatch);
+  --color-nao-conferivel: var(--color-reading-lowconf);
+  --conforme-soft: var(--reading-success-soft);
+  --divergente-soft: var(--reading-mismatch-soft);
+  --nao-conferivel-soft: var(--reading-lowconf-soft);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-conforme: var(--conforme);
-  --color-divergente: var(--divergente);
-  --color-nao-conferivel: var(--nao-conferivel);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-conforme: var(--color-conforme);
+  --color-divergente: var(--color-divergente);
+  --color-nao-conferivel: var(--color-nao-conferivel);
+  --color-conforme-soft: var(--conforme-soft);
+  --color-divergente-soft: var(--divergente-soft);
+  --color-nao-conferivel-soft: var(--nao-conferivel-soft);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    --conforme: #22c55e;
-    --divergente: #f87171;
-    --nao-conferivel: #fbbf24;
-  }
+  /* Layout do shell como utilities (w-sidebar, h-topbar, h-row). */
+  --spacing-sidebar: var(--sidebar-w);
+  --spacing-topbar: var(--topbar-h);
+  --spacing-row: var(--row-h);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg-canvas);
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Keyframes do protótipo (Plataforma Trael.dc.html, linhas 18–22) +
+   crescimento de barras dos charts. */
+@keyframes tvPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+@keyframes tvShimmer {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes tvBelt {
+  from {
+    background-position-x: 0;
+  }
+  to {
+    background-position-x: -56px;
+  }
+}
+@keyframes tvBeltR {
+  from {
+    background-position-x: 0;
+  }
+  to {
+    background-position-x: 56px;
+  }
+}
+@keyframes tvBeltV {
+  from {
+    background-position-y: 0;
+  }
+  to {
+    background-position-y: 56px;
+  }
+}
+@keyframes tvGrow {
+  from {
+    clip-path: inset(100% 0 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes tvGrowX {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+.tv-belt-stripes {
+  animation-duration: 1.6s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+.tv-pulse {
+  animation: tvPulse 1.6s var(--ease-standard) infinite;
+}
+.tv-shimmer {
+  animation: tvShimmer 1.4s var(--ease-standard) infinite;
+}
+
+@utility skeleton {
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  animation: tvShimmer 1.4s var(--ease-standard) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tv-belt-stripes,
+  .tv-pulse,
+  .tv-shimmer,
+  .skeleton,
+  [data-tv-anim] {
+    animation: none !important;
+  }
+  [data-tv-anim] {
+    clip-path: none !important;
+  }
 }

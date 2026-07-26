@@ -1,0 +1,17 @@
+/* ============================================================
+   TRAEL Vision — light base resets (opt-in, safe for specimens)
+   ============================================================ */
+
+.trael-root,
+body.trael {
+  background: var(--bg-canvas);
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.trael-root *,
+body.trael * { box-sizing: border-box; }

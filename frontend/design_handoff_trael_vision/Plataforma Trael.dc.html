@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/trael-vision-778f7270-bd6e-452d-8930-2fd3deecacf0/fonts/fonts.css">
+<link rel="stylesheet" href="_ds/trael-vision-778f7270-bd6e-452d-8930-2fd3deecacf0/_ds_bundle.css">
+<link rel="stylesheet" href="_ds/trael-vision-778f7270-bd6e-452d-8930-2fd3deecacf0/styles.css">
+<script src="_ds/trael-vision-778f7270-bd6e-452d-8930-2fd3deecacf0/_ds_bundle.js"></script>
+<style>
+body{margin:0}
+a{color:var(--color-brand-medium)}a:hover{color:var(--color-brand-primary-600)}
+@keyframes tvPulse{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes tvShimmer{0%{opacity:.55}50%{opacity:1}100%{opacity:.55}}
+@keyframes tvBelt{from{background-position-x:0}to{background-position-x:-56px}}
+@keyframes tvBeltR{from{background-position-x:0}to{background-position-x:56px}}
+@keyframes tvBeltV{from{background-position-y:0}to{background-position-y:56px}}
+</style>
+</helmet>
+<div class="trael-root" data-theme="{{tema}}" style="min-height:100vh;display:flex;align-items:stretch">
+
+<sc-if value="{{verLogin}}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;display:flex;align-items:center;justify-content:center;padding:var(--space-6);background:var(--bg-canvas)">
+  <div style="width:100%;max-width:380px;display:grid;gap:var(--space-5)">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:var(--space-3)">
+      <div style="width:52px;height:52px;border-radius:var(--radius-md);background:var(--gradient-brand)"></div>
+      <div style="text-align:center">
+        <div style="font-size:var(--text-2xl);font-weight:var(--weight-bold);letter-spacing:var(--tracking-wide)">TRAEL</div>
+        <div class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3)">Vision · monitoramento de linha</div>
+      </div>
+    </div>
+    <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-2);padding:var(--space-6);display:grid;gap:var(--space-4)">
+      <div style="display:grid;gap:var(--space-2)">
+        <label class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3)">E-mail corporativo</label>
+        <input value="{{loginEmail}}" onChange="{{setLoginEmail}}" onKeyDown="{{loginKey}}" placeholder="nome@trael.com.br" style="height:var(--space-12);padding:0 var(--space-3);border-radius:var(--radius-md);border:1px solid {{loginBorda}};background:var(--surface-2);color:var(--text-1);font:inherit;font-size:var(--text-sm);outline:none">
+      </div>
+      <div style="display:grid;gap:var(--space-2)">
+        <label class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3)">Senha</label>
+        <input type="password" value="{{loginSenha}}" onChange="{{setLoginSenha}}" onKeyDown="{{loginKey}}" placeholder="••••••••" style="height:var(--space-12);padding:0 var(--space-3);border-radius:var(--radius-md);border:1px solid {{loginBorda}};background:var(--surface-2);color:var(--text-1);font:inherit;font-size:var(--text-sm);outline:none">
+      </div>
+      <sc-if value="{{loginErro}}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;gap:var(--space-2);align-items:flex-start;background:var(--reading-mismatch-soft);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);font-size:var(--text-xs);color:var(--color-reading-mismatch)">Preencha e-mail e senha para entrar.</div>
+      </sc-if>
+      <button onClick="{{entrar}}" style-hover="background:var(--color-brand-primary-600)" style="border:0;background:var(--color-brand-primary);color:var(--color-brand-on);font:inherit;font-size:var(--text-sm);font-weight:var(--weight-semibold);height:var(--space-12);border-radius:var(--radius-md);cursor:pointer">{{loginBtnTxt}}</button>
+      <a href="#" onClick="{{semAcao}}" style="font-size:var(--text-xs);text-align:center">Esqueci minha senha</a>
+    </div>
+    <div class="t-mono" style="text-align:center;font-size:var(--text-2xs);color:var(--text-3)">linha-1.trael · acesso restrito</div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{verApp}}" hint-placeholder-val="{{ true }}">
+<sc-if value="{{isDesktop}}" hint-placeholder-val="{{ false }}">
+<nav style="width:var(--sidebar-w);flex:none;background:var(--surface-1);border-right:1px solid var(--border);display:flex;flex-direction:column;gap:var(--space-2);padding:var(--space-4) var(--space-3);position:sticky;top:0;height:100vh;box-sizing:border-box">
+  <div style="display:flex;align-items:center;gap:10px;padding:var(--space-2) var(--space-2) var(--space-4)">
+    <div style="width:30px;height:30px;border-radius:var(--radius-sm);background:var(--gradient-brand);flex:none"></div>
+    <div>
+      <div style="font-weight:var(--weight-bold);letter-spacing:var(--tracking-wide);font-size:var(--text-md)">TRAEL</div>
+      <div class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3)">Vision · Linha 1</div>
+    </div>
+  </div>
+  <button onClick="{{goDash}}" style-hover="background:var(--surface-2)" style="display:flex;align-items:center;gap:10px;width:100%;border:0;text-align:left;padding:10px 12px;border-radius:var(--radius-md);font:inherit;font-size:var(--text-sm);font-weight:var(--weight-medium);cursor:pointer;color:{{ndC}};background:{{ndB}}">
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect></svg>
+    Dashboard
+  </button>
+  <button onClick="{{goTrafos}}" style-hover="background:var(--surface-2)" style="display:flex;align-items:center;gap:10px;width:100%;border:0;text-align:left;padding:10px 12px;border-radius:var(--radius-md);font:inherit;font-size:var(--text-sm);font-weight:var(--weight-medium);cursor:pointer;color:{{ntC}};background:{{ntB}}">
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l9 5v10l-9 5-9-5V7z"></path><path d="M3 7l9 5 9-5M12 22V12"></path></svg>
+    Transformadores
+  </button>
+  <button onClick="{{goLotes}}" style-hover="background:var(--surface-2)" style="display:flex;align-items:center;gap:10px;width:100%;border:0;text-align:left;padding:10px 12px;border-radius:var(--radius-md);font:inherit;font-size:var(--text-sm);font-weight:var(--weight-medium);cursor:pointer;color:{{nbC}};background:{{nbB}}">
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="13" width="8" height="8" rx="1"></rect><rect x="13" y="13" width="8" height="8" rx="1"></rect><rect x="8" y="3" width="8" height="8" rx="1"></rect></svg>
+    Lotes
+  </button>
+  <button onClick="{{goProj}}" style-hover="background:var(--surface-2)" style="display:flex;align-items:center;gap:10px;width:100%;border:0;text-align:left;padding:10px 12px;border-radius:var(--radius-md);font:inherit;font-size:var(--text-sm);font-weight:var(--weight-medium);cursor:pointer;color:{{npC}};background:{{npB}}">
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+    Projetos
+  </button>
+  <button onClick="{{goCli}}" style-hover="background:var(--surface-2)" style="display:flex;align-items:center;gap:10px;width:100%;border:0;text-align:left;padding:10px 12px;border-radius:var(--radius-md);font:inherit;font-size:var(--text-sm);font-weight:var(--weight-medium);cursor:pointer;color:{{ncC}};background:{{ncB}}">
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 19c.8-3.2 3.4-5 6.5-5s5.7 1.8 6.5 5"></path><circle cx="17.5" cy="9" r="2.5"></circle><path d="M16 14.4c2.5.3 4.4 1.8 5.2 4.1"></path></svg>
+    Clientes
+  </button>
+  <button onClick="{{goLive}}" style-hover="background:var(--surface-2)" style="display:flex;align-items:center;gap:10px;width:100%;border:0;text-align:left;padding:10px 12px;border-radius:var(--radius-md);font:inherit;font-size:var(--text-sm);font-weight:var(--weight-medium);cursor:pointer;color:{{nlC}};background:{{nlB}}">
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12h4l3-8 6 16 3-8h4"></path></svg>
+    Tempo real
+  </button>
+  <button onClick="{{goCam}}" style-hover="background:var(--surface-2)" style="display:flex;align-items:center;gap:10px;width:100%;border:0;text-align:left;padding:10px 12px;border-radius:var(--radius-md);font:inherit;font-size:var(--text-sm);font-weight:var(--weight-medium);cursor:pointer;color:{{ncmC}};background:{{ncmB}}">
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="6" width="13" height="12" rx="2"></rect><path d="M15 10l7-4v12l-7-4"></path></svg>
+    Câmeras
+  </button>
+  <button onClick="{{goChk}}" style-hover="background:var(--surface-2)" style="display:flex;align-items:center;gap:10px;width:100%;border:0;text-align:left;padding:10px 12px;border-radius:var(--radius-md);font:inherit;font-size:var(--text-sm);font-weight:var(--weight-medium);cursor:pointer;color:{{nchC}};background:{{nchB}}">
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="12" r="2.5"></circle><circle cx="12" cy="12" r="2.5"></circle><circle cx="19" cy="12" r="2.5"></circle><path d="M7.5 12h2M14.5 12h2"></path></svg>
+    Checkpoints
+  </button>
+  <button onClick="{{goConfig}}" style-hover="background:var(--surface-2)" style="display:flex;align-items:center;gap:10px;width:100%;border:0;text-align:left;padding:10px 12px;border-radius:var(--radius-md);font:inherit;font-size:var(--text-sm);font-weight:var(--weight-medium);cursor:pointer;color:{{ncfC}};background:{{ncfB}}">
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"></circle><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.5-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.5 2 1.5A7 7 0 0 0 5 12a7 7 0 0 0 .1 1.2l-2 1.5 2 3.5 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.5-2-1.5A7 7 0 0 0 19 12z"></path></svg>
+    Configurações
+  </button>
+  <div style="margin-top:auto;padding:var(--space-2);font-size:var(--text-2xs);color:var(--text-3)" class="t-mono">v1.0 · linha-1.trael</div>
+</nav>
+</sc-if>
+
+<div style="flex:1;min-width:0;display:flex;flex-direction:column">
+  <header style="position:sticky;top:0;z-index:40;height:var(--topbar-h);flex:none;display:flex;align-items:center;gap:var(--space-3);padding:0 var(--space-4);background:var(--surface-1);border-bottom:1px solid var(--border)">
+    <sc-if value="{{isMobile}}" hint-placeholder-val="{{ false }}">
+      <div style="width:24px;height:24px;border-radius:var(--radius-xs);background:var(--gradient-brand);flex:none"></div>
+    </sc-if>
+    <div style="font-size:var(--text-lg);font-weight:var(--weight-semibold)">{{titulo}}</div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:var(--space-3)">
+      <div style="position:relative">
+        <button onClick="{{toggleNotif}}" title="Notificações" style-hover="background:var(--surface-3)" style="position:relative;width:36px;height:36px;border-radius:var(--radius-pill);border:1px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer;display:flex;align-items:center;justify-content:center">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 9a6 6 0 1 0-12 0c0 5-2 6-2 7h16c0-1-2-2-2-7M10 19a2 2 0 0 0 4 0"></path></svg>
+          <sc-if value="{{temNotif}}" hint-placeholder-val="{{ false }}">
+            <span class="t-mono" style="position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;border-radius:var(--radius-pill);background:var(--color-reading-mismatch);color:#fff;font-size:var(--text-2xs);display:flex;align-items:center;justify-content:center;padding:0 4px">{{nNotif}}</span>
+          </sc-if>
+        </button>
+        <sc-if value="{{notifAberto}}" hint-placeholder-val="{{ false }}">
+          <div onClick="{{fecharNotif}}" style="position:fixed;inset:0;z-index:60"></div>
+          <div style="position:absolute;right:-46px;top:44px;z-index:61;width:min(320px,calc(100vw - 24px));background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-pop);overflow:hidden">
+            <div style="display:flex;align-items:center;padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--border)">
+              <span style="font-size:var(--text-sm);font-weight:var(--weight-semibold)">Notificações</span>
+              <button onClick="{{marcarLidas}}" style-hover="color:var(--text-1)" style="margin-left:auto;border:0;background:transparent;font:inherit;font-size:var(--text-xs);color:var(--text-3);cursor:pointer">Marcar todas como lidas</button>
+            </div>
+            <div style="max-height:320px;overflow-y:auto">
+              <sc-for list="{{notifs}}" as="nt" hint-placeholder-count="4">
+                <div style="display:flex;gap:var(--space-2);align-items:flex-start;padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--border);opacity:{{nt.op}}">
+                  <span style="width:8px;height:8px;flex:none;border-radius:50%;background:{{nt.cor}};margin-top:5px"></span>
+                  <div style="min-width:0">
+                    <div style="font-size:var(--text-sm);color:var(--text-1)">{{nt.msg}}</div>
+                    <div class="t-mono" style="font-size:var(--text-2xs);color:var(--text-3);margin-top:2px">{{nt.hora}}</div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+      <button onClick="{{toggleTema}}" title="Alternar tema" style-hover="background:var(--surface-3)" style="width:36px;height:36px;border-radius:var(--radius-pill);border:1px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer;display:flex;align-items:center;justify-content:center">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"></circle><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" stroke="none"></path></svg>
+      </button>
+      <div style="position:relative">
+        <button onClick="{{toggleMenu}}" class="t-mono" style-hover="box-shadow:var(--ring-focus-tight)" style="width:36px;height:36px;border-radius:var(--radius-pill);background:var(--brand-surface);border:1px solid var(--brand-surface-border);color:var(--text-1);display:flex;align-items:center;justify-content:center;font-size:var(--text-xs);cursor:pointer">AD</button>
+        <sc-if value="{{menuAberto}}" hint-placeholder-val="{{ false }}">
+          <div onClick="{{fecharMenu}}" style="position:fixed;inset:0;z-index:60"></div>
+          <div style="position:absolute;right:0;top:44px;z-index:61;width:224px;background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-pop);padding:var(--space-2);display:grid;gap:2px">
+            <div style="padding:var(--space-2) var(--space-3) var(--space-3);border-bottom:1px solid var(--border);margin-bottom:var(--space-1)">
+              <div style="font-size:var(--text-sm);font-weight:var(--weight-semibold)">Ana Duarte</div>
+              <div style="font-size:var(--text-xs);color:var(--text-3)">Supervisora · Linha 1</div>
+            </div>
+            <button onClick="{{fecharMenu}}" style-hover="background:var(--surface-2)" style="display:flex;align-items:center;gap:10px;border:0;background:transparent;text-align:left;padding:var(--space-2) var(--space-3);border-radius:var(--radius-md);font:inherit;font-size:var(--text-sm);color:var(--text-2);cursor:pointer">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.5"></circle><path d="M4.5 20c.9-3.5 3.9-5.5 7.5-5.5s6.6 2 7.5 5.5"></path></svg>
+              Meu perfil
+            </button>
+            <button onClick="{{menuChk}}" style-hover="background:var(--surface-2)" style="display:flex;align-items:center;gap:10px;border:0;background:transparent;text-align:left;padding:var(--space-2) var(--space-3);border-radius:var(--radius-md);font:inherit;font-size:var(--text-sm);color:var(--text-2);cursor:pointer">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="12" r="2.5"></circle><circle cx="12" cy="12" r="2.5"></circle><circle cx="19" cy="12" r="2.5"></circle><path d="M7.5 12h2M14.5 12h2"></path></svg>
+              Checkpoints
+            </button>
+            <button onClick="{{menuConfig}}" style-hover="background:var(--surface-2)" style="display:flex;align-items:center;gap:10px;border:0;background:transparent;text-align:left;padding:var(--space-2) var(--space-3);border-radius:var(--radius-md);font:inherit;font-size:var(--text-sm);color:var(--text-2);cursor:pointer">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"></circle><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.5-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.5 2 1.5A7 7 0 0 0 5 12a7 7 0 0 0 .1 1.2l-2 1.5 2 3.5 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.5-2-1.5A7 7 0 0 0 19 12z"></path></svg>
+              Configurações
+            </button>
+            <button onClick="{{menuTema}}" style-hover="background:var(--surface-2)" style="display:flex;align-items:center;gap:10px;border:0;background:transparent;text-align:left;padding:var(--space-2) var(--space-3);border-radius:var(--radius-md);font:inherit;font-size:var(--text-sm);color:var(--text-2);cursor:pointer">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"></circle><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" stroke="none"></path></svg>
+              Alternar tema
+            </button>
+            <div style="border-top:1px solid var(--border);margin:var(--space-1) 0"></div>
+            <button onClick="{{sair}}" style-hover="background:var(--reading-mismatch-soft)" style="display:flex;align-items:center;gap:10px;border:0;background:transparent;text-align:left;padding:var(--space-2) var(--space-3);border-radius:var(--radius-md);font:inherit;font-size:var(--text-sm);color:var(--color-reading-mismatch);cursor:pointer">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"></path></svg>
+              Sair
+            </button>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </header>
+
+  <main style="width:100%;max-width:1180px;margin:0 auto;box-sizing:border-box;padding:var(--space-4);padding-bottom:{{padB}}">
+
+  <sc-if value="{{carregando}}" hint-placeholder-val="{{ false }}">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3);margin-bottom:var(--space-3)">
+      <sc-for list="{{skelKpis}}" as="s" hint-placeholder-count="4">
+        <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-4);display:grid;gap:var(--space-2);animation:tvShimmer 1.4s var(--ease-standard) infinite">
+          <div style="height:10px;width:60%;background:var(--surface-3);border-radius:var(--radius-pill)"></div>
+          <div style="height:28px;width:40%;background:var(--surface-3);border-radius:var(--radius-sm)"></div>
+          <div style="height:10px;width:75%;background:var(--surface-3);border-radius:var(--radius-pill)"></div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="display:grid;gap:var(--space-2)">
+      <sc-for list="{{skelRows}}" as="s" hint-placeholder-count="6">
+        <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-3) var(--space-4);display:flex;align-items:center;gap:var(--space-3);animation:tvShimmer 1.4s var(--ease-standard) infinite">
+          <div style="width:34px;height:34px;flex:none;background:var(--surface-3);border-radius:var(--radius-md)"></div>
+          <div style="flex:1;display:grid;gap:var(--space-2)">
+            <div style="height:11px;width:45%;background:var(--surface-3);border-radius:var(--radius-pill)"></div>
+            <div style="height:9px;width:70%;background:var(--surface-3);border-radius:var(--radius-pill)"></div>
+          </div>
+          <div style="width:72px;height:20px;background:var(--surface-3);border-radius:var(--radius-pill)"></div>
+        </div>
+      </sc-for>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{prontas}}" hint-placeholder-val="{{ true }}">
+  <sc-if value="{{verAlertas}}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap;background:var(--reading-mismatch-soft);border:1px solid var(--border-strong);border-radius:var(--radius-lg);padding:var(--space-3) var(--space-4);margin-bottom:var(--space-3)">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-reading-mismatch)" stroke-width="1.8" style="flex:none"><path d="M12 3L2 20h20z"></path><path d="M12 10v5M12 17.5v.5"></path></svg>
+      <span style="font-size:var(--text-sm);color:var(--text-1)">{{alertaMsg}}</span>
+      <div style="display:flex;gap:var(--space-2);flex-wrap:wrap;margin-left:auto">
+        <sc-for list="{{alertas}}" as="a" hint-placeholder-count="2">
+          <button onClick="{{a.abrir}}" style-hover="box-shadow:var(--ring-focus-tight)" style="display:flex;align-items:center;gap:8px;border:1px solid var(--border-strong);background:var(--surface-1);border-radius:var(--radius-pill);padding:4px 12px;font:inherit;font-size:var(--text-xs);color:var(--text-1);cursor:pointer">
+            <span class="t-mono">{{a.serie}}</span>
+            <span style="color:{{a.cor}}">{{a.motivo}}</span>
+          </button>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{verDash}}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-3)">
+      <div style="display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-pill);padding:3px;gap:3px">
+        <sc-for list="{{perOpts}}" as="po" hint-placeholder-count="4">
+          <button onClick="{{po.sel}}" style="border:0;font:inherit;font-size:var(--text-xs);font-weight:var(--weight-medium);padding:5px 14px;border-radius:var(--radius-pill);cursor:pointer;background:{{po.bg}};color:{{po.c}};box-shadow:{{po.s}};white-space:nowrap">{{po.n}}</button>
+        </sc-for>
+      </div>
+      <sc-if value="{{perEhCustom}}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap">
+          <input type="date" value="{{dashDe}}" onChange="{{setDashDe}}" style="height:var(--space-8);padding:0 var(--space-2);border-radius:var(--radius-md);border:1px solid var(--border);background:var(--surface-1);color:var(--text-1);font:inherit;font-size:var(--text-xs);outline:none">
+          <span style="font-size:var(--text-xs);color:var(--text-3)">até</span>
+          <input type="date" value="{{dashAte}}" onChange="{{setDashAte}}" style="height:var(--space-8);padding:0 var(--space-2);border-radius:var(--radius-md);border:1px solid var(--border);background:var(--surface-1);color:var(--text-1);font:inherit;font-size:var(--text-xs);outline:none">
+        </div>
+      </sc-if>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3)">
+      <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);padding:var(--space-4);display:grid;gap:var(--space-1)">
+        <span class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3)">Em produção</span>
+        <span class="t-mono" style="font-size:var(--text-3xl);font-weight:var(--weight-bold)">{{kpiProducao}}</span>
+        <span style="font-size:var(--text-xs);color:var(--text-3)">transformadores na linha</span>
+      </div>
+      <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);padding:var(--space-4);display:grid;gap:var(--space-1)">
+        <span class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3)">{{kpiProdLabel}}</span>
+        <span class="t-mono" style="font-size:var(--text-3xl);font-weight:var(--weight-bold)">{{kpiProdVal}}</span>
+        <span style="font-size:var(--text-xs);color:var(--color-reading-success)">{{kpiProdSub}}</span>
+      </div>
+      <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);padding:var(--space-4);display:grid;gap:var(--space-1)">
+        <span class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3)">Aprovação em ensaios</span>
+        <span class="t-mono" style="font-size:var(--text-3xl);font-weight:var(--weight-bold)">{{aprovPct}}</span>
+        <span style="font-size:var(--text-xs);color:var(--text-3)">no período selecionado</span>
+      </div>
+      <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);padding:var(--space-4);display:grid;gap:var(--space-1)">
+        <span class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3)">Tempo médio total</span>
+        <span class="t-mono" style="font-size:var(--text-3xl);font-weight:var(--weight-bold)">10,7 d</span>
+        <span style="font-size:var(--text-xs);color:var(--text-3)">da bobinagem à expedição</span>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:var(--space-3);margin-top:var(--space-3)">
+      <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);padding:var(--space-4)">
+        <div class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3);margin-bottom:var(--space-4)">{{prodTitulo}}</div>
+        <div style="display:flex;align-items:stretch;gap:var(--space-2);height:150px">
+          <sc-for list="{{prodDias}}" as="b" hint-placeholder-count="7">
+            <div style="flex:1;display:flex;flex-direction:column;gap:6px;min-width:0">
+              <div style="flex:1;display:flex;align-items:flex-end">
+                <div style="width:100%;height:{{b.h}}%;min-height:4px;background:{{b.cor}};border-radius:var(--radius-sm) var(--radius-sm) 0 0"></div>
+              </div>
+              <div style="text-align:center;font-size:var(--text-2xs);color:var(--text-3)">{{b.d}}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);padding:var(--space-4)">
+        <div class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3);margin-bottom:var(--space-4)">Status por etapa</div>
+        <div style="display:grid;gap:var(--space-3)">
+          <sc-for list="{{funil}}" as="f" hint-placeholder-count="6">
+            <div style="display:grid;grid-template-columns:82px 1fr 26px;gap:var(--space-2);align-items:center">
+              <span style="font-size:var(--text-xs);color:var(--text-2)">{{f.nome}}</span>
+              <div style="height:12px;background:var(--viz-track);border-radius:var(--radius-pill);overflow:hidden">
+                <div style="height:100%;width:{{f.w}}%;background:{{f.cor}};border-radius:var(--radius-pill);transition:width .6s var(--ease-standard)"></div>
+              </div>
+              <span class="t-mono" style="font-size:var(--text-xs);color:var(--text-1);text-align:right">{{f.n}}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);padding:var(--space-4);display:flex;flex-direction:column">
+        <div class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3);margin-bottom:var(--space-2)">Taxa de aprovação em ensaios</div>
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:var(--space-5);flex-wrap:wrap">
+          <div style="position:relative;width:132px;height:132px;flex:none">
+            <svg width="132" height="132" viewBox="0 0 132 132" style="display:block">
+              <circle cx="66" cy="66" r="48" fill="none" stroke="var(--viz-track)" stroke-width="14"></circle>
+              <circle cx="66" cy="66" r="48" fill="none" stroke="var(--color-reading-success)" stroke-width="14" stroke-linecap="round" stroke-dasharray="{{aprovDash}} 400" transform="rotate(-90 66 66)"></circle>
+            </svg>
+            <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">
+              <span class="t-mono" style="font-size:var(--text-xl);font-weight:var(--weight-bold);color:var(--text-1)">{{aprovPct}}</span>
+              <span style="font-size:var(--text-2xs);color:var(--text-3)">aprovados</span>
+            </div>
+          </div>
+          <div style="display:grid;gap:var(--space-2);font-size:var(--text-xs)">
+            <div style="display:flex;align-items:center;gap:8px"><span style="width:9px;height:9px;border-radius:50%;background:var(--color-reading-success)"></span><span style="color:var(--text-2)">Aprovados · <span class="t-mono">{{nAprov}}</span></span></div>
+            <div style="display:flex;align-items:center;gap:8px"><span style="width:9px;height:9px;border-radius:50%;background:var(--color-reading-mismatch)"></span><span style="color:var(--text-2)">Reprovados · <span class="t-mono">{{nReprov}}</span></span></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);padding:var(--space-4)">
+        <div class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3);margin-bottom:var(--space-4)">Tempo médio por checkpoint</div>
+        <div style="display:grid;gap:var(--space-3)">
+          <sc-for list="{{tempoEtapas}}" as="t" hint-placeholder-count="6">
+            <div style="display:grid;grid-template-columns:82px 1fr 44px;gap:var(--space-2);align-items:center">
+              <span style="font-size:var(--text-xs);color:var(--text-2)">{{t.nome}}</span>
+              <div style="height:12px;background:var(--viz-track);border-radius:var(--radius-pill);overflow:hidden">
+                <div style="height:100%;width:{{t.w}}%;background:var(--viz-2);border-radius:var(--radius-pill)"></div>
+              </div>
+              <span class="t-mono" style="font-size:var(--text-xs);color:var(--text-1);text-align:right">{{t.v}} d</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{verTrafos}}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-3)">
+      <input value="{{busca}}" onChange="{{setBusca}}" placeholder="Buscar série ou cliente…" style="flex:1;min-width:170px;height:var(--space-10);padding:0 var(--space-3);border-radius:var(--radius-md);border:1px solid var(--border);background:var(--surface-1);color:var(--text-1);font:inherit;font-size:var(--text-sm);outline:none">
+      <select value="{{fStatus}}" onChange="{{setFStatus}}" style="height:var(--space-10);padding:0 var(--space-2);border-radius:var(--radius-md);border:1px solid var(--border);background:var(--surface-1);color:var(--text-1);font:inherit;font-size:var(--text-sm);outline:none;cursor:pointer">
+        <option value="all">Status: todos</option>
+        <option value="pending">Aguardando</option>
+        <option value="processing">Em processo</option>
+        <option value="success">Aprovado</option>
+        <option value="lowconf">Atenção</option>
+        <option value="mismatch">Reprovado</option>
+      </select>
+      <select value="{{fEtapa}}" onChange="{{setFEtapa}}" style="height:var(--space-10);padding:0 var(--space-2);border-radius:var(--radius-md);border:1px solid var(--border);background:var(--surface-1);color:var(--text-1);font:inherit;font-size:var(--text-sm);outline:none;cursor:pointer">
+        <option value="all">Etapa: todas</option>
+        <option value="0">Bobinagem</option>
+        <option value="1">Núcleo</option>
+        <option value="2">Tanque</option>
+        <option value="3">Ensaios</option>
+        <option value="4">Pintura</option>
+        <option value="5">Expedição</option>
+      </select>
+      <span class="t-mono" style="font-size:var(--text-xs);color:var(--text-3)">{{nTrafos}} unidades</span>
+    </div>
+    <sc-if value="{{buscaVazia}}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:var(--space-3);padding:var(--space-16) var(--space-4);text-align:center">
+        <div style="width:56px;height:56px;border-radius:var(--radius-pill);background:var(--surface-2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="1.8"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.5-4.5"></path></svg>
+        </div>
+        <div style="font-size:var(--text-md);font-weight:var(--weight-semibold)">Nenhum transformador encontrado</div>
+        <div style="font-size:var(--text-sm);color:var(--text-3);max-width:340px">Nenhum resultado para os filtros atuais. Ajuste a busca, o status ou a etapa.</div>
+        <button onClick="{{limparFiltros}}" style-hover="background:var(--surface-2)" style="border:1px solid var(--border-strong);background:transparent;color:var(--text-1);font:inherit;font-size:var(--text-sm);font-weight:var(--weight-medium);padding:0 var(--space-4);height:var(--space-10);border-radius:var(--radius-md);cursor:pointer">Limpar filtros</button>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{temResultados}}" hint-placeholder-val="{{ true }}">
+    <sc-if value="{{isDesktop}}" hint-placeholder-val="{{ false }}">
+      <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);overflow:hidden">
+        <div class="t-caps" style="display:grid;grid-template-columns:105px minmax(160px,1fr) 110px 110px 90px;gap:var(--space-3);padding:var(--space-3) var(--space-4);font-size:var(--text-2xs);color:var(--text-3);border-bottom:1px solid var(--border)">
+          <span>Série</span><span>Cliente</span><span>Etapa</span><span>Status</span><span>Entrega</span>
+        </div>
+        <sc-for list="{{trafosFiltrados}}" as="tr" hint-placeholder-count="8">
+          <div onClick="{{tr.abrir}}" style-hover="background:var(--surface-2)" style="display:grid;grid-template-columns:105px minmax(160px,1fr) 110px 110px 90px;gap:var(--space-3);align-items:center;padding:0 var(--space-4);min-height:var(--row-h);border-bottom:1px solid var(--border);cursor:pointer">
+            <span class="t-mono" style="font-size:var(--text-sm)">{{tr.serie}}</span>
+            <span style="font-size:var(--text-sm);color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{tr.cliente}} · <span class="t-mono" style="font-size:var(--text-xs)">{{tr.kva}} kVA</span></span>
+            <span style="justify-self:start;font-size:var(--text-xs);background:var(--surface-2);border:1px solid var(--border);color:var(--text-2);padding:2px 10px;border-radius:var(--radius-pill)">{{tr.etapa}}</span>
+            <span style="justify-self:start;font-size:var(--text-xs);background:{{tr.sBg}};color:{{tr.sCor}};padding:2px 10px;border-radius:var(--radius-pill)">{{tr.status}}</span>
+            <span class="t-mono" style="font-size:var(--text-xs);color:var(--text-2)">{{tr.entrega}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+    <sc-if value="{{isMobile}}" hint-placeholder-val="{{ false }}">
+      <div style="display:grid;gap:var(--space-2)">
+        <sc-for list="{{trafosFiltrados}}" as="tr" hint-placeholder-count="6">
+          <div onClick="{{tr.abrir}}" style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);padding:var(--space-3) var(--space-4);display:grid;gap:var(--space-2);cursor:pointer">
+            <div style="display:flex;align-items:center;gap:var(--space-2)">
+              <span class="t-mono" style="font-size:var(--text-md);font-weight:var(--weight-semibold)">{{tr.serie}}</span>
+              <span style="margin-left:auto;font-size:var(--text-xs);background:{{tr.sBg}};color:{{tr.sCor}};padding:2px 10px;border-radius:var(--radius-pill)">{{tr.status}}</span>
+            </div>
+            <div style="font-size:var(--text-sm);color:var(--text-2)">{{tr.cliente}} · <span class="t-mono" style="font-size:var(--text-xs)">{{tr.kva}} kVA</span></div>
+            <div style="display:flex;align-items:center;gap:var(--space-2)">
+              <span style="font-size:var(--text-xs);background:var(--surface-2);border:1px solid var(--border);color:var(--text-2);padding:2px 10px;border-radius:var(--radius-pill)">{{tr.etapa}}</span>
+              <span class="t-mono" style="margin-left:auto;font-size:var(--text-2xs);color:var(--text-3)">entrega {{tr.entrega}}</span>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+    </sc-if>
+  </sc-if>
+
+  <sc-if value="{{verCli}}" hint-placeholder-val="{{ false }}">
+    <sc-if value="{{isDesktop}}" hint-placeholder-val="{{ false }}">
+      <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);overflow:hidden">
+        <div class="t-caps" style="display:grid;grid-template-columns:1fr 220px 110px 110px;gap:var(--space-3);padding:var(--space-3) var(--space-4);font-size:var(--text-2xs);color:var(--text-3);border-bottom:1px solid var(--border)">
+          <span>Cliente</span><span>Contato</span><span>Em produção</span><span>Entregues</span>
+        </div>
+        <sc-for list="{{clientes}}" as="c" hint-placeholder-count="8">
+          <div style-hover="background:var(--surface-2)" style="display:grid;grid-template-columns:1fr 220px 110px 110px;gap:var(--space-3);align-items:center;padding:var(--space-2) var(--space-4);min-height:var(--row-h);border-bottom:1px solid var(--border)">
+            <div style="display:flex;align-items:center;gap:var(--space-3);min-width:0">
+              <div class="t-mono" style="width:34px;height:34px;flex:none;border-radius:var(--radius-md);background:var(--brand-surface);border:1px solid var(--brand-surface-border);display:flex;align-items:center;justify-content:center;font-size:var(--text-xs)">{{c.ini}}</div>
+              <div style="min-width:0">
+                <div style="font-size:var(--text-sm);font-weight:var(--weight-medium);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{c.nome}}</div>
+                <div style="font-size:var(--text-xs);color:var(--text-3)">{{c.cid}}</div>
+              </div>
+            </div>
+            <span class="t-mono" style="font-size:var(--text-xs);color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{c.email}}</span>
+            <span class="t-mono" style="font-size:var(--text-sm)">{{c.ativos}}</span>
+            <span class="t-mono" style="font-size:var(--text-sm);color:var(--text-2)">{{c.total}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+    <sc-if value="{{isMobile}}" hint-placeholder-val="{{ false }}">
+      <div style="display:grid;gap:var(--space-2)">
+        <sc-for list="{{clientes}}" as="c" hint-placeholder-count="6">
+          <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);padding:var(--space-3) var(--space-4);display:flex;align-items:center;gap:var(--space-3)">
+            <div class="t-mono" style="width:40px;height:40px;flex:none;border-radius:var(--radius-md);background:var(--brand-surface);border:1px solid var(--brand-surface-border);display:flex;align-items:center;justify-content:center;font-size:var(--text-sm)">{{c.ini}}</div>
+            <div style="min-width:0;flex:1">
+              <div style="font-size:var(--text-sm);font-weight:var(--weight-medium)">{{c.nome}}</div>
+              <div style="font-size:var(--text-xs);color:var(--text-3)">{{c.cid}}</div>
+            </div>
+            <div style="text-align:right">
+              <div class="t-mono" style="font-size:var(--text-md);font-weight:var(--weight-semibold)">{{c.ativos}}</div>
+              <div class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3)">ativos</div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+  </sc-if>
+
+  <sc-if value="{{verLotes}}" hint-placeholder-val="{{ false }}">
+    <sc-if value="{{isDesktop}}" hint-placeholder-val="{{ false }}">
+      <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);overflow:hidden">
+        <div class="t-caps" style="display:grid;grid-template-columns:100px minmax(110px,1fr) 62px minmax(90px,1fr) 100px 78px;gap:var(--space-3);padding:var(--space-3) var(--space-4);font-size:var(--text-2xs);color:var(--text-3);border-bottom:1px solid var(--border)">
+          <span>Lote</span><span>Projeto</span><span>Unidades</span><span>Progresso</span><span>Status</span><span>Previsão</span>
+        </div>
+        <sc-for list="{{lotes}}" as="l" hint-placeholder-count="8">
+          <div style-hover="background:var(--surface-2)" style="display:grid;grid-template-columns:100px minmax(110px,1fr) 62px minmax(90px,1fr) 100px 78px;gap:var(--space-3);align-items:center;padding:0 var(--space-4);min-height:var(--row-h);border-bottom:1px solid var(--border)">
+            <span class="t-mono" style="font-size:var(--text-sm)">{{l.id}}</span>
+            <span style="font-size:var(--text-sm);color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{l.projeto}}</span>
+            <span class="t-mono" style="font-size:var(--text-sm)">{{l.n}}</span>
+            <div style="display:flex;align-items:center;gap:var(--space-2)">
+              <div style="flex:1;height:8px;background:var(--viz-track);border-radius:var(--radius-pill);overflow:hidden"><div style="height:100%;width:{{l.prog}}%;background:{{l.sCor}};border-radius:var(--radius-pill)"></div></div>
+              <span class="t-mono" style="font-size:var(--text-2xs);color:var(--text-3);width:32px;text-align:right">{{l.prog}}%</span>
+            </div>
+            <span style="justify-self:start;font-size:var(--text-xs);background:{{l.sBg}};color:{{l.sCor}};padding:2px 10px;border-radius:var(--radius-pill)">{{l.status}}</span>
+            <span class="t-mono" style="font-size:var(--text-xs);color:var(--text-2)">{{l.prev}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+    <sc-if value="{{isMobile}}" hint-placeholder-val="{{ false }}">
+      <div style="display:grid;gap:var(--space-2)">
+        <sc-for list="{{lotes}}" as="l" hint-placeholder-count="6">
+          <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);padding:var(--space-3) var(--space-4);display:grid;gap:var(--space-2)">
+            <div style="display:flex;align-items:center;gap:var(--space-2)">
+              <span class="t-mono" style="font-size:var(--text-md);font-weight:var(--weight-semibold)">{{l.id}}</span>
+              <span style="margin-left:auto;font-size:var(--text-xs);background:{{l.sBg}};color:{{l.sCor}};padding:2px 10px;border-radius:var(--radius-pill)">{{l.status}}</span>
+            </div>
+            <div style="font-size:var(--text-sm);color:var(--text-2)">{{l.projeto}} · <span class="t-mono" style="font-size:var(--text-xs)">{{l.n}} transformadores</span></div>
+            <div style="display:flex;align-items:center;gap:var(--space-2)">
+              <div style="flex:1;height:8px;background:var(--viz-track);border-radius:var(--radius-pill);overflow:hidden"><div style="height:100%;width:{{l.prog}}%;background:{{l.sCor}};border-radius:var(--radius-pill)"></div></div>
+              <span class="t-mono" style="font-size:var(--text-2xs);color:var(--text-3)">{{l.prog}}%</span>
+            </div>
+            <div class="t-mono" style="font-size:var(--text-2xs);color:var(--text-3)">previsão {{l.prev}}</div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+  </sc-if>
+
+  <sc-if value="{{verProj}}" hint-placeholder-val="{{ false }}">
+    <sc-if value="{{isDesktop}}" hint-placeholder-val="{{ false }}">
+      <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);overflow:hidden">
+        <div class="t-caps" style="display:grid;grid-template-columns:minmax(120px,1.2fr) minmax(100px,1fr) 44px 62px minmax(84px,1fr) 66px;gap:var(--space-3);padding:var(--space-3) var(--space-4);font-size:var(--text-2xs);color:var(--text-3);border-bottom:1px solid var(--border)">
+          <span>Projeto</span><span>Cliente</span><span>Lotes</span><span>Unidades</span><span>Progresso</span><span>Entrega</span>
+        </div>
+        <sc-for list="{{projetos}}" as="p" hint-placeholder-count="6">
+          <div style-hover="background:var(--surface-2)" style="display:grid;grid-template-columns:minmax(120px,1.2fr) minmax(100px,1fr) 44px 62px minmax(84px,1fr) 66px;gap:var(--space-3);align-items:center;padding:0 var(--space-4);min-height:var(--row-h);border-bottom:1px solid var(--border)">
+            <span style="font-size:var(--text-sm);font-weight:var(--weight-medium);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{p.nome}}</span>
+            <span style="font-size:var(--text-sm);color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{p.cliente}}</span>
+            <span class="t-mono" style="font-size:var(--text-sm)">{{p.lotes}}</span>
+            <span class="t-mono" style="font-size:var(--text-sm)">{{p.trafos}}</span>
+            <div style="display:flex;align-items:center;gap:var(--space-2)">
+              <div style="flex:1;height:8px;background:var(--viz-track);border-radius:var(--radius-pill);overflow:hidden"><div style="height:100%;width:{{p.prog}}%;background:{{p.sCor}};border-radius:var(--radius-pill)"></div></div>
+              <span class="t-mono" style="font-size:var(--text-2xs);color:var(--text-3);width:32px;text-align:right">{{p.prog}}%</span>
+            </div>
+            <span class="t-mono" style="font-size:var(--text-xs);color:var(--text-2)">{{p.entrega}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+    <sc-if value="{{isMobile}}" hint-placeholder-val="{{ false }}">
+      <div style="display:grid;gap:var(--space-2)">
+        <sc-for list="{{projetos}}" as="p" hint-placeholder-count="6">
+          <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);padding:var(--space-3) var(--space-4);display:grid;gap:var(--space-2)">
+            <div style="display:flex;align-items:center;gap:var(--space-2)">
+              <span style="font-size:var(--text-md);font-weight:var(--weight-semibold)">{{p.nome}}</span>
+              <span class="t-mono" style="margin-left:auto;font-size:var(--text-2xs);color:var(--text-3)">{{p.entrega}}</span>
+            </div>
+            <div style="font-size:var(--text-sm);color:var(--text-2)">{{p.cliente}} · <span class="t-mono" style="font-size:var(--text-xs)">{{p.lotes}} lotes · {{p.trafos}} transformadores</span></div>
+            <div style="display:flex;align-items:center;gap:var(--space-2)">
+              <div style="flex:1;height:8px;background:var(--viz-track);border-radius:var(--radius-pill);overflow:hidden"><div style="height:100%;width:{{p.prog}}%;background:{{p.sCor}};border-radius:var(--radius-pill)"></div></div>
+              <span class="t-mono" style="font-size:var(--text-2xs);color:var(--text-3)">{{p.prog}}%</span>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+  </sc-if>
+
+  <sc-if value="{{verDet}}" hint-placeholder-val="{{ false }}">
+    <button onClick="{{voltarTrafos}}" style-hover="background:var(--surface-2)" style="display:flex;align-items:center;gap:8px;border:0;background:transparent;font:inherit;font-size:var(--text-sm);color:var(--text-2);cursor:pointer;padding:var(--space-2) var(--space-2);border-radius:var(--radius-md);margin-bottom:var(--space-3)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 5l-7 7 7 7"></path></svg>
+      Voltar para transformadores
+    </button>
+    <div style="display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:flex-start">
+      <div style="flex:1 1 260px;min-width:0;background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);padding:var(--space-5);display:grid;gap:var(--space-3)">
+        <div style="display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap">
+          <span class="t-mono" style="font-size:var(--text-2xl);font-weight:var(--weight-bold)">{{detSerie}}</span>
+          <span style="font-size:var(--text-xs);background:{{detSBg}};color:{{detSCor}};padding:2px 10px;border-radius:var(--radius-pill)">{{detStatus}}</span>
+        </div>
+        <div style="display:grid;gap:var(--space-2)">
+          <div style="display:flex;justify-content:space-between;gap:var(--space-3);font-size:var(--text-sm)"><span style="color:var(--text-3)">Cliente</span><span style="color:var(--text-1);text-align:right">{{detCliente}}</span></div>
+          <div style="display:flex;justify-content:space-between;gap:var(--space-3);font-size:var(--text-sm)"><span style="color:var(--text-3)">Potência</span><span class="t-mono" style="color:var(--text-1)">{{detKva}} kVA</span></div>
+          <div style="display:flex;justify-content:space-between;gap:var(--space-3);font-size:var(--text-sm)"><span style="color:var(--text-3)">Etapa atual</span><span style="color:var(--text-1)">{{detEtapa}}</span></div>
+          <div style="display:flex;justify-content:space-between;gap:var(--space-3);font-size:var(--text-sm)"><span style="color:var(--text-3)">Entrega prevista</span><span class="t-mono" style="color:var(--text-1)">{{detEntrega}}</span></div>
+        </div>
+        <div style="display:grid;gap:var(--space-1)">
+          <div style="display:flex;justify-content:space-between;font-size:var(--text-xs);color:var(--text-3)"><span class="t-caps" style="font-size:var(--text-2xs)">Progresso na linha</span><span class="t-mono">{{detProg}}%</span></div>
+          <div style="height:8px;background:var(--viz-track);border-radius:var(--radius-pill);overflow:hidden"><div style="height:100%;width:{{detProg}}%;background:var(--viz-2);border-radius:var(--radius-pill)"></div></div>
+        </div>
+      </div>
+      <div style="flex:2 1 380px;min-width:0;background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);padding:var(--space-5)">
+        <div class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3);margin-bottom:var(--space-4)">Linha do tempo · checkpoints</div>
+        <sc-for list="{{detTimeline}}" as="ti" hint-placeholder-count="6">
+          <div style="display:grid;grid-template-columns:20px 1fr;gap:var(--space-3)">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+              <span style="width:12px;height:12px;flex:none;border-radius:50%;background:{{ti.cor}};margin-top:4px;box-shadow:{{ti.anel}}"></span>
+              <sc-if value="{{ti.linha}}" hint-placeholder-val="{{ true }}"><div style="flex:1;width:2px;background:var(--border);border-radius:var(--radius-pill)"></div></sc-if>
+            </div>
+            <div style="padding-bottom:{{ti.padB}};min-width:0">
+              <div style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap">
+                <span style="font-size:var(--text-sm);font-weight:var(--weight-semibold);color:{{ti.tCor}}">{{ti.nome}}</span>
+                <span style="font-size:var(--text-2xs);background:{{ti.cBg}};color:{{ti.cCor}};padding:1px 8px;border-radius:var(--radius-pill)">{{ti.chip}}</span>
+                <span class="t-mono" style="margin-left:auto;font-size:var(--text-2xs);color:var(--text-3);white-space:nowrap">{{ti.data}}</span>
+              </div>
+              <div style="font-size:var(--text-xs);color:var(--text-2);margin-top:2px">{{ti.desc}}</div>
+              <sc-if value="{{ti.temFoto}}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:var(--space-2);display:flex;gap:var(--space-3);align-items:center;flex-wrap:wrap;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3)">
+                  <div style="width:84px;height:60px;flex:none;background:var(--surface-inset);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;overflow:hidden"><img src="uploads/pasted-1785043146111-0.png" alt="Foto de confirmação {{ti.nome}}" style="height:52px;display:block"></div>
+                  <div style="display:grid;gap:4px;min-width:0">
+                    <span class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3)">Inscrições conferidas</span>
+                    <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
+                      <span class="t-mono" style="font-size:var(--text-xs);background:var(--surface-1);border:1px solid var(--border);padding:1px 8px;border-radius:var(--radius-pill)">{{detSerie}}</span>
+                      <span class="t-mono" style="font-size:var(--text-xs);background:var(--surface-1);border:1px solid var(--border);padding:1px 8px;border-radius:var(--radius-pill)">{{detKva}} kVA</span>
+                      <span style="font-size:var(--text-xs);background:var(--reading-success-soft);color:var(--color-reading-success);padding:1px 8px;border-radius:var(--radius-pill)">Leitura confirmada</span>
+                    </div>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{verCam}}" hint-placeholder-val="{{ false }}">
+    <div style="display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-pill);padding:3px;gap:3px;margin-bottom:var(--space-4)">
+      <button onClick="{{verAoVivo}}" style="border:0;font:inherit;font-size:var(--text-sm);font-weight:var(--weight-medium);padding:6px 16px;border-radius:var(--radius-pill);cursor:pointer;background:{{cvLB}};color:{{cvLC}};box-shadow:{{cvLS}}">Ao vivo</button>
+      <button onClick="{{verCadastro}}" style="border:0;font:inherit;font-size:var(--text-sm);font-weight:var(--weight-medium);padding:6px 16px;border-radius:var(--radius-pill);cursor:pointer;background:{{cvRB}};color:{{cvRC}};box-shadow:{{cvRS}}">Cadastro</button>
+    </div>
+    <sc-if value="{{camReg}}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-3)">
+        <span style="font-size:var(--text-sm);color:var(--text-2)">Câmeras cadastradas e vínculo com checkpoints</span>
+        <button onClick="{{novaCam}}" style-hover="background:var(--color-brand-primary-600)" style="margin-left:auto;border:0;background:var(--color-brand-primary);color:var(--color-brand-on);font:inherit;font-size:var(--text-sm);font-weight:var(--weight-medium);padding:0 var(--space-4);height:var(--space-10);border-radius:var(--radius-md);cursor:pointer">+ Nova câmera</button>
+      </div>
+      <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);overflow:hidden">
+        <sc-for list="{{camRows}}" as="cr" hint-placeholder-count="8">
+          <div style="display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap;padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--border)">
+            <span class="t-mono" style="width:64px;flex:none;font-size:var(--text-sm);font-weight:var(--weight-semibold)">{{cr.id}}</span>
+            <span class="t-mono" style="flex:1 1 170px;min-width:0;font-size:var(--text-2xs);color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{cr.endpoint}}</span>
+            <span style="display:flex;align-items:center;gap:6px;font-size:var(--text-xs);color:var(--text-2);width:70px"><span style="width:7px;height:7px;border-radius:50%;background:{{cr.dotCor}}"></span>{{cr.statusTxt}}</span>
+            <select value="{{cr.vinculo}}" onChange="{{cr.mudar}}" style="height:var(--space-8);padding:0 var(--space-2);border-radius:var(--radius-md);border:1px solid var(--border);background:var(--surface-2);color:var(--text-1);font:inherit;font-size:var(--text-xs);outline:none;cursor:pointer">
+              <option value="">Sem vínculo</option>
+              <sc-for list="{{cr.opcoes}}" as="o" hint-placeholder-count="6"><option value="{{o.v}}">{{o.n}}</option></sc-for>
+            </select>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+    <sc-if value="{{camLive}}" hint-placeholder-val="{{ true }}">
+    <sc-if value="{{linhaParada}}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap;background:var(--reading-mismatch-soft);border:1px solid var(--color-reading-mismatch);border-radius:var(--radius-lg);padding:var(--space-3) var(--space-4);margin-bottom:var(--space-3)">
+        <span style="width:10px;height:10px;flex:none;border-radius:50%;background:var(--color-reading-mismatch);animation:tvPulse 1.2s var(--ease-standard) infinite"></span>
+        <div style="min-width:0;flex:1">
+          <div style="font-size:var(--text-sm);font-weight:var(--weight-semibold)">Linha parada — checkpoint Ensaios</div>
+          <div style="font-size:var(--text-xs);color:var(--text-2)">Divergência de chassi em <span class="t-mono">TR-847250</span> — leitura não confere com o pedido</div>
+        </div>
+        <button onClick="{{liberarLinha}}" style-hover="background:var(--color-brand-primary-600)" style="border:0;background:var(--color-brand-primary);color:var(--color-brand-on);font:inherit;font-size:var(--text-sm);font-weight:var(--weight-medium);padding:0 var(--space-4);height:var(--space-10);border-radius:var(--radius-md);cursor:pointer">Liberar linha</button>
+      </div>
+    </sc-if>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:var(--space-3);margin-bottom:var(--space-4)">
+      <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);padding:var(--space-3) var(--space-4);display:grid;gap:2px">
+        <span class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3)">Câmeras online</span>
+        <span class="t-mono" style="font-size:var(--text-xl);font-weight:var(--weight-bold)">{{camsOnline}}</span>
+      </div>
+      <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);padding:var(--space-3) var(--space-4);display:grid;gap:2px">
+        <span class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3)">Leituras hoje</span>
+        <span class="t-mono" style="font-size:var(--text-xl);font-weight:var(--weight-bold)">128</span>
+      </div>
+      <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);padding:var(--space-3) var(--space-4);display:grid;gap:2px">
+        <span class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3)">Validação automática</span>
+        <span class="t-mono" style="font-size:var(--text-xl);font-weight:var(--weight-bold)">91%</span>
+      </div>
+      <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);padding:var(--space-3) var(--space-4);display:grid;gap:2px">
+        <span class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3)">Paradas de linha hoje</span>
+        <span class="t-mono" style="font-size:var(--text-xl);font-weight:var(--weight-bold);color:{{paradasCor}}">{{paradasHoje}}</span>
+      </div>
+    </div>
+    <sc-for list="{{camGrupos}}" as="g" hint-placeholder-count="6">
+      <div style="margin-bottom:var(--space-5)">
+        <div style="display:flex;align-items:baseline;gap:var(--space-2);margin-bottom:var(--space-2)">
+          <span class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3)">Checkpoint</span>
+          <span style="font-size:var(--text-md);font-weight:var(--weight-semibold)">{{g.nome}}</span>
+        </div>
+        <sc-if value="{{g.vazio}}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:center;gap:var(--space-3);border:1px dashed var(--border-strong);border-radius:var(--radius-lg);padding:var(--space-4);color:var(--text-3);font-size:var(--text-sm)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="flex:none"><rect x="2" y="6" width="13" height="12" rx="2"></rect><path d="M15 10l7-4v12l-7-4M3 3l18 18"></path></svg>
+            Nenhuma câmera vinculada a este checkpoint — vincule em Câmeras › Cadastro.
+          </div>
+        </sc-if>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:var(--space-3)">
+          <sc-for list="{{g.cams}}" as="cm" hint-placeholder-count="1">
+            <div style="background:var(--surface-1);border:1px solid {{cm.borda}};border-radius:var(--radius-lg);box-shadow:var(--shadow-1);overflow:hidden">
+              <div style="position:relative;aspect-ratio:16/9;background:var(--surface-inset)">
+                <img src="uploads/pasted-1785043106924-0.png" alt="Feed {{cm.id}}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.9">
+                <div style="position:absolute;inset:0;background:var(--overlay-scrim);opacity:.4"></div>
+                <div style="position:absolute;left:36%;top:20%;width:30%;height:58%;border:2px solid {{cm.boxCor}};border-radius:var(--radius-xs)"></div>
+                <span class="t-mono" style="position:absolute;left:8px;top:8px;display:flex;align-items:center;gap:6px;background:var(--overlay-chip-bg);color:#fff;font-size:var(--text-2xs);padding:2px 8px;border-radius:var(--radius-pill)"><span style="width:6px;height:6px;border-radius:50%;background:var(--color-reading-mismatch);animation:tvPulse 1.6s var(--ease-standard) infinite"></span>{{cm.id}}</span>
+                <span class="t-mono" style="position:absolute;left:8px;bottom:8px;background:var(--overlay-chip-bg);color:{{cm.boxCor}};font-size:var(--text-2xs);padding:2px 8px;border-radius:var(--radius-pill)">{{cm.leitura}} · {{cm.conf}}</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:var(--space-2);padding:var(--space-2) var(--space-3)">
+                <span style="width:8px;height:8px;flex:none;border-radius:50%;background:{{cm.stCor}}"></span>
+                <span style="font-size:var(--text-xs);color:var(--text-2)">{{cm.stTxt}}</span>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-for>
+    </sc-if>
+  </sc-if>
+
+  <sc-if value="{{verChk}}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-3)">
+      <span style="font-size:var(--text-sm);color:var(--text-2)">Etapas da esteira e regras de validação por checkpoint</span>
+      <button style-hover="background:var(--color-brand-primary-600)" style="margin-left:auto;border:0;background:var(--color-brand-primary);color:var(--color-brand-on);font:inherit;font-size:var(--text-sm);font-weight:var(--weight-medium);padding:0 var(--space-4);height:var(--space-10);border-radius:var(--radius-md);cursor:pointer">+ Nova etapa</button>
+    </div>
+    <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);overflow:hidden;margin-bottom:var(--space-4)">
+      <sc-for list="{{cfgRows}}" as="cf" hint-placeholder-count="6">
+        <div onClick="{{cf.abrir}}" style-hover="background:var(--surface-2)" style="display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap;padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--border);opacity:{{cf.op}};cursor:pointer">
+          <span class="t-mono" style="width:26px;height:26px;flex:none;border-radius:var(--radius-sm);background:var(--surface-2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:var(--text-2xs);color:var(--text-3)">{{cf.ordem}}</span>
+          <div style="flex:1 1 140px;min-width:0">
+            <div style="font-size:var(--text-sm);font-weight:var(--weight-medium)">{{cf.nome}}</div>
+            <div class="t-mono" style="font-size:var(--text-2xs);color:var(--text-3)">{{cf.cam}}</div>
+          </div>
+          <div style="flex:1 1 180px;display:flex;gap:var(--space-1);flex-wrap:wrap">
+            <sc-for list="{{cf.insc}}" as="ins" hint-placeholder-count="2">
+              <span style="font-size:var(--text-2xs);background:var(--surface-2);border:1px solid var(--border);color:var(--text-2);padding:1px 8px;border-radius:var(--radius-pill)">{{ins.n}}</span>
+            </sc-for>
+          </div>
+          <div style="display:grid;gap:1px;text-align:right">
+            <span class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3)">Limiar</span>
+            <span class="t-mono" style="font-size:var(--text-sm)">{{cf.limiar}}%</span>
+          </div>
+          <button onClick="{{cf.toggle}}" title="Ativar/desativar etapa" style="position:relative;width:40px;height:22px;flex:none;border-radius:var(--radius-pill);border:1px solid var(--border);background:{{cf.swBg}};cursor:pointer;transition:background .3s var(--ease-standard)">
+            <span style="position:absolute;top:2px;left:{{cf.swX}}px;width:16px;height:16px;border-radius:50%;background:var(--surface-1);box-shadow:var(--shadow-1);transition:left .3s var(--ease-standard)"></span>
+          </button>
+        </div>
+      </sc-for>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{verChkDet}}" hint-placeholder-val="{{ false }}">
+    <button onClick="{{voltarChk}}" style-hover="background:var(--surface-2)" style="display:flex;align-items:center;gap:8px;border:0;background:transparent;font:inherit;font-size:var(--text-sm);color:var(--text-2);cursor:pointer;padding:var(--space-2) var(--space-2);border-radius:var(--radius-md);margin-bottom:var(--space-3)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 5l-7 7 7 7"></path></svg>
+      Voltar para checkpoints
+    </button>
+    <div style="display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:flex-start">
+      <div style="flex:1 1 300px;min-width:0;background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);padding:var(--space-5);display:grid;gap:var(--space-4)">
+        <div style="display:grid;gap:var(--space-2)">
+          <label class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3)">Nome da etapa</label>
+          <input value="{{ckNome}}" onChange="{{setCkNome}}" style="height:var(--space-10);padding:0 var(--space-3);border-radius:var(--radius-md);border:1px solid var(--border);background:var(--surface-2);color:var(--text-1);font:inherit;font-size:var(--text-sm);outline:none">
+        </div>
+        <div style="display:grid;gap:var(--space-2)">
+          <div style="display:flex;justify-content:space-between;align-items:baseline">
+            <label class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3)">Limiar de confiança</label>
+            <span class="t-mono" style="font-size:var(--text-md);font-weight:var(--weight-semibold)">{{ckLimiar}}%</span>
+          </div>
+          <input type="range" min="50" max="100" step="1" value="{{ckLimiar}}" onChange="{{setCkLimiar}}" style="width:100%;accent-color:var(--color-brand-medium)">
+          <div style="display:flex;justify-content:space-between;font-size:var(--text-2xs);color:var(--text-3)"><span>50% · permissivo</span><span>100% · rígido</span></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:var(--space-3);border-top:1px solid var(--border);padding-top:var(--space-4)">
+          <div style="flex:1">
+            <div style="font-size:var(--text-sm);font-weight:var(--weight-medium)">Etapa ativa</div>
+            <div style="font-size:var(--text-xs);color:var(--text-3)">Inativa: a esteira pula este checkpoint</div>
+          </div>
+          <button onClick="{{ckToggleAtivo}}" style="position:relative;width:40px;height:22px;flex:none;border-radius:var(--radius-pill);border:1px solid var(--border);background:{{ckSwBg}};cursor:pointer;transition:background .3s var(--ease-standard)">
+            <span style="position:absolute;top:2px;left:{{ckSwX}}px;width:16px;height:16px;border-radius:50%;background:var(--surface-1);box-shadow:var(--shadow-1);transition:left .3s var(--ease-standard)"></span>
+          </button>
+        </div>
+      </div>
+      <div style="flex:1 1 300px;min-width:0;background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);padding:var(--space-5);display:grid;gap:var(--space-4)">
+        <div style="display:grid;gap:var(--space-2)">
+          <label class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3)">Câmeras vinculadas · {{ckNCams}}</label>
+          <sc-for list="{{ckCams}}" as="c" hint-placeholder-count="2">
+            <div style="display:flex;align-items:center;gap:var(--space-2);background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3)">
+              <span class="t-mono" style="font-size:var(--text-sm)">{{c.id}}</span>
+              <span style="display:flex;align-items:center;gap:5px;font-size:var(--text-2xs);color:var(--text-3)"><span style="width:6px;height:6px;border-radius:50%;background:var(--color-reading-success)"></span>online</span>
+              <button onClick="{{c.remover}}" title="Desvincular câmera" style-hover="color:var(--color-reading-mismatch)" style="margin-left:auto;border:0;background:transparent;color:var(--text-3);cursor:pointer;font:inherit;font-size:var(--text-sm);padding:2px 6px">✕</button>
+            </div>
+          </sc-for>
+          <sc-if value="{{temLivres}}" hint-placeholder-val="{{ false }}">
+            <div style="display:grid;gap:var(--space-1)">
+              <span style="font-size:var(--text-2xs);color:var(--text-3)">Disponíveis para vincular:</span>
+              <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
+                <sc-for list="{{ckLivres}}" as="lv" hint-placeholder-count="1">
+                  <button onClick="{{lv.vincular}}" style-hover="background:var(--surface-2)" style="border:1px dashed var(--border-strong);background:transparent;color:var(--text-2);font:inherit;font-size:var(--text-xs);padding:5px 12px;border-radius:var(--radius-pill);cursor:pointer" class="t-mono">+ {{lv.id}}</button>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{semLivres}}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:var(--text-xs);color:var(--text-3)">Todas as câmeras cadastradas já estão vinculadas — cadastre novas no módulo Câmeras › Cadastro.</div>
+          </sc-if>
+        </div>
+        <div style="display:grid;gap:var(--space-2)">
+          <label class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3)">Campos validados neste checkpoint</label>
+          <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
+            <sc-for list="{{ckCampos}}" as="cp" hint-placeholder-count="4">
+              <button onClick="{{cp.toggle}}" style="border:1px solid {{cp.bd}};background:{{cp.bg}};color:{{cp.cor}};font:inherit;font-size:var(--text-sm);padding:6px 14px;border-radius:var(--radius-pill);cursor:pointer;transition:background .2s var(--ease-standard)">{{cp.n}}</button>
+            </sc-for>
+          </div>
+          <div style="font-size:var(--text-xs);color:var(--text-3)">A leitura só é confirmada quando todos os campos selecionados conferem com o pedido.</div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{verConfig}}" hint-placeholder-val="{{ false }}">
+    <div class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3);margin-bottom:var(--space-2)">Notificações</div>
+    <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);overflow:hidden">
+      <sc-for list="{{cfgNotifRows}}" as="cn" hint-placeholder-count="4">
+        <div style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--border)">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:var(--text-sm);font-weight:var(--weight-medium)">{{cn.nome}}</div>
+            <div style="font-size:var(--text-xs);color:var(--text-3)">{{cn.desc}}</div>
+          </div>
+          <button onClick="{{cn.toggle}}" style="position:relative;width:40px;height:22px;flex:none;border-radius:var(--radius-pill);border:1px solid var(--border);background:{{cn.swBg}};cursor:pointer;transition:background .3s var(--ease-standard)">
+            <span style="position:absolute;top:2px;left:{{cn.swX}}px;width:16px;height:16px;border-radius:50%;background:var(--surface-1);box-shadow:var(--shadow-1);transition:left .3s var(--ease-standard)"></span>
+          </button>
+        </div>
+      </sc-for>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{verLive}}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;margin-bottom:var(--space-3)">
+      <span style="width:9px;height:9px;border-radius:50%;background:var(--color-reading-success);animation:tvPulse 1.6s var(--ease-standard) infinite"></span>
+      <span style="font-size:var(--text-sm);color:var(--text-2)">Conectado</span>
+      <span class="t-mono" style="font-size:var(--text-2xs);color:var(--text-3)">ws://linha-1.trael/stream</span>
+      <span class="t-mono" style="margin-left:auto;font-size:var(--text-xs);color:var(--text-2)"><span style="color:var(--text-3)">na esteira</span> {{nBelt}}</span>
+    </div>
+    <div style="display:flex;flex-direction:{{liveDir}};gap:var(--space-3);align-items:{{liveAlign}}">
+      <div style="flex:1;min-width:0;background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);padding:var(--space-3);overflow:hidden">
+        <div ref="{{mapaRef}}" style="width:100%">
+        <div style="width:{{mapaW}}px;height:{{mapaH}}px;margin:0 auto;overflow:hidden">
+        <div style="width:{{mapaBaseW}}px;height:{{mapaBaseH}}px;position:relative;transform:scale({{mapaScale}});transform-origin:top left;overflow:hidden">
+          <sc-for list="{{beltSegs}}" as="s" hint-placeholder-count="5">
+            <div style="position:absolute;left:{{s.l}}px;top:{{s.t}}px;width:{{s.w}}px;height:{{s.h}}px;border:1px solid var(--border-strong);background:var(--surface-inset);border-radius:var(--radius-xs);overflow:hidden;box-sizing:border-box">
+              <div style="position:absolute;inset:3px;background:repeating-linear-gradient({{s.deg}}deg,rgba(255,255,255,.28) 0 5px,rgba(255,255,255,.10) 5px 7px,transparent 7px 14px);animation:{{s.anim}} 1.6s linear infinite"></div>
+            </div>
+          </sc-for>
+          <sc-if value="{{moverVis}}" hint-placeholder-val="{{ false }}">
+            <img src="uploads/pasted-1785043146111-0.png" alt="Transformador em movimento" style="position:absolute;left:{{moverX}}px;top:{{moverY}}px;height:48px;transform:translate(-50%,-58%);z-index:4;transition:{{moverTrans}};filter:drop-shadow(0 5px 6px rgba(0,0,0,.45));pointer-events:none">
+          </sc-if>
+          <sc-for list="{{etapasMapa}}" as="e" hint-placeholder-count="6">
+            <div onClick="{{e.sel}}" title="Ver transformadores nesta etapa" style="position:absolute;left:{{e.l}}px;top:{{e.t}}px;width:130px;height:92px;box-sizing:border-box;z-index:5;background:var(--surface-1);border:1px solid var(--border-strong);border-radius:var(--radius-md);box-shadow:{{e.ring}};cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;transition:box-shadow .4s var(--ease-standard)">
+              <span class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3)">{{e.nome}}</span>
+              <span class="t-mono" style="font-size:var(--text-2xl);font-weight:var(--weight-bold);line-height:var(--leading-tight);color:{{e.nCor}}">{{e.n}}</span>
+              <span style="font-size:var(--text-2xs);color:var(--text-3)">na etapa</span>
+            </div>
+          </sc-for>
+        </div>
+        </div>
+        </div>
+      </div>
+
+      <sc-if value="{{verFeed}}" hint-placeholder-val="{{ true }}">
+      <div style="flex:none;width:{{feedW}};min-width:0;display:flex;flex-direction:column;gap:var(--space-3)">
+        <sc-if value="{{temSel}}" hint-placeholder-val="{{ false }}">
+          <div style="background:var(--surface-1);border:1px solid var(--brand-surface-border);border-radius:var(--radius-lg);box-shadow:var(--shadow-2);padding:var(--space-4);display:grid;gap:var(--space-2)">
+            <div style="display:flex;align-items:center">
+              <span class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3)">Checkpoint</span>
+              <button onClick="{{fecharSel}}" style-hover="color:var(--text-1)" style="margin-left:auto;border:0;background:transparent;color:var(--text-3);cursor:pointer;font:inherit;font-size:var(--text-xs);padding:4px 8px">Fechar ✕</button>
+            </div>
+            <img src="uploads/pasted-1785043106924-0.png" alt="Esteira da linha 1" style="width:100%;height:84px;object-fit:cover;object-position:center 58%;border-radius:var(--radius-md);border:1px solid var(--border)">
+            <span style="font-size:var(--text-lg);font-weight:var(--weight-semibold)">{{selEtapa}}</span>
+            <span style="font-size:var(--text-xs);color:var(--text-3)"><span class="t-mono">{{selN}}</span> transformador(es) nesta etapa</span>
+            <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
+              <sc-for list="{{selSeries}}" as="s" hint-placeholder-count="2">
+                <span class="t-mono" style="font-size:var(--text-xs);background:var(--surface-2);border:1px solid var(--border);color:var(--text-1);padding:2px 10px;border-radius:var(--radius-pill)">{{s.serie}}</span>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+        <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-1);padding:var(--space-4);flex:1;min-height:0">
+          <div class="t-caps" style="font-size:var(--text-2xs);color:var(--text-3);margin-bottom:var(--space-2)">Eventos ao vivo</div>
+          <div style="max-height:340px;overflow-y:auto">
+            <sc-for list="{{eventos}}" as="ev" hint-placeholder-count="5">
+              <div style="display:flex;gap:var(--space-2);align-items:flex-start;padding:var(--space-2) 0;border-bottom:1px solid var(--border)">
+                <span style="width:8px;height:8px;flex:none;border-radius:50%;background:{{ev.cor}};margin-top:5px"></span>
+                <div style="min-width:0">
+                  <div style="font-size:var(--text-sm);color:var(--text-1)">{{ev.msg}}</div>
+                  <div class="t-mono" style="font-size:var(--text-2xs);color:var(--text-3)">{{ev.hora}} · {{ev.serie}}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+    </div>
+  </sc-if>
+  </sc-if>
+
+  </main>
+</div>
+
+<sc-if value="{{isMobile}}" hint-placeholder-val="{{ false }}">
+<nav style="position:fixed;left:0;right:0;bottom:0;z-index:50;display:flex;background:var(--surface-1);border-top:1px solid var(--border);box-shadow:var(--shadow-3);padding-bottom:env(safe-area-inset-bottom)">
+  <button onClick="{{goDash}}" style="flex:1;min-height:60px;border:0;background:transparent;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:inherit;font-size:10px;font-weight:var(--weight-medium);color:{{ndC}}">
+    <span style="display:flex;padding:3px 14px;border-radius:var(--radius-pill);background:{{ndB}};transition:background .3s var(--ease-standard)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect></svg></span>
+    Dashboard
+  </button>
+  <button onClick="{{goTrafos}}" style="flex:1;min-height:60px;border:0;background:transparent;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:inherit;font-size:10px;font-weight:var(--weight-medium);color:{{ntC}}">
+    <span style="display:flex;padding:3px 14px;border-radius:var(--radius-pill);background:{{ntB}};transition:background .3s var(--ease-standard)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l9 5v10l-9 5-9-5V7z"></path><path d="M3 7l9 5 9-5M12 22V12"></path></svg></span>
+    Unidades
+  </button>
+  <button onClick="{{goLotes}}" style="flex:1;min-height:60px;border:0;background:transparent;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:inherit;font-size:10px;font-weight:var(--weight-medium);color:{{nbC}}">
+    <span style="display:flex;padding:3px 10px;border-radius:var(--radius-pill);background:{{nbB}};transition:background .3s var(--ease-standard)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="13" width="8" height="8" rx="1"></rect><rect x="13" y="13" width="8" height="8" rx="1"></rect><rect x="8" y="3" width="8" height="8" rx="1"></rect></svg></span>
+    Lotes
+  </button>
+  <button onClick="{{goProj}}" style="flex:1;min-height:60px;border:0;background:transparent;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:inherit;font-size:10px;font-weight:var(--weight-medium);color:{{npC}}">
+    <span style="display:flex;padding:3px 10px;border-radius:var(--radius-pill);background:{{npB}};transition:background .3s var(--ease-standard)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg></span>
+    Projetos
+  </button>
+  <button onClick="{{goCli}}" style="flex:1;min-height:60px;border:0;background:transparent;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:inherit;font-size:10px;font-weight:var(--weight-medium);color:{{ncC}}">
+    <span style="display:flex;padding:3px 14px;border-radius:var(--radius-pill);background:{{ncB}};transition:background .3s var(--ease-standard)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 19c.8-3.2 3.4-5 6.5-5s5.7 1.8 6.5 5"></path><circle cx="17.5" cy="9" r="2.5"></circle><path d="M16 14.4c2.5.3 4.4 1.8 5.2 4.1"></path></svg></span>
+    Clientes
+  </button>
+  <button onClick="{{goLive}}" style="flex:1;min-height:60px;border:0;background:transparent;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:inherit;font-size:10px;font-weight:var(--weight-medium);color:{{nlC}}">
+    <span style="display:flex;padding:3px 10px;border-radius:var(--radius-pill);background:{{nlB}};transition:background .3s var(--ease-standard)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12h4l3-8 6 16 3-8h4"></path></svg></span>
+    Ao vivo
+  </button>
+  <button onClick="{{goCam}}" style="flex:1;min-height:60px;border:0;background:transparent;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:inherit;font-size:10px;font-weight:var(--weight-medium);color:{{ncmC}}">
+    <span style="display:flex;padding:3px 10px;border-radius:var(--radius-pill);background:{{ncmB}};transition:background .3s var(--ease-standard)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="6" width="13" height="12" rx="2"></rect><path d="M15 10l7-4v12l-7-4"></path></svg></span>
+    Câmeras
+  </button>
+</nav>
+</sc-if>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;intervaloSim&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:2.5,&quot;min&quot;:1,&quot;max&quot;:8,&quot;step&quot;:0.5,&quot;unit&quot;:&quot;s&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Tempo real&quot;},&quot;unidadesIniciais&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:8,&quot;min&quot;:2,&quot;max&quot;:20,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Tempo real&quot;},&quot;mostrarFeed&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Tempo real&quot;}}">
+const ETAPAS = ['Bobinagem', 'Núcleo', 'Tanque', 'Ensaios', 'Pintura', 'Expedição'];
+const ST = {
+  pending: { t: 'Aguardando', c: 'var(--color-reading-pending)', bg: 'var(--reading-pending-soft)' },
+  processing: { t: 'Em processo', c: 'var(--color-reading-processing)', bg: 'var(--reading-processing-soft)' },
+  success: { t: 'Aprovado', c: 'var(--color-reading-success)', bg: 'var(--reading-success-soft)' },
+  lowconf: { t: 'Atenção', c: 'var(--color-reading-lowconf)', bg: 'var(--reading-lowconf-soft)' },
+  mismatch: { t: 'Reprovado', c: 'var(--color-reading-mismatch)', bg: 'var(--reading-mismatch-soft)' },
+};
+const TRAFOS = [
+  ['TR-847233', 112.5, 'EnerSul Distribuidora', 3, 'processing', '12 ago 2026'],
+  ['TR-847234', 75, 'Rede Vale Energia', 1, 'processing', '15 ago 2026'],
+  ['TR-847240', 150, 'Coopercel', 4, 'processing', '18 ago 2026'],
+  ['TR-847241', 45, 'Luz do Norte S.A.', 0, 'pending', '22 ago 2026'],
+  ['TR-847245', 300, 'CPE Paulista', 2, 'lowconf', '25 ago 2026'],
+  ['TR-847246', 30, 'Energia Serrana', 5, 'success', '05 ago 2026'],
+  ['TR-847250', 112.5, 'Grid Nordeste', 3, 'mismatch', '28 ago 2026'],
+  ['TR-847251', 75, 'EnerSul Distribuidora', 2, 'processing', '30 ago 2026'],
+  ['TR-847252', 225, 'Eletro Baía', 1, 'processing', '02 set 2026'],
+  ['TR-847255', 15, 'Coopercel', 0, 'pending', '08 set 2026'],
+  ['TR-847256', 45, 'Rede Vale Energia', 4, 'processing', '04 set 2026'],
+  ['TR-847257', 150, 'CPE Paulista', 5, 'success', '01 ago 2026'],
+  ['TR-847260', 75, 'Grid Nordeste', 2, 'processing', '10 set 2026'],
+  ['TR-847261', 112.5, 'Energia Serrana', 0, 'pending', '15 set 2026'],
+].map(([serie, kva, cliente, et, st, entrega]) => ({ serie, kva, cliente, et, st, entrega }));
+const CLIENTES = [
+  ['EnerSul Distribuidora', 'Campo Grande · MS', 'compras@enersul.com.br', 4, 23],
+  ['Rede Vale Energia', 'Belo Horizonte · MG', 'suprimentos@redevale.com.br', 3, 31],
+  ['Coopercel', 'Chapecó · SC', 'engenharia@coopercel.coop.br', 2, 12],
+  ['CPE Paulista', 'Campinas · SP', 'pedidos@cpepaulista.com.br', 3, 40],
+  ['Grid Nordeste', 'Recife · PE', 'compras@gridne.com.br', 2, 17],
+  ['Energia Serrana', 'Caxias do Sul · RS', 'contato@energiaserrana.com.br', 2, 9],
+  ['Luz do Norte S.A.', 'Belém · PA', 'suprimentos@luzdonorte.com.br', 1, 14],
+  ['Eletro Baía', 'Salvador · BA', 'compras@eletrobaia.com.br', 1, 21],
+].map(([nome, cid, email, ativos, total]) => ({
+  nome, cid, email, ativos, total,
+  ini: nome.split(' ').map(p => p[0]).join('').replace(/[^A-ZÀ-Ú]/g, '').slice(0, 2).toUpperCase(),
+}));
+const POS_D = [[20, 20], [610, 20], [610, 180], [170, 180], [170, 336], [610, 336]];
+const POS_V = [[95, 16], [95, 156], [95, 296], [95, 436], [95, 576], [95, 716]];
+const BELTS_D = [[150, 52, 460, 28, 90, 'tvBelt'], [661, 112, 28, 68, 180, 'tvBeltV'], [300, 212, 310, 28, 90, 'tvBeltR'], [221, 272, 28, 64, 180, 'tvBeltV'], [300, 368, 310, 28, 90, 'tvBelt']];
+const BELTS_V = [0, 1, 2, 3, 4].map(i => [146, 108 + 140 * i, 28, 48, 180, 'tvBeltV']);
+const LOTES = [
+  ['LT-2026-018', 'Expansão Rural MS', 6, 35, 'processing', '28 ago 2026'],
+  ['LT-2026-017', 'Rede Vale — Fase 2', 4, 62, 'processing', '20 ago 2026'],
+  ['LT-2026-016', 'Coopercel Oeste', 3, 88, 'lowconf', '12 ago 2026'],
+  ['LT-2026-015', 'CPE Paulista 300', 5, 100, 'success', '05 ago 2026'],
+  ['LT-2026-014', 'Grid NE Subestações', 8, 47, 'processing', '02 set 2026'],
+  ['LT-2026-013', 'Luz do Norte PA', 2, 10, 'pending', '15 set 2026'],
+  ['LT-2026-012', 'Serrana Compactos', 4, 100, 'success', '22 jul 2026'],
+  ['LT-2026-011', 'Eletro Baía Urbano', 6, 74, 'processing', '30 ago 2026'],
+].map(([id, projeto, n, prog, st, prev]) => ({ id, projeto, n, prog, st, prev }));
+const PROJETOS = [
+  ['Expansão Rural MS', 'EnerSul Distribuidora', 2, 10, 42, 'set 2026', 'processing'],
+  ['Rede Vale — Fase 2', 'Rede Vale Energia', 1, 4, 62, 'ago 2026', 'processing'],
+  ['Coopercel Oeste', 'Coopercel', 1, 3, 88, 'ago 2026', 'lowconf'],
+  ['CPE Paulista 300', 'CPE Paulista', 2, 9, 95, 'ago 2026', 'processing'],
+  ['Grid NE Subestações', 'Grid Nordeste', 1, 8, 47, 'set 2026', 'processing'],
+  ['Serrana Compactos', 'Energia Serrana', 1, 4, 100, 'jul 2026', 'success'],
+].map(([nome, cliente, lotes, trafos, prog, entrega, st]) => ({ nome, cliente, lotes, trafos, prog, entrega, st }));
+const STL = { pending: 'Aguardando', processing: 'Em produção', lowconf: 'Atenção', success: 'Concluído' };
+const DESC_OK = ['Bobinas montadas e conferidas', 'Núcleo prensado, medições dentro da tolerância', 'Encapsulamento e soldas finalizados', 'Ensaios elétricos de rotina aprovados', 'Acabamento aplicado e seco', 'Liberado para transporte'];
+const HORAS_TL = ['08:12', '10:45', '14:32', '09:18', '16:05', '11:50'];
+const fmtDia = (d) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '');
+const hora = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+class Component extends DCLogic {
+  state = {
+    logado: true, loginEmail: '', loginSenha: '', loginErro: false, loginBusy: false,
+    carregandoTab: false,
+    tab: 'dash', tema: 'dark', isMobile: false, busca: '', sel: null, hot: null,
+    detSerie: null, fStatus: 'all', fEtapa: 'all',
+    dashPer: '7d', dashDe: '2026-07-19', dashAte: '2026-07-26',
+    notif: false, notifLidas: false, linhaParada: true, camView: 'live',
+    camData: [
+      { id: 'CAM-01', endpoint: 'rtsp://linha-1.trael/cam-01', on: true },
+      { id: 'CAM-02', endpoint: 'rtsp://linha-1.trael/cam-02', on: true },
+      { id: 'CAM-03', endpoint: 'rtsp://linha-1.trael/cam-03', on: true },
+      { id: 'CAM-04', endpoint: 'rtsp://linha-1.trael/cam-04', on: true },
+      { id: 'CAM-05', endpoint: 'rtsp://linha-1.trael/cam-05', on: true },
+      { id: 'CAM-06', endpoint: 'rtsp://linha-1.trael/cam-06', on: true },
+      { id: 'CAM-07', endpoint: 'rtsp://linha-1.trael/cam-07', on: true },
+      { id: 'CAM-08', endpoint: 'rtsp://linha-1.trael/cam-08', on: false },
+    ],
+    chkSel: null,
+    chkData: [
+      { nome: 'Bobinagem', cams: ['CAM-01'], insc: ['Serigrafia'], limiar: 90, ativo: true },
+      { nome: 'Núcleo', cams: ['CAM-02'], insc: ['Chassi'], limiar: 92, ativo: true },
+      { nome: 'Tanque', cams: ['CAM-03', 'CAM-04'], insc: ['Chassi', 'Serigrafia'], limiar: 90, ativo: true },
+      { nome: 'Ensaios', cams: ['CAM-05'], insc: ['Plaqueta', 'Etiqueta'], limiar: 97, ativo: true },
+      { nome: 'Pintura', cams: ['CAM-06'], insc: ['Serigrafia'], limiar: 88, ativo: true },
+      { nome: 'Expedição', cams: ['CAM-07'], insc: ['Plaqueta', 'Etiqueta', 'Chassi'], limiar: 95, ativo: true },
+    ],
+    cfgNotif: [true, true, false, true],
+    mover: { vis: false, anim: false, x: 0, y: 0 }, mapaScale: 1, mapaCompact: false, menu: false,
+    unidades: [], eventos: [{ msg: 'Conexão estabelecida com a linha 1', serie: 'ws://linha-1', cor: 'var(--color-reading-success)', hora: hora() }],
+  };
+  proxSerie = 847262;
+  mapaRef = (el) => {
+    if (this.ro) { this.ro.disconnect(); this.ro = null; }
+    if (el) {
+      this.ro = new ResizeObserver(() => {
+        const w = el.clientWidth;
+        const compact = w < 600;
+        const s = Math.min(1, w / (compact ? 320 : 760));
+        if (compact !== this.state.mapaCompact || Math.abs(s - this.state.mapaScale) > 0.01) this.setState({ mapaCompact: compact, mapaScale: s });
+      });
+      this.ro.observe(el);
+    }
+  };
+  componentDidMount() {
+    this.mq = window.matchMedia('(max-width: 880px)');
+    this.mqN = window.matchMedia('(max-width: 1150px)');
+    this.onMq = () => this.setState({ isMobile: this.mq.matches, isNarrow: this.mqN.matches });
+    this.mq.addEventListener('change', this.onMq);
+    this.mqN.addEventListener('change', this.onMq);
+    const n = Math.min(this.props.unidadesIniciais ?? 8, 20);
+    const unidades = TRAFOS.filter(t => t.et < 5).slice(0, n).map(t => ({ serie: t.serie, stage: t.et }));
+    this.setState({ isMobile: this.mq.matches, isNarrow: this.mqN.matches, unidades });
+    document.documentElement.setAttribute('data-theme', this.state.tema);
+    this.agendar();
+  }
+  componentWillUnmount() { clearTimeout(this.timer); clearTimeout(this.mt1); clearTimeout(this.mt2); this.mq.removeEventListener('change', this.onMq); this.mqN.removeEventListener('change', this.onMq); if (this.ro) this.ro.disconnect(); }
+  entrar() {
+    if (!this.state.loginEmail.trim() || !this.state.loginSenha) { this.setState({ loginErro: true }); return; }
+    this.setState({ loginBusy: true });
+    setTimeout(() => this.setState({ logado: true, loginBusy: false, carregandoTab: true }, () => {
+      clearTimeout(this.loadT);
+      this.loadT = setTimeout(() => this.setState({ carregandoTab: false }), 650);
+    }), 700);
+  }
+  agendar() { this.timer = setTimeout(() => { this.tick(); this.agendar(); }, (this.props.intervaloSim ?? 2.5) * 1000); }
+  moverPara(a, b) {
+    const C = (this.state.mapaCompact ? POS_V : POS_D).map(([l, t]) => [l + 65, t + 46]);
+    const [fx, fy] = C[a];
+    const [tx, ty] = b == null
+      ? (this.state.mapaCompact ? [C[5][0], C[5][1] + 130] : [C[5][0] + 180, C[5][1]])
+      : C[b];
+    // duração proporcional ao comprimento do trecho (velocidade constante de ~240 px/s)
+    const dist = Math.hypot(tx - fx, ty - fy);
+    const dur = +(dist / 240).toFixed(2);
+    clearTimeout(this.mt2);
+    // garante que a posição inicial foi pintada antes de animar (evita começar no meio do trajeto)
+    this.setState({ mover: { vis: true, anim: false, x: fx, y: fy, dur }, hot: b ?? a }, () => {
+      requestAnimationFrame(() => requestAnimationFrame(() =>
+        this.setState({ mover: { vis: true, anim: true, x: tx, y: ty, dur } })));
+    });
+    this.mt2 = setTimeout(() => this.setState({ mover: { ...this.state.mover, vis: false } }), dur * 1000 + 400);
+  }
+  tick() {
+    const us = [...this.state.unidades];
+    if (!us.length) return;
+    const i = Math.floor(Math.random() * us.length);
+    const u = { ...us[i] };
+    const evs = [];
+    if (u.stage >= 5) {
+      const novo = { serie: 'TR-' + this.proxSerie++, stage: 0 };
+      us[i] = novo;
+      evs.push({ msg: 'Expedido para o cliente', serie: u.serie, cor: 'var(--color-reading-success)' });
+      evs.push({ msg: 'Entrou na linha — Bobinagem', serie: novo.serie, cor: 'var(--color-reading-pending)' });
+      this.moverPara(5, null);
+    } else if (u.stage === 3) {
+      if (Math.random() < 0.18) {
+        u.stage = 2;
+        evs.push({ msg: 'Ensaio reprovado — retorna ao Tanque', serie: u.serie, cor: 'var(--color-reading-mismatch)' });
+        this.moverPara(3, 2);
+      } else {
+        u.stage = 4;
+        evs.push({ msg: 'Ensaio aprovado — segue para Pintura', serie: u.serie, cor: 'var(--color-reading-success)' });
+        this.moverPara(3, 4);
+      }
+      us[i] = u;
+    } else {
+      const de = u.stage;
+      u.stage++;
+      us[i] = u;
+      evs.push({ msg: 'Avançou para ' + this.state.chkData[u.stage].nome, serie: u.serie, cor: 'var(--color-reading-processing)' });
+      this.moverPara(de, u.stage);
+    }
+    this.setState({
+      unidades: us,
+      eventos: [...evs.map(e => ({ ...e, hora: hora() })), ...this.state.eventos].slice(0, 14),
+    });
+  }
+  renderVals() {
+    const { tab, tema, isMobile, busca, sel, hot, mover, unidades, eventos } = this.state;
+    const NOMES = this.state.chkData.map(c => c.nome);
+    const updChk = (i, patch) => this.setState({ chkData: this.state.chkData.map((c, j) => j === i ? { ...c, ...patch } : c) });
+    const vincular = (id, alvo) => {
+      const data = this.state.chkData.map(c => ({ ...c, cams: c.cams.filter(x => x !== id) }));
+      if (alvo !== '') data[+alvo] = { ...data[+alvo], cams: [...data[+alvo].cams, id] };
+      this.setState({ chkData: data });
+    };
+    const nav = (t) => (tab === t || (t === 'trafos' && tab === 'det') || (t === 'chk' && tab === 'chkdet'))
+      ? { c: 'var(--text-1)', b: 'var(--brand-surface)' }
+      : { c: 'var(--text-3)', b: 'transparent' };
+    const abrirDet = (serie) => irPara('det', { detSerie: serie });
+    const irPara = (t, extra) => {
+      if (t === this.state.tab && !extra) return;
+      clearTimeout(this.loadT);
+      this.setState({ tab: t, carregandoTab: true, ...(extra ?? {}) });
+      this.loadT = setTimeout(() => this.setState({ carregandoTab: false }), 650);
+    };
+    const nd = nav('dash'), nt = nav('trafos'), nc = nav('cli'), nl = nav('live'), nb = nav('lotes'), np = nav('proj'), ncm = nav('cam'), ncf = nav('config'), nch = nav('chk');
+    const NOTIFS = [
+      { msg: 'Linha parada — divergência de chassi no checkpoint Ensaios (TR-847250)', hora: 'há 4 min', cor: 'var(--color-reading-mismatch)' },
+      { msg: 'Divergência de leitura na serigrafia de TR-847245 — verificação manual', hora: 'há 26 min', cor: 'var(--color-reading-lowconf)' },
+      { msg: 'Lote LT-2026-015 concluído — 5 unidades aprovadas', hora: 'há 2 h', cor: 'var(--color-reading-success)' },
+      { msg: 'Entrega de TR-847246 prevista para 05 ago — expedição agendada', hora: 'há 5 h', cor: 'var(--color-reading-processing)' },
+    ];
+    const q = busca.trim().toLowerCase();
+    const { fStatus, fEtapa } = this.state;
+    const trafosFiltrados = TRAFOS
+      .filter(t => (!q || t.serie.toLowerCase().includes(q) || t.cliente.toLowerCase().includes(q))
+        && (fStatus === 'all' || t.st === fStatus)
+        && (fEtapa === 'all' || t.et === +fEtapa))
+      .map(t => ({ serie: t.serie, kva: String(t.kva).replace('.', ','), cliente: t.cliente, etapa: NOMES[t.et], status: ST[t.st].t, sCor: ST[t.st].c, sBg: ST[t.st].bg, entrega: t.entrega, abrir: () => abrirDet(t.serie) }));
+    const alertasL = TRAFOS.filter(t => t.st === 'mismatch' || t.st === 'lowconf');
+    const dt = TRAFOS.find(t => t.serie === this.state.detSerie) ?? TRAFOS[0];
+    const detTimeline = NOMES.map((nome, i) => {
+      const feita = i < dt.et || (i === dt.et && dt.st === 'success');
+      const atual = i === dt.et && dt.st !== 'success';
+      let chip, cCor, cBg, cor, desc, data = '—';
+      if (feita) {
+        chip = 'Concluído'; cCor = 'var(--color-reading-success)'; cBg = 'var(--reading-success-soft)';
+        cor = 'var(--color-reading-success)'; desc = DESC_OK[i];
+        data = fmtDia(new Date(Date.now() - (dt.et - i + 1) * 1.4 * 86400000)) + ' · ' + HORAS_TL[i];
+      } else if (atual) {
+        const m = {
+          mismatch: ['Reprovado', 'Reprovado no ensaio de rotina — aguardando retrabalho'],
+          lowconf: ['Atenção', 'Divergência na leitura das inscrições — verificação manual'],
+          processing: ['Em processo', 'Etapa em andamento'],
+          pending: ['Aguardando', 'Na fila para iniciar a etapa'],
+        }[dt.st];
+        chip = m[0]; desc = m[1]; cCor = ST[dt.st].c; cBg = ST[dt.st].bg; cor = ST[dt.st].c;
+        data = 'hoje · ' + HORAS_TL[i];
+      } else {
+        chip = 'Previsto'; cCor = 'var(--text-3)'; cBg = 'var(--surface-2)';
+        cor = 'var(--viz-track)'; desc = 'Etapa ainda não iniciada';
+      }
+      return {
+        nome, chip, cCor, cBg, cor, desc, data,
+        tCor: feita || atual ? 'var(--text-1)' : 'var(--text-3)',
+        anel: atual ? 'var(--ring-focus-tight)' : 'none',
+        linha: i < 5, padB: i < 5 ? 'var(--space-5)' : '0px',
+        temFoto: feita && (i === 0 || i === 3),
+      };
+    });
+    const contEt = ETAPAS.map((_, i) => TRAFOS.filter(t => t.et === i).length);
+    const maxEt = Math.max(...contEt, 1);
+    const funil = NOMES.map((nome, i) => ({ nome, n: contEt[i], w: Math.round(contEt[i] / maxEt * 100), cor: `var(--viz-${i + 1})` }));
+    const D7 = [['Seg', 5], ['Ter', 7], ['Qua', 4], ['Qui', 8], ['Sex', 6], ['Sáb', 3], ['Dom', 2]];
+    const fmtBr = (s) => s ? s.slice(8, 10) + '/' + s.slice(5, 7) : '';
+    const PERD = {
+      hoje: { label: 'Produção · hoje', val: '6', sub: '+2 vs ontem', aprov: 96.1, na: '22', nr: '1', titulo: 'Produção por hora', dias: [['06h', 0], ['08h', 1], ['10h', 1], ['12h', 2], ['14h', 1], ['16h', 1]] },
+      '7d': { label: 'Produção · semana', val: '35', sub: '+8% vs semana anterior', aprov: 94.2, na: '213', nr: '13', titulo: 'Produção por dia', dias: D7 },
+      '30d': { label: 'Produção · 30 dias', val: '124', sub: '+5% vs mês anterior', aprov: 93.4, na: '876', nr: '62', titulo: 'Produção por semana', dias: [['Sem 1', 28], ['Sem 2', 31], ['Sem 3', 35], ['Sem 4', 30]] },
+      custom: { label: 'Produção · período', val: '35', sub: fmtBr(this.state.dashDe) + ' – ' + fmtBr(this.state.dashAte), aprov: 94.2, na: '213', nr: '13', titulo: 'Produção por dia', dias: D7 },
+    };
+    const per = PERD[this.state.dashPer];
+    const maxD = Math.max(...per.dias.map(x => x[1]), 1);
+    const prodDias = per.dias.map(([d, v]) => ({ d, v, h: Math.round(v / maxD * 100), cor: v === maxD ? 'var(--color-brand-medium)' : 'var(--viz-1)' }));
+    const tempos = [2.8, 1.9, 2.4, 1.2, 1.6, 0.8];
+    const tempoEtapas = NOMES.map((nome, i) => ({ nome, v: String(tempos[i]).replace('.', ','), w: Math.round(tempos[i] / 2.8 * 100) }));
+    const POSA = this.state.mapaCompact ? POS_V : POS_D;
+    const contBelt = ETAPAS.map((_, i) => unidades.filter(u => u.stage === i).length);
+    const etapasMapa = NOMES.map((nome, i) => ({
+      nome, l: POSA[i][0], t: POSA[i][1], n: contBelt[i],
+      nCor: contBelt[i] ? 'var(--text-1)' : 'var(--text-3)',
+      ring: hot === i ? 'var(--ring-focus)' : 'var(--shadow-1)',
+      sel: () => this.setState({ sel: this.state.sel === i ? null : i }),
+    }));
+    return {
+      tema, isMobile, isDesktop: !isMobile,
+      verLogin: !this.state.logado, verApp: this.state.logado,
+      loginEmail: this.state.loginEmail, setLoginEmail: (e) => this.setState({ loginEmail: e.target.value, loginErro: false }),
+      loginSenha: this.state.loginSenha, setLoginSenha: (e) => this.setState({ loginSenha: e.target.value, loginErro: false }),
+      loginErro: this.state.loginErro,
+      loginBorda: this.state.loginErro ? 'var(--color-reading-mismatch)' : 'var(--border)',
+      loginBtnTxt: this.state.loginBusy ? 'Entrando…' : 'Entrar',
+      loginKey: (e) => { if (e.key === 'Enter') this.entrar(); },
+      entrar: () => this.entrar(),
+      semAcao: (e) => e.preventDefault(),
+      sair: () => this.setState({ logado: false, menu: false, loginSenha: '', tab: 'dash' }),
+      carregando: this.state.carregandoTab, prontas: !this.state.carregandoTab,
+      skelKpis: [{}, {}, {}, {}], skelRows: [{}, {}, {}, {}, {}, {}],
+      buscaVazia: trafosFiltrados.length === 0, temResultados: trafosFiltrados.length > 0,
+      limparFiltros: () => this.setState({ busca: '', fStatus: 'all', fEtapa: 'all' }),
+      verDash: tab === 'dash', verTrafos: tab === 'trafos', verCli: tab === 'cli', verLive: tab === 'live', verLotes: tab === 'lotes', verProj: tab === 'proj', verDet: tab === 'det', verCam: tab === 'cam', verConfig: tab === 'config', verChk: tab === 'chk', verChkDet: tab === 'chkdet',
+      titulo: { dash: 'Dashboard', trafos: 'Transformadores', cli: 'Clientes', live: 'Tempo real', lotes: 'Lotes', proj: 'Projetos', det: 'Transformador', cam: 'Câmeras ao vivo', config: 'Configurações', chk: 'Checkpoints', chkdet: 'Checkpoint' }[tab],
+      verAlertas: (tab === 'dash' || tab === 'trafos') && alertasL.length > 0,
+      alertaMsg: alertasL.length + (alertasL.length === 1 ? ' transformador exige' : ' transformadores exigem') + ' atenção',
+      alertas: alertasL.map(t => ({ serie: t.serie, motivo: t.st === 'mismatch' ? 'Reprovado em ensaio' : 'Divergência de leitura', cor: ST[t.st].c, abrir: () => abrirDet(t.serie) })),
+      fStatus, setFStatus: (e) => this.setState({ fStatus: e.target.value }),
+      fEtapa, setFEtapa: (e) => this.setState({ fEtapa: e.target.value }),
+      voltarTrafos: () => this.setState({ tab: 'trafos' }),
+      detSerie: dt.serie, detCliente: dt.cliente, detKva: String(dt.kva).replace('.', ','),
+      detEtapa: NOMES[dt.et], detStatus: ST[dt.st].t, detSCor: ST[dt.st].c, detSBg: ST[dt.st].bg,
+      detEntrega: dt.entrega, detProg: Math.round((dt.et + (dt.st === 'success' ? 1 : 0)) / 6 * 100), detTimeline,
+      padB: isMobile ? '96px' : 'var(--space-8)',
+      liveDir: this.state.isNarrow ? 'column' : 'row',
+      liveAlign: this.state.isNarrow ? 'stretch' : 'flex-start',
+      feedW: this.state.isNarrow ? 'auto' : '320px',
+      verFeed: this.props.mostrarFeed ?? true,
+      ndC: nd.c, ndB: nd.b, ntC: nt.c, ntB: nt.b, ncC: nc.c, ncB: nc.b, nlC: nl.c, nlB: nl.b, nbC: nb.c, nbB: nb.b, npC: np.c, npB: np.b, ncmC: ncm.c, ncmB: ncm.b, ncfC: ncf.c, ncfB: ncf.b, nchC: nch.c, nchB: nch.b,
+      goChk: () => irPara('chk'),
+      menuChk: () => irPara('chk', { menu: false }),
+      ...(() => {
+        const ci = this.state.chkSel ?? 0;
+        const ck = this.state.chkData[ci];
+        return {
+          voltarChk: () => this.setState({ tab: 'chk' }),
+          ckNome: ck.nome, setCkNome: (e) => updChk(ci, { nome: e.target.value }),
+          ckLimiar: ck.limiar, setCkLimiar: (e) => updChk(ci, { limiar: +e.target.value }),
+          ckSwBg: ck.ativo ? 'var(--color-brand-medium)' : 'var(--surface-3)', ckSwX: ck.ativo ? 20 : 2,
+          ckToggleAtivo: () => updChk(ci, { ativo: !ck.ativo }),
+          ckNCams: ck.cams.length,
+          ckCams: ck.cams.map(id => ({ id, remover: () => updChk(ci, { cams: ck.cams.filter(x => x !== id) }) })),
+          ...(() => {
+            const usadas = this.state.chkData.flatMap(c => c.cams);
+            const livres = this.state.camData.filter(c => !usadas.includes(c.id));
+            return {
+              temLivres: livres.length > 0, semLivres: livres.length === 0,
+              ckLivres: livres.map(c => ({ id: c.id, vincular: () => vincular(c.id, String(ci)) })),
+            };
+          })(),
+          ckCampos: ['Serigrafia', 'Chassi', 'Plaqueta', 'Etiqueta'].map(n => {
+            const on = ck.insc.includes(n);
+            return {
+              n, bg: on ? 'var(--brand-surface)' : 'var(--surface-2)',
+              bd: on ? 'var(--brand-surface-border)' : 'var(--border)',
+              cor: on ? 'var(--text-1)' : 'var(--text-3)',
+              toggle: () => updChk(ci, { insc: on ? ck.insc.filter(x => x !== n) : [...ck.insc, n] }),
+            };
+          }),
+        };
+      })(),
+      goCam: () => irPara('cam'),
+      goConfig: () => irPara('config', { menu: false }),
+      menuConfig: () => irPara('config', { menu: false }),
+      notifAberto: this.state.notif,
+      toggleNotif: () => this.setState({ notif: !this.state.notif }),
+      fecharNotif: () => this.setState({ notif: false }),
+      marcarLidas: () => this.setState({ notifLidas: true }),
+      temNotif: !this.state.notifLidas, nNotif: NOTIFS.length,
+      notifs: NOTIFS.map(n => ({ ...n, op: this.state.notifLidas ? 0.55 : 1 })),
+      linhaParada: this.state.linhaParada,
+      liberarLinha: () => this.setState({ linhaParada: false }),
+      paradasHoje: this.state.linhaParada ? 1 : 0,
+      paradasCor: this.state.linhaParada ? 'var(--color-reading-mismatch)' : 'var(--text-1)',
+      camLive: this.state.camView === 'live', camReg: this.state.camView === 'reg',
+      verAoVivo: () => this.setState({ camView: 'live' }),
+      verCadastro: () => this.setState({ camView: 'reg' }),
+      cvLB: this.state.camView === 'live' ? 'var(--surface-1)' : 'transparent',
+      cvLC: this.state.camView === 'live' ? 'var(--text-1)' : 'var(--text-3)',
+      cvLS: this.state.camView === 'live' ? 'var(--shadow-1)' : 'none',
+      cvRB: this.state.camView === 'reg' ? 'var(--surface-1)' : 'transparent',
+      cvRC: this.state.camView === 'reg' ? 'var(--text-1)' : 'var(--text-3)',
+      cvRS: this.state.camView === 'reg' ? 'var(--shadow-1)' : 'none',
+      camsOnline: this.state.camData.filter(c => c.on).length + '/' + this.state.camData.length,
+      camRows: this.state.camData.map(c => {
+        const idx = this.state.chkData.findIndex(k => k.cams.includes(c.id));
+        return {
+          id: c.id, endpoint: c.endpoint,
+          dotCor: c.on ? 'var(--color-reading-success)' : 'var(--text-3)',
+          statusTxt: c.on ? 'online' : 'offline',
+          vinculo: idx >= 0 ? String(idx) : '',
+          opcoes: NOMES.map((n, i) => ({ v: String(i), n })),
+          mudar: (e) => vincular(c.id, e.target.value),
+        };
+      }),
+      novaCam: () => {
+        let n = 1;
+        while (this.state.camData.some(c => c.id === 'CAM-' + String(n).padStart(2, '0'))) n++;
+        const id = 'CAM-' + String(n).padStart(2, '0');
+        this.setState({ camData: [...this.state.camData, { id, endpoint: 'rtsp://linha-1.trael/cam-' + String(n).padStart(2, '0'), on: false }] });
+      },
+      camGrupos: (() => {
+        const lp = this.state.linhaParada;
+        const LEIT = {
+          'CAM-01': ['TR-847241', '98,4%', 'success'],
+          'CAM-02': ['TR-847234', '97,1%', 'success'],
+          'CAM-03': ['TR-847245', '71,3%', 'lowconf'],
+          'CAM-04': ['TR-847251', '96,8%', 'success'],
+          'CAM-05': ['TR-847250', '99,0%', lp ? 'mismatch' : 'processing'],
+          'CAM-06': ['TR-847256', '98,9%', 'success'],
+          'CAM-07': ['TR-847246', '99,2%', 'success'],
+        };
+        const TXT = { success: 'Leitura confirmada', lowconf: 'Divergência — verificação manual', mismatch: 'Linha parada — chassi divergente', processing: 'Aguardando próxima leitura' };
+        const HC = { success: 'var(--color-reading-success-hc)', lowconf: 'var(--color-reading-lowconf-hc)', mismatch: 'var(--color-reading-mismatch-hc)', processing: 'var(--color-reading-processing-hc)' };
+        return this.state.chkData.map(c => ({
+          nome: c.nome, vazio: c.cams.length === 0,
+          cams: c.cams.map(id => {
+            const cam = this.state.camData.find(x => x.id === id) ?? { on: true };
+            const [leitura, conf, st] = cam.on ? (LEIT[id] ?? ['—', '—', 'processing']) : ['—', '—', 'processing'];
+            return {
+              id, leitura, conf,
+              boxCor: cam.on ? HC[st] : 'var(--text-3)',
+              stCor: cam.on ? ST[st].c : 'var(--text-3)',
+              stTxt: cam.on ? TXT[st] : 'Câmera offline',
+              borda: cam.on && st === 'mismatch' ? 'var(--color-reading-mismatch)' : 'var(--border)',
+            };
+          }),
+        }));
+      })(),
+      cfgRows: this.state.chkData.map((c, i) => ({
+        ordem: String(i + 1).padStart(2, '0'), nome: c.nome,
+        cam: c.cams.join(' · '), insc: c.insc.map(n => ({ n })), limiar: c.limiar,
+        op: c.ativo ? 1 : 0.5, swBg: c.ativo ? 'var(--color-brand-medium)' : 'var(--surface-3)', swX: c.ativo ? 20 : 2,
+        abrir: () => this.setState({ tab: 'chkdet', chkSel: i }),
+        toggle: (e) => { e.stopPropagation(); updChk(i, { ativo: !c.ativo }); },
+      })),
+      cfgNotifRows: [
+        ['Parada de linha', 'Alerta imediato quando um checkpoint reprova uma leitura'],
+        ['Divergência de leitura', 'Quando a confiança fica abaixo do limiar da etapa'],
+        ['Resumo diário', 'Produção, aprovações e paradas do dia por e-mail'],
+        ['Entregas próximas', 'Transformadores a 3 dias da data prevista'],
+      ].map(([nome, desc], i) => {
+        const on = this.state.cfgNotif[i];
+        return {
+          nome, desc,
+          swBg: on ? 'var(--color-brand-medium)' : 'var(--surface-3)', swX: on ? 20 : 2,
+          toggle: () => {
+            const a = [...this.state.cfgNotif]; a[i] = !a[i];
+            this.setState({ cfgNotif: a });
+          },
+        };
+      }),
+      goLotes: () => irPara('lotes'),
+      goProj: () => irPara('proj'),
+      lotes: LOTES.map(l => ({ ...l, status: STL[l.st], sCor: ST[l.st].c, sBg: ST[l.st].bg })),
+      projetos: PROJETOS.map(p => ({ ...p, sCor: ST[p.st].c })),
+      menuAberto: this.state.menu,
+      toggleMenu: () => this.setState({ menu: !this.state.menu }),
+      fecharMenu: () => this.setState({ menu: false }),
+      menuTema: () => {
+        const novo = tema === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', novo);
+        this.setState({ tema: novo, menu: false });
+      },
+      goDash: () => irPara('dash'),
+      goTrafos: () => irPara('trafos'),
+      goCli: () => irPara('cli'),
+      goLive: () => irPara('live'),
+      toggleTema: () => {
+        const novo = tema === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', novo);
+        this.setState({ tema: novo });
+      },
+      kpiProducao: TRAFOS.filter(t => t.et < 5).length,
+      prodDias, funil, tempoEtapas, aprovDash: (2 * Math.PI * 48 * per.aprov / 100).toFixed(1),
+      prodTitulo: per.titulo, kpiProdLabel: per.label, kpiProdVal: per.val, kpiProdSub: per.sub,
+      aprovPct: String(per.aprov).replace('.', ',') + '%', nAprov: per.na, nReprov: per.nr,
+      perEhCustom: this.state.dashPer === 'custom',
+      dashDe: this.state.dashDe, setDashDe: (e) => this.setState({ dashDe: e.target.value }),
+      dashAte: this.state.dashAte, setDashAte: (e) => this.setState({ dashAte: e.target.value }),
+      perOpts: [['hoje', 'Hoje'], ['7d', '7 dias'], ['30d', '30 dias'], ['custom', 'Personalizado']].map(([v, n]) => ({
+        n, sel: () => this.setState({ dashPer: v }),
+        bg: this.state.dashPer === v ? 'var(--surface-1)' : 'transparent',
+        c: this.state.dashPer === v ? 'var(--text-1)' : 'var(--text-3)',
+        s: this.state.dashPer === v ? 'var(--shadow-1)' : 'none',
+      })),
+      busca, setBusca: (e) => this.setState({ busca: e.target.value }),
+      trafosFiltrados, nTrafos: trafosFiltrados.length,
+      clientes: CLIENTES,
+      etapasMapa, nBelt: unidades.length, eventos,
+      mapaRef: this.mapaRef, mapaScale: this.state.mapaScale,
+      mapaBaseW: this.state.mapaCompact ? 320 : 760, mapaBaseH: this.state.mapaCompact ? 824 : 448,
+      mapaW: Math.round((this.state.mapaCompact ? 320 : 760) * this.state.mapaScale),
+      mapaH: Math.round((this.state.mapaCompact ? 824 : 448) * this.state.mapaScale),
+      beltSegs: (this.state.mapaCompact ? BELTS_V : BELTS_D).map(([l, t, w, h, deg, anim]) => ({ l, t, w, h, deg, anim })),
+      moverVis: mover.vis, moverX: mover.x, moverY: mover.y,
+      moverTrans: mover.anim ? `left ${mover.dur}s linear,top ${mover.dur}s linear` : 'none',
+      temSel: sel != null,
+      selEtapa: sel != null ? NOMES[sel] : '',
+      selN: sel != null ? contBelt[sel] : 0,
+      selSeries: sel != null ? unidades.filter(u => u.stage === sel).map(u => ({ serie: u.serie })) : [],
+      fecharSel: () => this.setState({ sel: null }),
+    };
+  }
+}
+</script>
+</body>
+</html>
