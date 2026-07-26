@@ -2,6 +2,7 @@ import { AchadoLivre } from '../extracao/ports/extractor.port';
 import { PayloadEtiqueta } from '../transformadores/qr/payload-etiqueta';
 
 import { cruzarAchados } from './conferencia-extracao.service';
+import { FotoDaEvidenciaResposta } from './dto/resumos-compartilhados.dto';
 
 // Nota de lint: a regra `no-restricted-syntax` do projeto exige que todo `it`
 // comece com "should"; o restante da frase segue o vocabulario de dominio.
@@ -115,9 +116,24 @@ describe('cruzarAchados — dedupe por texto normalizado', () => {
     expect(alarmes).toHaveLength(1);
     expect(alarmes[0].texto).toBe('847833');
     expect(alarmes[0].ocorrencias).toEqual([
-      { fotoEvidenciaId: 'foto-1', confianca: 0.99, regiaoLeitura: null },
-      { fotoEvidenciaId: 'foto-2', confianca: 0.71, regiaoLeitura: null },
-      { fotoEvidenciaId: 'foto-3', confianca: 0.88, regiaoLeitura: null },
+      {
+        fotoEvidenciaId: 'foto-1',
+        confianca: 0.99,
+        regiaoLeitura: null,
+        foto: null,
+      },
+      {
+        fotoEvidenciaId: 'foto-2',
+        confianca: 0.71,
+        regiaoLeitura: null,
+        foto: null,
+      },
+      {
+        fotoEvidenciaId: 'foto-3',
+        confianca: 0.88,
+        regiaoLeitura: null,
+        foto: null,
+      },
     ]);
   });
 
@@ -152,7 +168,49 @@ describe('cruzarAchados — dedupe por texto normalizado', () => {
       fotoEvidenciaId: null,
       confianca: 0,
       regiaoLeitura: null,
+      foto: null,
     });
+  });
+});
+
+describe('cruzarAchados — evidencia do alarme', () => {
+  const FOTO_PLACA = {
+    id: 'foto-placa',
+    url: 'foto-placa.jpg',
+    fonteFisica: 'placa',
+  };
+
+  it('should devolver a foto pronta quando o chamador informa o registro', () => {
+    const [alarme] = cruzarAchados(
+      [achado('847833')],
+      PAYLOAD,
+      new Map([[FOTO_PLACA.id, FOTO_PLACA]]),
+    );
+
+    expect(alarme.ocorrencias[0].foto).toMatchObject(FOTO_PLACA);
+    // O id continua ali: contrato antigo preservado.
+    expect(alarme.ocorrencias[0].fotoEvidenciaId).toBe('foto-placa');
+  });
+
+  it('should montar a foto como INSTANCIA, para a url ser assinada sob s3', () => {
+    const [alarme] = cruzarAchados(
+      [achado('847833')],
+      PAYLOAD,
+      new Map([[FOTO_PLACA.id, FOTO_PLACA]]),
+    );
+
+    expect(alarme.ocorrencias[0].foto).toBeInstanceOf(FotoDaEvidenciaResposta);
+  });
+
+  it('should deixar foto null quando o id do achado nao esta no mapa', () => {
+    const [alarme] = cruzarAchados(
+      [achado('847833', { fotoEvidenciaId: 'foto-desconhecida' })],
+      PAYLOAD,
+      new Map([[FOTO_PLACA.id, FOTO_PLACA]]),
+    );
+
+    expect(alarme.ocorrencias[0].foto).toBeNull();
+    expect(alarme.ocorrencias[0].fotoEvidenciaId).toBe('foto-desconhecida');
   });
 });
 

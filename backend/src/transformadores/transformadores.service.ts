@@ -141,12 +141,19 @@ export class TransformadoresService {
     }
 
     // QR so com codigo de lookup: o fallback de digitacao manual e do front.
+    // Medido em 2026-07-26, o QR da ETIQUETA — o que o fluxo manda ler — e
+    // exatamente isso (13 digitos, sem campo nenhum), entao esta mensagem e o
+    // que o operador REALMENTE ve, nao um canto raro. Por isso ela aponta a
+    // saida em vez de so nomear a limitacao. Prefixo `payload-somente-codigo`
+    // e contrato: a /demo traduz o erro casando esse pedaco por substring.
     if (resultado.tipo === 'codigo') {
       throw new UnprocessableEntityException({
         status: HttpStatus.UNPROCESSABLE_ENTITY,
         errors: {
           payloadQr:
-            'payload-somente-codigo: lookup nao suportado nesta rodada',
+            'payload-somente-codigo: o QR traz apenas um codigo de lookup; ' +
+            'digite os campos da etiqueta manualmente ' +
+            '(lookup automatico e rodada futura)',
         },
       });
     }

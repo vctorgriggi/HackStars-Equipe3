@@ -13,9 +13,11 @@
  * canônica Unicode) — sem isso, QR gerado em iOS/macOS (NFD) divergiria de
  * OCR em NFC. Não é fuzzy: perda de acento continua divergente.
  *
- * DECISAO EM ABERTO: politica para campo parcialmente legivel (rejeitar
- * sempre x similaridade >= N% com revisao humana). Enquanto nao houver
- * decisao, so igualdade exata do valor normalizado vira `conforme`.
+ * Campo parcialmente legivel foi RESOLVIDO como rejeitar sempre (limiar 0.9
+ * medido): nao ha similaridade nem percentual em lugar nenhum. O unico
+ * criterio alternativo de igualdade e a contencao de TOKEN INTEIRO do modo
+ * `contem-token` (`comparacao.ts`), usada so em campo de cliente e por medicao
+ * — e ela tambem nao e fuzzy.
  */
 export function normalizar(valor: string): string {
   return valor.normalize('NFC').trim().replace(/\s+/g, ' ').toLowerCase();

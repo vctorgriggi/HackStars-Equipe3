@@ -43,6 +43,12 @@ export class CheckpointsService {
     });
   }
 
+  // Etapas da linha inteira, na ordem da sequencia. Usada pelo plano de fotos:
+  // "o que cada gate confere" so existe em relacao a linha toda.
+  findAll() {
+    return this.checkpointRepository.findAll();
+  }
+
   findById(id: Checkpoint['id']) {
     return this.checkpointRepository.findById(id);
   }

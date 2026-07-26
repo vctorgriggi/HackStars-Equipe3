@@ -25,6 +25,7 @@ import {
   OcorrenciaAchado,
   ResultadoExecucaoComExtracao,
 } from './dto/resultado-execucao-com-extracao.dto';
+import { paraFotoDaEvidencia } from './dto/resumos-compartilhados.dto';
 import { ConferenciasService } from './conferencias.service';
 import { ExecutarComFotosDto } from './dto/executar-com-fotos.dto';
 import { LeituraCampoDto } from './dto/executar-conferencia.dto';
@@ -126,9 +127,15 @@ export class ConferenciaExtracaoService {
     // gravar exigiria entidade nova e trilha de auditoria propria, e o alerta
     // persistente ja tem dono (T4.3 do PLAN). Recarregar a conferencia por id
     // nao traz — e assim de proposito ate a decisao de modelagem.
+    //
+    // As fotos entram como MAPA das que foram efetivamente lidas: o alarme ja
+    // sai com a evidencia (url pronta + vista), sem o front ter de casar id com
+    // foto por conta propria. Sao os registros que este metodo ja carregou —
+    // nenhuma consulta a mais.
     const achadosInconsistentes = cruzarAchados(
       achadosLivres,
       contexto.payload,
+      new Map(usadas.map((registro) => [registro.id, registro])),
     );
 
     if (achadosInconsistentes.length > 0) {
@@ -345,10 +352,19 @@ const PADRAO_SO_DIGITOS = /^\d+$/;
  * O que esta funcao NUNCA faz: emitir veredito, mexer em campo conferido ou
  * transformar ausencia de alarme em `conforme`. Consistencia nao enxerga
  * ausencia — peca lisa, sem marcacao nenhuma, sai daqui sem alarme algum.
+ *
+ * `fotosPorId` e so PROJECAO da evidencia (id -> foto ja carregada pelo
+ * chamador): cada ocorrencia sai com a foto pronta para exibir. Mapa vazio (ou
+ * id ausente nele) nao muda alarme nenhum — `foto` fica `null` e o
+ * `fotoEvidenciaId` continua ali.
  */
 export function cruzarAchados(
   achados: AchadoLivre[],
   payload: PayloadEtiqueta,
+  fotosPorId: Map<
+    string,
+    { id: string; url: string; fonteFisica: string }
+  > = new Map(),
 ): AchadoInconsistente[] {
   const identificadores = [payload.numeroSerie, payload.patrimonio]
     .map((valor) => (valor === null ? '' : normalizar(valor)))
@@ -394,10 +410,14 @@ export function cruzarAchados(
     }
 
     const atual = porTexto.get(texto);
+    const fotoEvidenciaId = achado.fotoEvidenciaId ?? null;
     const ocorrencia: OcorrenciaAchado = {
-      fotoEvidenciaId: achado.fotoEvidenciaId ?? null,
+      fotoEvidenciaId,
       confianca: achado.confianca,
       regiaoLeitura: achado.regiaoLeitura ?? null,
+      foto: paraFotoDaEvidencia(
+        fotoEvidenciaId === null ? null : fotosPorId.get(fotoEvidenciaId),
+      ),
     };
 
     if (atual) {

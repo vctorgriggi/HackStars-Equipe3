@@ -1,6 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-import { TransformUrlEvidencia } from '../../fotos-evidencia/domain/url-evidencia.transform';
 import { ItemChecklist } from '../engine/tipos';
 import { ProjetoModelo } from '../../projetos-modelo/domain/projeto-modelo';
 import { ehItemChecklist } from '../conferencia-execucao.service';
@@ -11,6 +10,7 @@ import {
 } from '../dto/resultado-execucao.dto';
 import {
   EtapaResumo,
+  FotoDaEvidenciaResposta,
   TransformadorResumo,
 } from '../dto/resumos-compartilhados.dto';
 
@@ -26,47 +26,12 @@ const DESCRICAO_VEREDITO_GERAL_PERSISTIDO =
   '`achadosInconsistentes` NAO sao persistidos e nao voltam nesta rota.';
 
 /**
- * A evidencia de UM campo como a tela de veredito precisa dela.
- *
- * E CLASSE, nao interface, de proposito: `@TransformUrlEvidencia()` so roda
- * quando o class-transformer encontra uma INSTANCIA na resposta (objeto plano
- * nao carrega metadado de decorator). Sem isso, sob `FILE_DRIVER=s3` o front
- * receberia a key crua do bucket em vez da URL assinada — a foto nao abriria e
- * o criterio 1 do SPEC ("cada valor lido com link para sua foto-evidencia")
- * cairia justamente no ambiente da demo.
- *
- * A cadeia que entrega a URL pronta e global (main.ts): ClassSerializerInterceptor
- * aplica o transform (que sob s3 devolve uma PROMISE) e o ResolvePromisesInterceptor,
- * registrado por fora dele, resolve a promise antes de serializar o JSON.
+ * A evidencia de UM campo mora em `FotoDaEvidenciaResposta`
+ * (dto/resumos-compartilhados.dto.ts): a MESMA classe que a resposta dos
+ * endpoints de execucao usa. Uma copia local com outro nome viraria um segundo
+ * schema identico no OpenAPI para o front escolher — nome de schema e global no
+ * documento.
  */
-export class FotoEvidenciaResumo {
-  @ApiProperty({
-    type: String,
-    example: 'c0ffee00-1111-2222-3333-444455556666',
-  })
-  id: string;
-
-  @ApiProperty({
-    type: String,
-    example: 'https://trael.s3.us-east-1.amazonaws.com/1e0f2c9d.jpg?X-Amz-...',
-    description:
-      'URL pronta para uso: driver local → absoluta; driver s3 → ASSINADA E ' +
-      'COM VALIDADE DE 1 HORA. Por isso ela nao pode ser persistida em store ' +
-      'de longa duracao no cliente — depois de 1h o link devolve 403 e a ' +
-      'evidencia some da tela. Recarregue a conferencia para obter uma nova.',
-  })
-  @TransformUrlEvidencia()
-  url: string;
-
-  @ApiProperty({
-    type: String,
-    example: 'placa',
-    description:
-      'Vista da peca de onde a foto veio (topo, frente, placa…). Este valor e ' +
-      'PERSISTIDO junto da foto — e a procedencia real da evidencia.',
-  })
-  fonteFisica: string;
-}
 
 /** Um campo comparado, do jeito que a engine gravou. */
 export class CampoVeredito {
@@ -154,14 +119,15 @@ export class CampoVeredito {
   regiaoLeitura: string | null;
 
   @ApiProperty({
-    type: FotoEvidenciaResumo,
+    type: FotoDaEvidenciaResposta,
     nullable: true,
     description:
       'Foto que lastreia este campo (criterio 1 do SPEC: cada valor lido com ' +
       'link para sua evidencia). `null` quando a leitura entrou sem foto ' +
-      '(leituras digitadas do modo avancado).',
+      '(leituras digitadas do modo avancado). MESMA forma devolvida pelos ' +
+      'endpoints de execucao — a tela nao precisa de dois desenhos.',
   })
-  fotoEvidencia: FotoEvidenciaResumo | null;
+  fotoEvidencia: FotoDaEvidenciaResposta | null;
 }
 
 /** A conferencia relida, com a etapa em que o veredito saiu. */

@@ -1,6 +1,9 @@
 import { PayloadEtiqueta } from '../transformadores/qr/payload-etiqueta';
 
-import { montarValoresEsperados } from './conferencia-execucao.service';
+import {
+  montarModosDeComparacao,
+  montarValoresEsperados,
+} from './conferencia-execucao.service';
 import { conferir } from './engine/engine-conformidade';
 import { ItemChecklist } from './engine/tipos';
 
@@ -116,5 +119,66 @@ describe('montarValoresEsperados — origem do esperado por PREFIXO do campo', (
 
     expect(resultado.campos[0].motivo).toBe('sem-valor-esperado');
     expect(resultado.vereditoGeral).toBe('nao_conferivel');
+  });
+});
+
+// O MODO de comparacao sai da MESMA tabela de prefixos que o valor esperado
+// (`ORIGENS_DO_ESPERADO`): quem diz de onde vem o esperado e quem sabe como ele
+// se parece na peca. A engine nao conhece prefixo nenhum — ela recebe o mapa.
+describe('montarModosDeComparacao — o criterio de igualdade por PREFIXO', () => {
+  it('should pedir contencao de token so para campo de cliente', () => {
+    const modos = montarModosDeComparacao([
+      item('cliente-serigrafia-frente'),
+      item('serie-placa'),
+      item('serie-chumbada-topo'),
+      item('patrimonio-placa'),
+    ]);
+
+    expect(modos).toEqual({
+      'cliente-serigrafia-frente': 'contem-token',
+      'serie-placa': 'exato',
+      'serie-chumbada-topo': 'exato',
+      'patrimonio-placa': 'exato',
+    });
+  });
+
+  it('should ignorar campo de prefixo sem origem no QR', () => {
+    // Sem valor esperado nao ha comparacao — logo, nao ha modo a declarar.
+    const modos = montarModosDeComparacao([
+      item('potencia-serigrafia-frente', false),
+      item('peso-total'),
+    ]);
+
+    expect(modos).toEqual({});
+  });
+
+  it('should fechar o divergente FALSO do cliente sem tocar no cenario-ancora', () => {
+    // Ponta a ponta com a engine, com o caso medido em 2026-07-26 no ar: a
+    // serigrafia traz a MARCA, o QR traz a razao social com codigo.
+    const checklist = [item('cliente-serigrafia-frente'), item('serie-placa')];
+    const etiqueta = payload({
+      cliente: '143091 - Energisa Rondônia Distribuidora de Energia S.A',
+    });
+
+    const resultado = conferir(
+      checklist,
+      montarValoresEsperados(checklist, etiqueta),
+      [
+        {
+          campo: 'cliente-serigrafia-frente',
+          valorLido: 'energisa',
+          confianca: 0.9967,
+        },
+        { campo: 'serie-placa', valorLido: '847833', confianca: 0.999 },
+      ],
+      {
+        limiarConfianca: 0.9,
+        modosPorCampo: montarModosDeComparacao(checklist),
+      },
+    );
+
+    expect(resultado.campos[0].veredito).toBe('conforme');
+    expect(resultado.campos[1].veredito).toBe('divergente');
+    expect(resultado.vereditoGeral).toBe('divergente');
   });
 });

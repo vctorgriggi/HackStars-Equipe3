@@ -70,8 +70,31 @@ export interface LeituraCampo {
   corroboracao?: 'confirmada' | 'nao-confirmada';
 }
 
+/**
+ * CRITERIO DE IGUALDADE TEXTUAL de um campo. Como o limiar, e POLITICA — entra
+ * por parametro, nunca por constante (nem por dedução dentro da engine: quem
+ * conhece prefixo de campo é o chamador).
+ *
+ * - `exato` (default): igualdade do valor normalizado. Vale para TODO
+ *   identificador — em número de série, "quase igual" é divergente.
+ * - `contem-token`: o lido é um TOKEN INTEIRO (ou uma sequência de tokens
+ *   inteiros consecutivos) do esperado, comparando sem acento e sem caixa.
+ *   Existe por medição (2026-07-26, gap 21): a serigrafia carrega a MARCA
+ *   (`Energisa`) e o QR carrega a razão social com código
+ *   (`143091 - Energisa Rondônia ...`), então a igualdade exata acusava a peça
+ *   CORRETA. Não é fuzzy match: pedaço de palavra (`ener`) continua divergente
+ *   e a contenção vale num sentido só (lido dentro do esperado).
+ */
+export type ModoComparacao = 'exato' | 'contem-token';
+
 export interface OpcoesEngine {
   limiarConfianca: number; // parâmetro obrigatório — nunca constante enterrada
+  /**
+   * Modo de comparação POR CAMPO. Campo ausente do mapa (ou mapa ausente) usa
+   * `exato` — o default preserva o comportamento de todo campo que o chamador
+   * não classificou.
+   */
+  modosPorCampo?: Record<string, ModoComparacao>;
 }
 
 /**

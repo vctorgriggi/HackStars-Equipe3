@@ -10,6 +10,7 @@ import {
 import {
   CheckpointResumo,
   EtapaResumo,
+  FotoDaEvidenciaResposta,
   TransformadorResumo,
 } from './resumos-compartilhados.dto';
 
@@ -258,6 +259,38 @@ export class CampoExecutado implements ResultadoCampo {
       'mesma linha que `GET /conferencias/{id}/campos` devolve na releitura.',
   })
   campoConferidoId: string;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: '{"Width":0.12,"Height":0.04,"Left":0.31,"Top":0.62}',
+    description:
+      'ONDE na foto o valor foi lido: o bounding box que o serviço de visão ' +
+      'devolveu, como JSON `{"Width","Height","Left","Top"}` com coordenadas ' +
+      'NORMALIZADAS (0..1) — fração da largura/altura da imagem, não pixels. ' +
+      'O referencial é a foto JÁ ORIENTADA pelo EXIF, que é como o navegador a ' +
+      'exibe: dá para desenhar o destaque direto sobre a `<img>` sem corrigir ' +
+      'rotação. Serve para mostrar ao operador o trecho exato que produziu o ' +
+      'veredito (e é a matéria-prima da conferência posicional futura). ' +
+      '`null` quando não houve leitura ou o extrator não informou a região. ' +
+      'É o MESMO valor persistido em `CampoConferido.regiaoLeitura`.',
+  })
+  regiaoLeitura: string | null;
+
+  @ApiProperty({
+    type: FotoDaEvidenciaResposta,
+    nullable: true,
+    description:
+      'DE ONDE a leitura saiu: a foto que lastreia este veredito, com URL ' +
+      'pronta para exibir (critério 1 do SPEC). Sai da MESMA leitura que ' +
+      'virou o lastro persistido em `CampoConferido.fotoEvidencia` — o front ' +
+      'não precisa parear campo e foto por estado local da sessão. `null` ' +
+      'quando a leitura não veio de foto (ex.: `POST /conferencias/executar` ' +
+      'com leituras digitadas, sem `fotoEvidenciaId`) ou quando o id ' +
+      'informado não existe mais. ATENÇÃO à validade de 1 h da URL sob ' +
+      '`FILE_DRIVER=s3` (ver a propriedade `url`).',
+  })
+  fotoEvidencia: FotoDaEvidenciaResposta | null;
 }
 
 /** A conferência recém-criada. */
@@ -377,8 +410,14 @@ export type EQUIVALENCIA_COM_A_ENGINE = [
   >,
   Exige<LeituraDoGrupo extends LeituraDoGrupoResposta ? true : false>,
   Exige<LeituraDoGrupoResposta extends LeituraDoGrupo ? true : false>,
+  // `campoConferidoId`, `regiaoLeitura` e `fotoEvidencia` sao de RESPOSTA (o
+  // lastro persistido), nao do resultado da engine — que segue pura e sem
+  // conhecer foto, banco nem storage.
   Exige<
-    ResultadoCampo extends Omit<CampoExecutado, 'campoConferidoId'>
+    ResultadoCampo extends Omit<
+      CampoExecutado,
+      'campoConferidoId' | 'regiaoLeitura' | 'fotoEvidencia'
+    >
       ? true
       : false
   >,

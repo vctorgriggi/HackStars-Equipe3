@@ -124,7 +124,9 @@ describe('lerPayloadDoQr — parser do QR com erro tipado', () => {
           status: 422,
           errors: {
             payloadQr:
-              'payload-somente-codigo: lookup nao suportado nesta rodada',
+              'payload-somente-codigo: o QR traz apenas um codigo de lookup; ' +
+              'digite os campos da etiqueta manualmente ' +
+              '(lookup automatico e rodada futura)',
           },
         },
       }),

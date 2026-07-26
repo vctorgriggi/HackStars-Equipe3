@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 import { ResultadoExecucao } from './resultado-execucao.dto';
+import { FotoDaEvidenciaResposta } from './resumos-compartilhados.dto';
 
 /**
  * Resposta de `POST /conferencias/executar-com-fotos` — o caminho principal do
@@ -79,9 +80,24 @@ export class OcorrenciaAchado {
     nullable: true,
     example: 'c0ffee00-1111-2222-3333-444455556666',
     description:
-      'Foto em que o texto apareceu; `null` se o extrator não informou.',
+      'Foto em que o texto apareceu; `null` se o extrator não informou. ' +
+      'Mantido por compatibilidade — é o mesmo id de `foto.id` quando `foto` ' +
+      'vem preenchida.',
   })
   fotoEvidenciaId: string | null;
+
+  @ApiProperty({
+    type: FotoDaEvidenciaResposta,
+    nullable: true,
+    description:
+      'A foto em que o texto estranho apareceu, com URL pronta e a vista que ' +
+      'ela mostra — o alarme já vem com a evidência para o operador olhar, ' +
+      'sem segunda chamada. Combinada com `regiaoLeitura`, dá para destacar o ' +
+      'trecho exato. `null` quando o extrator não vinculou a foto (ou o ' +
+      'registro não foi encontrado); nesses casos `fotoEvidenciaId` também é ' +
+      '`null`. Validade de 1 h da `url` sob `FILE_DRIVER=s3`.',
+  })
+  foto: FotoDaEvidenciaResposta | null;
 
   @ApiProperty({
     type: Number,

@@ -13,6 +13,7 @@ import { ConferenciasService } from './conferencias.service';
 import { ConferenciaConsultasService } from './consultas/conferencia-consultas.service';
 import { ConferenciaExecucaoService } from './conferencia-execucao.service';
 import { ConferenciaExtracaoService } from './conferencia-extracao.service';
+import { ConferenciaPlanoService } from './plano/conferencia-plano.service';
 import { ConferenciasController } from './conferencias.controller';
 import { RelationalConferenciaPersistenceModule } from './infrastructure/persistence/relational/relational-persistence.module';
 
@@ -46,12 +47,14 @@ import { RelationalConferenciaPersistenceModule } from './infrastructure/persist
     ConferenciaExecucaoService,
     ConferenciaExtracaoService,
     ConferenciaConsultasService,
+    ConferenciaPlanoService,
   ],
   exports: [
     ConferenciasService,
     ConferenciaExecucaoService,
     ConferenciaExtracaoService,
     ConferenciaConsultasService,
+    ConferenciaPlanoService,
     RelationalConferenciaPersistenceModule,
   ],
 })

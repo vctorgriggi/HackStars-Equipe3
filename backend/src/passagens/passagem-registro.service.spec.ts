@@ -183,7 +183,9 @@ describe('registrar — 422 barato, antes de escrever', () => {
       response: {
         errors: {
           payloadQr:
-            'payload-somente-codigo: lookup nao suportado nesta rodada',
+            'payload-somente-codigo: o QR traz apenas um codigo de lookup; ' +
+            'digite os campos da etiqueta manualmente ' +
+            '(lookup automatico e rodada futura)',
         },
       },
     });

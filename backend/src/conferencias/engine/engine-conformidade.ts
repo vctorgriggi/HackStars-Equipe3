@@ -1,4 +1,5 @@
 import { detectarIncoerencias } from './coerencia';
+import { valoresBatem } from './comparacao';
 import { aplicarRegraDeCorroboracao } from './corroboracao';
 import { normalizar, temConteudo } from './normalizacao';
 import {
@@ -188,11 +189,16 @@ export function conferir(
       continue;
     }
 
-    // (d) comparacao propriamente dita.
-    const veredito: Veredito =
-      normalizar(valorLido) === normalizar(valorEsperadoBruto)
-        ? 'conforme'
-        : 'divergente';
+    // (d) comparacao propriamente dita. O CRITERIO de igualdade e politica do
+    // chamador (`modosPorCampo`), como o limiar: default `exato`, e
+    // `contem-token` so onde foi MEDIDO que a peca e a etiqueta escrevem o
+    // mesmo dado de formas diferentes (campo de cliente — a serigrafia traz a
+    // marca, o QR traz a razao social). A engine nao deduz o modo: nao conhece
+    // prefixo de campo. Regra e limites em `comparacao.ts`.
+    const modo = opcoes.modosPorCampo?.[item.campo] ?? 'exato';
+    const veredito: Veredito = valoresBatem(valorEsperadoBruto, valorLido, modo)
+      ? 'conforme'
+      : 'divergente';
     campos.push(
       montarCampo(item, valorEsperadoBruto, valorLido, confianca, veredito),
     );

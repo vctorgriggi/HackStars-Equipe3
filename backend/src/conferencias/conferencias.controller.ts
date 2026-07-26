@@ -15,7 +15,9 @@ import { ConferenciasService } from './conferencias.service';
 import { ConferenciaConsultasService } from './consultas/conferencia-consultas.service';
 import { ConferenciaExecucaoService } from './conferencia-execucao.service';
 import { ConferenciaExtracaoService } from './conferencia-extracao.service';
+import { ConferenciaPlanoService } from './plano/conferencia-plano.service';
 import { CreateConferenciaDto } from './dto/create-conferencia.dto';
+import { PlanoDeFotos, PlanoDeFotosQueryDto } from './dto/plano-de-fotos.dto';
 import { ExecutarComFotosDto } from './dto/executar-com-fotos.dto';
 import { ExecutarConferenciaDto } from './dto/executar-conferencia.dto';
 import { UpdateConferenciaDto } from './dto/update-conferencia.dto';
@@ -54,6 +56,7 @@ export class ConferenciasController {
     private readonly conferenciaExecucaoService: ConferenciaExecucaoService,
     private readonly conferenciaExtracaoService: ConferenciaExtracaoService,
     private readonly conferenciaConsultasService: ConferenciaConsultasService,
+    private readonly conferenciaPlanoService: ConferenciaPlanoService,
   ) {}
 
   @Post()
@@ -96,7 +99,10 @@ export class ConferenciasController {
   @ApiUnprocessableEntityResponse({
     description:
       'Codigos possiveis (em `errors`): `payload-invalido` / ' +
-      '`payload-somente-codigo` (QR ilegivel ou so com codigo de lookup), ' +
+      '`payload-somente-codigo` (QR ilegivel ou so com codigo de lookup — o ' +
+      'caso do QR da ETIQUETA, medido: 13 digitos sem campo nenhum; a ' +
+      'mensagem manda digitar os campos manualmente, porque o lookup ' +
+      'automatico exige ERP e e rodada futura), ' +
       '`etapa-desconhecida` (nao existe Checkpoint com esse `codigo`), ' +
       '`projeto-modelo-indeterminado` (o QR nao aponta projeto, a peca nao tem ' +
       'vinculo e ha 0 ou 2+ projetos cadastrados), ' +
@@ -151,6 +157,55 @@ export class ConferenciasController {
     return this.conferenciaExtracaoService.executarComFotos(
       executarComFotosDto,
     );
+  }
+
+  // ATENCAO A ORDEM: esta rota tem de vir ANTES de `@Get(':id')`, senao o
+  // parametro dinamico engole 'plano-de-fotos' e o cliente recebe 404/500 de
+  // "conferencia inexistente".
+  @Get('plano-de-fotos')
+  @ApiOperation({
+    summary: 'QUAIS FOTOS TIRAR em cada etapa, direto da checklist do projeto',
+    description:
+      'Devolve, por etapa da linha e por VISTA da peca, os campos que aquele ' +
+      'gate confere — a lista de fotos que o operador precisa tirar antes de ' +
+      'disparar `POST /conferencias/executar-com-fotos`.\n\n' +
+      'POR QUE EXISTE: o cliente estava remontando o recorte da checklist por ' +
+      'conta propria a partir de `GET /checkpoints` + `GET /projetos-modelo`. ' +
+      'Regra duplicada e regra que diverge — aqui o plano sai das MESMAS ' +
+      'funcoes que a conferencia usa, entao a foto que a tela pede e o campo ' +
+      'que o gate cobra nunca discordam.\n\n' +
+      'SEMANTICA CUMULATIVA: cada `etapas[]` traz o recorte da etapa E das ' +
+      'anteriores (a etapa N reconfere o que ja estava gravado — e assim que ' +
+      'se detecta troca de peca), entao a ultima etapa tende a pedir tudo. ' +
+      'Item da checklist sem `etapa`, ou com etapa que nao existe como ' +
+      'Checkpoint, aparece em TODOS os recortes com `entraNaEtapa: null`. ' +
+      '`pecaInteira` e o recorte sem etapa nenhuma (checklist completa).\n\n' +
+      'RESOLUCAO DO PROJETO: `?projeto=<codigo>` quando informado; senao, o ' +
+      'unico ProjetoModelo cadastrado. E a mesma cascata da conferencia menos ' +
+      'o elo do vinculo da peca (aqui nao ha QR). Codigo inexistente nao e ' +
+      'erro: cai no fallback do unico projeto.\n\n' +
+      'Somente LEITURA: nao cria peca, nao chama visao e nao gasta credito ' +
+      'AWS.',
+  })
+  @ApiOkResponse({
+    type: PlanoDeFotos,
+    description:
+      'Plano completo: `projeto`, a `checklist` inteira na ordem original, um ' +
+      'plano por Checkpoint em `etapas` (ordenados pela `ordem` da linha) e ' +
+      '`pecaInteira`. Cada campo vem com `tipoMarcacao` (`relevo` exige ' +
+      'enquadramento cuidadoso) e `entraNaEtapa`.',
+  })
+  @ApiUnprocessableEntityResponse({
+    description:
+      '`projeto-modelo-indeterminado`: nenhum `?projeto=` foi informado (ou o ' +
+      'codigo nao existe) e ha 0 ou 2+ projetos cadastrados — a API se recusa ' +
+      'a chutar de qual modelo e a peca. Alem dele, checklist corrompida no ' +
+      'banco responde 500 `checklist-invalido: <projeto>` (JSON malformado, ' +
+      'array vazio ou item fora do formato) — e dado corrompido, nao erro do ' +
+      'cliente.',
+  })
+  planoDeFotos(@Query() query: PlanoDeFotosQueryDto): Promise<PlanoDeFotos> {
+    return this.conferenciaPlanoService.planoDeFotos(query?.projeto);
   }
 
   @Get()
