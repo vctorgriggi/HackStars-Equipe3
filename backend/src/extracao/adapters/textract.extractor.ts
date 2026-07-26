@@ -7,10 +7,12 @@ import {
 } from '@aws-sdk/client-textract';
 
 import {
+  AchadoLivre,
   CampoAlvo,
   ExtractorPort,
   FonteImagem,
   LeituraExtraida,
+  ResultadoExtracao,
 } from '../ports/extractor.port';
 
 /**
@@ -38,6 +40,13 @@ import {
  *
  * Prefixo desconhecido sai como leitura nula — o adapter nunca inventa campo
  * fora dos alvos recebidos.
+ *
+ * ACHADOS LIVRES: toda linha `LINE` que a heuristica acima NAO consumiu como
+ * leitura de alvo sai em `achadosLivres` (texto cru, confianca do bloco,
+ * bounding box). E a MESMA resposta do Textract — zero chamada AWS a mais
+ * (SPEC, Could "conferencia de consistencia por achados livres"). O adapter
+ * nao interpreta nem filtra: quem decide o que e ruido e o cruzamento contra
+ * os valores do QR, em `conferencias/`.
  */
 
 /** Distancia maxima (coordenadas normalizadas) entre numero e rotulo vizinho. */
@@ -173,29 +182,55 @@ function lerLinhas(blocos: Block[]): LinhaOcr[] {
 }
 
 /**
- * Blocos do Textract -> leituras. Funcao PURA (sem I/O, sem SDK em runtime, so
- * o tipo `Block`), no mesmo espirito da engine de conformidade: e a heuristica
- * que o spike T2.1 vai refinar, entao ela precisa ser exercitavel sem AWS.
+ * Blocos do Textract -> leituras + achados livres. Funcao PURA (sem I/O, sem
+ * SDK em runtime, so o tipo `Block`), no mesmo espirito da engine de
+ * conformidade: e a heuristica que o spike T2.1 vai refinar, entao ela precisa
+ * ser exercitavel sem AWS.
  */
 export function interpretarBlocos(
   blocos: Block[],
   alvos: CampoAlvo[],
   fonte: FonteImagem,
-): LeituraExtraida[] {
+): ResultadoExtracao {
   const linhas = lerLinhas(blocos);
   const porCampo = new Map<string, LeituraExtraida>();
+  // Linhas que viraram leitura de campo alvo. O que sobra e achado livre —
+  // por identidade de objeto, entao a MESMA linha usada em dois campos conta
+  // como consumida uma vez so.
+  const consumidas = new Set<LinhaOcr>();
 
   for (const alvo of alvos) {
     porCampo.set(alvo.campo, leituraVazia(alvo.campo, fonte));
   }
 
-  resolverNumericos(linhas, alvos, fonte, porCampo);
-  resolverTextuais(linhas, alvos, fonte, porCampo);
+  resolverNumericos(linhas, alvos, fonte, porCampo, consumidas);
+  resolverTextuais(linhas, alvos, fonte, porCampo, consumidas);
 
-  // Ordem dos alvos preservada: quem chamou monta a tabela do spike com ela.
-  return alvos.map(
-    (alvo) => porCampo.get(alvo.campo) ?? leituraVazia(alvo.campo, fonte),
-  );
+  return {
+    // Ordem dos alvos preservada: quem chamou monta a tabela do spike com ela.
+    leituras: alvos.map(
+      (alvo) => porCampo.get(alvo.campo) ?? leituraVazia(alvo.campo, fonte),
+    ),
+    achadosLivres: achadosDasLinhas(linhas, consumidas, fonte),
+  };
+}
+
+/** Linhas nao consumidas, na ordem em que o Textract as devolveu. */
+function achadosDasLinhas(
+  linhas: LinhaOcr[],
+  consumidas: Set<LinhaOcr>,
+  fonte: FonteImagem,
+): AchadoLivre[] {
+  return linhas
+    .filter((linha) => !consumidas.has(linha))
+    .map((linha) => ({
+      texto: linha.texto,
+      // Bloco sem `Confidence` entra com 0: achado livre so alerta, e o 0 diz
+      // "sem lastro" em vez de fingir uma medicao que o servico nao deu.
+      confianca: linha.confianca ?? 0,
+      regiaoLeitura: linha.regiao,
+      fotoEvidenciaId: fonte.fotoEvidenciaId,
+    }));
 }
 
 function resolverNumericos(
@@ -203,6 +238,7 @@ function resolverNumericos(
   alvos: CampoAlvo[],
   fonte: FonteImagem,
   porCampo: Map<string, LeituraExtraida>,
+  consumidas: Set<LinhaOcr>,
 ): void {
   const alvosNumericos = alvos.filter(
     (alvo) => familiaDoCampo(alvo.campo) !== null,
@@ -230,6 +266,7 @@ function resolverNumericos(
 
     const escolhido = daFamilia[0];
     usados.add(escolhido);
+    consumidas.add(escolhido.linha);
     porCampo.set(
       alvo.campo,
       leituraDaLinha(alvo.campo, escolhido.valor, escolhido.linha, fonte),
@@ -244,6 +281,7 @@ function resolverNumericos(
   );
   if (livres.length === 1 && pendentes.length === 1) {
     const alvo = pendentes[0];
+    consumidas.add(livres[0].linha);
     porCampo.set(
       alvo.campo,
       leituraDaLinha(alvo.campo, livres[0].valor, livres[0].linha, fonte),
@@ -332,6 +370,7 @@ function resolverTextuais(
   alvos: CampoAlvo[],
   fonte: FonteImagem,
   porCampo: Map<string, LeituraExtraida>,
+  consumidas: Set<LinhaOcr>,
 ): void {
   for (const alvo of alvos) {
     if (alvo.campo.startsWith('cliente-')) {
@@ -348,6 +387,7 @@ function resolverTextuais(
       }, null);
 
       if (linha !== null) {
+        consumidas.add(linha);
         porCampo.set(
           alvo.campo,
           leituraDaLinha(alvo.campo, linha.texto, linha, fonte),
@@ -361,6 +401,7 @@ function resolverTextuais(
         atual.textoNormalizado.includes('kva'),
       );
       if (linha !== undefined) {
+        consumidas.add(linha);
         porCampo.set(
           alvo.campo,
           leituraDaLinha(alvo.campo, linha.texto, linha, fonte),
@@ -385,9 +426,9 @@ export class TextractExtractor extends ExtractorPort {
   async extrair(
     fonte: FonteImagem,
     alvos: CampoAlvo[],
-  ): Promise<LeituraExtraida[]> {
+  ): Promise<ResultadoExtracao> {
     if (alvos.length === 0) {
-      return [];
+      return { leituras: [], achadosLivres: [] };
     }
 
     // UMA chamada por foto. Sem retry proprio: o retry do SDK ja cobre falha
@@ -399,9 +440,9 @@ export class TextractExtractor extends ExtractorPort {
       }),
     );
 
-    const leituras = interpretarBlocos(resposta.Blocks ?? [], alvos, fonte);
+    const resultado = interpretarBlocos(resposta.Blocks ?? [], alvos, fonte);
 
-    const semLeitura = leituras
+    const semLeitura = resultado.leituras
       .filter((leitura) => leitura.valorLido === null)
       .map((leitura) => leitura.campo);
     if (semLeitura.length > 0) {
@@ -411,6 +452,6 @@ export class TextractExtractor extends ExtractorPort {
       );
     }
 
-    return leituras;
+    return resultado;
   }
 }

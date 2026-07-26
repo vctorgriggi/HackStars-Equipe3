@@ -62,6 +62,39 @@ export interface LeituraExtraida {
 }
 
 /**
+ * Texto que o servico de visao leu na foto e que NAO virou leitura de campo
+ * alvo. Materia-prima da conferencia de consistencia (SPEC, Could): o Textract
+ * ja devolve a foto inteira e o adapter descartava o resto — reaproveitar custa
+ * ZERO chamada AWS a mais.
+ *
+ * Nao tem `campo` de proposito: achado livre nao pertence a checklist nenhuma.
+ * Ele so ALERTA (cruzamento contra os valores do QR); veredito continua
+ * nascendo exclusivamente da checklist, na engine.
+ */
+export interface AchadoLivre {
+  /** Texto cru da linha lida, sem normalizacao. */
+  texto: string;
+  /**
+   * 0..1. Bloco sem confianca informada entra com 0: alarme e informativo e
+   * nunca vira veredito, e o 0 diz "sem lastro" a quem le.
+   */
+  confianca: number;
+  regiaoLeitura?: string | null;
+  fotoEvidenciaId?: string | null;
+}
+
+/**
+ * O que uma extracao produz: as leituras dos campos alvo (o que a engine
+ * julga) e os achados livres (o que so alerta). Objeto em vez de array porque
+ * o segundo canal nao pode viajar escondido — uma extracao que "esqueca" os
+ * achados vira erro de compilacao no consumidor, nao dado perdido em silencio.
+ */
+export interface ResultadoExtracao {
+  leituras: LeituraExtraida[];
+  achadosLivres: AchadoLivre[];
+}
+
+/**
  * Token de injecao do adapter ativo. A escolha do driver mora na factory
  * (`adapters/extractor.factory.ts`), nunca no consumidor.
  */
@@ -74,9 +107,12 @@ export abstract class ExtractorPort {
   /**
    * UMA chamada de visao por foto. Sem retry automatico e sem laco interno:
    * constraint 4 do SPEC (visao so sob disparo explicito) mora aqui.
+   *
+   * Devolve leituras E achados livres da MESMA resposta do servico — nunca uma
+   * segunda chamada para "olhar o resto da foto".
    */
   abstract extrair(
     fonte: FonteImagem,
     alvos: CampoAlvo[],
-  ): Promise<LeituraExtraida[]>;
+  ): Promise<ResultadoExtracao>;
 }

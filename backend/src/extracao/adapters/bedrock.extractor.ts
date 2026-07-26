@@ -6,6 +6,7 @@ import {
   ExtractorPort,
   FonteImagem,
   LeituraExtraida,
+  ResultadoExtracao,
 } from '../ports/extractor.port';
 
 /**
@@ -25,6 +26,13 @@ import {
  *
  * `regiaoLeitura` sai sempre `null`: o Bedrock nao devolve bounding box.
  * Bounding box so existe no caminho Textract (`textract.extractor.ts`).
+ *
+ * `achadosLivres` sai sempre VAZIO — limitacao deliberada desta rodada. O
+ * prompt pede so os campos alvo, entao o adapter nao tem o "resto da foto"
+ * para oferecer, e pedir um inventario completo custaria tokens e viraria
+ * texto alucinavel (achado livre alimenta alarme, e alarme falso e ruido caro).
+ * Com a conta AWS ainda bloqueada para Bedrock (docs/aws.md), fechar o custo
+ * de um segundo prompt aqui seria trabalho sem verificacao possivel.
  */
 
 /**
@@ -178,6 +186,14 @@ export function parseRespostaJson(texto: string): ItemResposta[] | null {
   return itens;
 }
 
+/**
+ * Envelope do retorno da porta. Achado livre nao existe neste adapter (ver o
+ * cabecalho do arquivo): o prompt pede so os campos alvo.
+ */
+function semAchados(leituras: LeituraExtraida[]): ResultadoExtracao {
+  return { leituras, achadosLivres: [] };
+}
+
 /** Confianca fora de 0..1 ou de tipo errado nao vira lastro: vira null. */
 function normalizarConfianca(bruto: unknown): number | null {
   if (typeof bruto !== 'number' || !Number.isFinite(bruto)) {
@@ -207,9 +223,9 @@ export class BedrockExtractor extends ExtractorPort {
   async extrair(
     fonte: FonteImagem,
     alvos: CampoAlvo[],
-  ): Promise<LeituraExtraida[]> {
+  ): Promise<ResultadoExtracao> {
     if (alvos.length === 0) {
-      return [];
+      return semAchados([]);
     }
 
     const mediaType = fonte.mimeType;
@@ -252,7 +268,7 @@ export class BedrockExtractor extends ExtractorPort {
       this.logger.warn(
         `resposta recusada pelo modelo em ${fonte.fonteFisica}; leituras nulas`,
       );
-      return this.leiturasVazias(alvos, fonte);
+      return semAchados(this.leiturasVazias(alvos, fonte));
     }
 
     const texto = resposta.content
@@ -266,12 +282,12 @@ export class BedrockExtractor extends ExtractorPort {
           `${fonte.fonteFisica}; leituras nulas. stop_reason=` +
           `${resposta.stop_reason ?? 'desconhecido'}`,
       );
-      return this.leiturasVazias(alvos, fonte);
+      return semAchados(this.leiturasVazias(alvos, fonte));
     }
 
     // Alvo manda: item devolvido para campo fora da lista e descartado, campo
     // sem item vira leitura nula.
-    return alvos.map((alvo) => {
+    const leituras = alvos.map((alvo) => {
       const item = itens.find((atual) => atual.campo === alvo.campo);
       const valorLido =
         item?.valorLido !== undefined && item.valorLido !== null
@@ -291,6 +307,8 @@ export class BedrockExtractor extends ExtractorPort {
         fotoEvidenciaId: fonte.fotoEvidenciaId,
       };
     });
+
+    return semAchados(leituras);
   }
 
   private leiturasVazias(

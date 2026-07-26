@@ -5,7 +5,7 @@ import {
   CampoAlvo,
   ExtractorPort,
   FonteImagem,
-  LeituraExtraida,
+  ResultadoExtracao,
 } from './ports/extractor.port';
 
 // Nota de lint: a regra `no-restricted-syntax` do projeto exige que todo `it`
@@ -30,7 +30,7 @@ class ExtractorEspiao extends ExtractorPort {
     super();
   }
 
-  extrair(fonte: FonteImagem, alvos: CampoAlvo[]): Promise<LeituraExtraida[]> {
+  extrair(fonte: FonteImagem, alvos: CampoAlvo[]): Promise<ResultadoExtracao> {
     this.chamadas.push({
       fonteFisica: fonte.fonteFisica,
       campos: alvos.map((alvo) => alvo.campo),
@@ -93,7 +93,7 @@ describe('ExtracaoService — roteamento foto -> campos', () => {
   it('should devolver uma leitura por campo alvo da foto', async () => {
     const service = new ExtracaoService(new ExtractorEspiao());
 
-    const leituras = await service.extrairDeFotos(
+    const { leituras } = await service.extrairDeFotos(
       [foto('placa', 'foto-placa')],
       CHECKLIST,
     );
@@ -108,7 +108,7 @@ describe('ExtracaoService — roteamento foto -> campos', () => {
   it('should ignorar campo do checklist cuja fonte fisica nao foi fotografada', async () => {
     const service = new ExtracaoService(new ExtractorEspiao());
 
-    const leituras = await service.extrairDeFotos(
+    const { leituras } = await service.extrairDeFotos(
       [foto('chumbado-1', 'foto-chumbado-1')],
       CHECKLIST,
     );
@@ -162,7 +162,7 @@ describe('ExtracaoService — vinculo com a foto de evidencia', () => {
   it('should propagar o fotoEvidenciaId da foto para toda leitura', async () => {
     const service = new ExtracaoService(new ExtractorEspiao());
 
-    const leituras = await service.extrairDeFotos(
+    const { leituras } = await service.extrairDeFotos(
       [foto('placa', 'foto-placa'), foto('serigrafia', 'foto-serigrafia')],
       CHECKLIST,
     );
@@ -183,24 +183,25 @@ describe('ExtracaoService — vinculo com a foto de evidencia', () => {
       extrair(
         fonte: FonteImagem,
         alvos: CampoAlvo[],
-      ): Promise<LeituraExtraida[]> {
+      ): Promise<ResultadoExtracao> {
         void fonte;
 
-        return Promise.resolve(
-          alvos.map((alvo) => ({
+        return Promise.resolve({
+          leituras: alvos.map((alvo) => ({
             campo: alvo.campo,
             valorLido: '847833',
             confianca: 0.9,
             regiaoLeitura: null,
             fotoEvidenciaId: null,
           })),
-        );
+          achadosLivres: [{ texto: '847833', confianca: 0.9 }],
+        });
       }
     }
 
     const service = new ExtracaoService(new ExtractorSemVinculo());
 
-    const leituras = await service.extrairDeFotos(
+    const { leituras, achadosLivres } = await service.extrairDeFotos(
       [foto('placa', 'foto-placa')],
       CHECKLIST,
     );
@@ -208,12 +209,39 @@ describe('ExtracaoService — vinculo com a foto de evidencia', () => {
     expect(
       leituras.every((leitura) => leitura.fotoEvidenciaId === 'foto-placa'),
     ).toBe(true);
+    // Achado livre segue a MESMA regra da leitura: sem evidencia de origem,
+    // o alarme nao daria para conferir na foto.
+    expect(
+      achadosLivres.every((achado) => achado.fotoEvidenciaId === 'foto-placa'),
+    ).toBe(true);
+  });
+
+  it('should deixar a foto que falhou sem leitura E sem achado livre', async () => {
+    class ExtractorQueFalha extends ExtractorPort {
+      readonly nome = 'mock';
+
+      extrair(): Promise<ResultadoExtracao> {
+        return Promise.reject(new Error('throttle da AWS'));
+      }
+    }
+
+    const service = new ExtracaoService(new ExtractorQueFalha());
+
+    const { leituras, achadosLivres } = await service.extrairDeFotos(
+      [foto('placa', 'foto-placa')],
+      CHECKLIST,
+    );
+
+    // Foto ruim vira `nao_conferivel` na engine, nunca 500 — e nao pode gerar
+    // alarme de consistencia a partir de leitura que nao existiu.
+    expect(leituras).toEqual([]);
+    expect(achadosLivres).toEqual([]);
   });
 
   it('should preservar fotoEvidenciaId null quando a foto tambem nao tem id', async () => {
     const service = new ExtracaoService(new ExtractorEspiao());
 
-    const leituras = await service.extrairDeFotos(
+    const { leituras } = await service.extrairDeFotos(
       [foto('placa', null)],
       CHECKLIST,
     );
@@ -229,7 +257,7 @@ describe('ExtracaoService — foto sem campo no checklist', () => {
     const espiao = new ExtractorEspiao();
     const service = new ExtracaoService(espiao);
 
-    const leituras = await service.extrairDeFotos(
+    const { leituras } = await service.extrairDeFotos(
       [foto('geral', 'foto-geral')],
       CHECKLIST,
     );
@@ -260,7 +288,7 @@ describe('ExtracaoService — foto sem campo no checklist', () => {
     const espiao = new ExtractorEspiao();
     const service = new ExtracaoService(espiao);
 
-    const leituras = await service.extrairDeFotos(
+    const { leituras } = await service.extrairDeFotos(
       [foto('placa', 'foto-placa')],
       [],
     );
@@ -278,29 +306,32 @@ describe('ExtracaoService — leitura fora dos alvos', () => {
       extrair(
         fonte: FonteImagem,
         alvos: CampoAlvo[],
-      ): Promise<LeituraExtraida[]> {
-        return Promise.resolve([
-          ...alvos.map((alvo) => ({
-            campo: alvo.campo,
-            valorLido: '847833',
-            confianca: 0.9,
-            regiaoLeitura: null,
-            fotoEvidenciaId: fonte.fotoEvidenciaId,
-          })),
-          {
-            campo: 'cliente-serigrafia',
-            valorLido: 'Energisa',
-            confianca: 0.99,
-            regiaoLeitura: null,
-            fotoEvidenciaId: fonte.fotoEvidenciaId,
-          },
-        ]);
+      ): Promise<ResultadoExtracao> {
+        return Promise.resolve({
+          leituras: [
+            ...alvos.map((alvo) => ({
+              campo: alvo.campo,
+              valorLido: '847833',
+              confianca: 0.9,
+              regiaoLeitura: null,
+              fotoEvidenciaId: fonte.fotoEvidenciaId,
+            })),
+            {
+              campo: 'cliente-serigrafia',
+              valorLido: 'Energisa',
+              confianca: 0.99,
+              regiaoLeitura: null,
+              fotoEvidenciaId: fonte.fotoEvidenciaId,
+            },
+          ],
+          achadosLivres: [],
+        });
       }
     }
 
     const service = new ExtracaoService(new ExtractorIntrometido());
 
-    const leituras = await service.extrairDeFotos(
+    const { leituras } = await service.extrairDeFotos(
       [foto('placa', 'foto-placa')],
       CHECKLIST,
     );
@@ -326,23 +357,70 @@ describe('MockExtractor — determinismo', () => {
   it('should devolver leitura nula e sem confianca para campo fora do mapa', async () => {
     const extractor = new MockExtractor({ 'serie-placa': '847833' });
 
-    const [leitura] = await extractor.extrair(foto('placa', 'f1'), [
+    const { leituras } = await extractor.extrair(foto('placa', 'f1'), [
       { campo: 'patrimonio-placa' },
     ]);
 
-    expect(leitura.valorLido).toBeNull();
-    expect(leitura.confianca).toBeNull();
+    expect(leituras[0].valorLido).toBeNull();
+    expect(leituras[0].confianca).toBeNull();
   });
 
   it('should aceitar valores configurados pelo construtor', async () => {
     const extractor = new MockExtractor({ 'serie-placa': '847233' }, 0.5);
 
-    const [leitura] = await extractor.extrair(foto('placa', 'f1'), [
+    const { leituras } = await extractor.extrair(foto('placa', 'f1'), [
       { campo: 'serie-placa' },
     ]);
 
-    expect(leitura.valorLido).toBe('847233');
-    expect(leitura.confianca).toBe(0.5);
+    expect(leituras[0].valorLido).toBe('847233');
+    expect(leituras[0].confianca).toBe(0.5);
+  });
+});
+
+describe('MockExtractor — achados livres', () => {
+  it('should ecoar como achado livre o proprio valor que leu', async () => {
+    const extractor = new MockExtractor({ 'serie-placa': '847833' });
+
+    const { achadosLivres } = await extractor.extrair(foto('placa', 'f1'), [
+      { campo: 'serie-placa' },
+    ]);
+
+    expect(achadosLivres).toEqual([
+      {
+        texto: '847833',
+        confianca: 0.99,
+        regiaoLeitura: null,
+        fotoEvidenciaId: 'f1',
+      },
+    ]);
+  });
+
+  it('should nao inventar achado quando nao ha leitura nem texto extra', async () => {
+    // Default do modo demo: o mock nao polui o fluxo com alarme fabricado.
+    const extractor = new MockExtractor({});
+
+    const { achadosLivres } = await extractor.extrair(foto('placa', 'f1'), [
+      { campo: 'serie-placa' },
+    ]);
+
+    expect(achadosLivres).toEqual([]);
+  });
+
+  it('should devolver o texto extra do construtor so como achado livre', async () => {
+    const extractor = new MockExtractor({ 'serie-placa': '847233' }, 0.99, [
+      '999999',
+    ]);
+
+    const { leituras, achadosLivres } = await extractor.extrair(
+      foto('placa', 'f1'),
+      [{ campo: 'serie-placa' }],
+    );
+
+    expect(leituras.map((leitura) => leitura.valorLido)).toEqual(['847233']);
+    expect(achadosLivres.map((achado) => achado.texto)).toEqual([
+      '847233',
+      '999999',
+    ]);
   });
 });
 

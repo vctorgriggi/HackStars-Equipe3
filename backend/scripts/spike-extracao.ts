@@ -223,7 +223,10 @@ async function rodarAdapter(
     let leituras: LeituraExtraida[];
 
     try {
-      leituras = await extractor.extrair(foto, alvos);
+      // `achadosLivres` do retorno nao entra na tabela do spike de proposito:
+      // o que o spike mede e acerto por campo alvo. Os achados alimentam o
+      // alarme de consistencia, verificavel pelo endpoint.
+      ({ leituras } = await extractor.extrair(foto, alvos));
     } catch (erro) {
       const tempoMs = String(Date.now() - inicio);
       const motivo = erro instanceof Error ? erro.message : String(erro);

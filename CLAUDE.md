@@ -150,6 +150,15 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
   fonte física (placa, serigrafia, chumbado 1..3), referência à foto e, quando
   o serviço fornecer, o bounding box da leitura (`regiaoLeitura`) — dado
   barato agora que habilita a conferência posicional futura.
+- `extrair` devolve `ResultadoExtracao { leituras, achadosLivres }`: dois canais
+  na MESMA resposta do serviço (zero chamada AWS a mais). Achado livre é o
+  texto lido que não virou leitura de campo alvo; `cruzarAchados` (pura, em
+  `conferencias/conferencia-extracao.service.ts`) o cruza contra o QR e devolve
+  `achadosInconsistentes` na resposta de `executar-com-fotos`. É ALARME:
+  nunca toca `vereditoGeral` nem campo, e não é persistido nesta rodada
+  (alerta persistente é T4.3). Candidato é só dígito com o comprimento de um
+  identificador DO PAYLOAD — comprimento hardcoded viraria spam com a próxima
+  numeração de cliente.
 
 ## Contrato API ↔ Front
 

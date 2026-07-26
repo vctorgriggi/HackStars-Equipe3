@@ -83,9 +83,12 @@ export class ConferenciasController {
       'so as fotos cuja fonte fisica tem campo no recorte da etapa sao lidas ' +
       'do storage e enviadas uma unica vez ao extrator ativo ' +
       '(EXTRACTOR_DRIVER). A resposta acrescenta `extracao` (driver, fotos, ' +
-      'leiturasProduzidas, fotosForaDoRecorte); as fotos usadas ficam ' +
-      'vinculadas a conferencia criada, e o veredito continua nascendo na ' +
-      'engine.',
+      'leiturasProduzidas, fotosForaDoRecorte, achadosLivres) e ' +
+      '`achadosInconsistentes`: textos com cara de identificador que a visao ' +
+      'leu na peca e o QR nao conhece. Esse ultimo e ALARME informativo — ' +
+      'nao entra no vereditoGeral nem em campo nenhum, e nao e persistido ' +
+      'nesta rodada. As fotos usadas ficam vinculadas a conferencia criada, ' +
+      'e o veredito continua nascendo na engine.',
   })
   @ApiUnprocessableEntityResponse({
     description:

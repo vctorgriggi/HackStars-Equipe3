@@ -2,6 +2,7 @@ import { HttpStatus, UnprocessableEntityException } from '@nestjs/common';
 
 import { criarExtractor } from '../extracao/adapters/extractor.factory';
 import {
+  CONFIANCA_MOCK,
   LEITURAS_DEMO,
   MockExtractor,
 } from '../extracao/adapters/mock.extractor';
@@ -10,7 +11,7 @@ import {
   CampoAlvo,
   ExtractorPort,
   FonteImagem,
-  LeituraExtraida,
+  ResultadoExtracao,
 } from '../extracao/ports/extractor.port';
 import { FileDriver } from '../files/config/file-config.type';
 import { FotoEvidencia } from '../fotos-evidencia/domain/foto-evidencia';
@@ -104,7 +105,7 @@ class ExtractorEspiao extends ExtractorPort {
     super();
   }
 
-  extrair(fonte: FonteImagem, alvos: CampoAlvo[]): Promise<LeituraExtraida[]> {
+  extrair(fonte: FonteImagem, alvos: CampoAlvo[]): Promise<ResultadoExtracao> {
     this.chamadas.push({
       fonteFisica: fonte.fonteFisica,
       campos: alvos.map((alvo) => alvo.campo),
@@ -391,6 +392,8 @@ describe('ConferenciaExtracaoService — visao plugada no fluxo', () => {
       fotos: 2,
       leiturasProduzidas: 4,
       fotosForaDoRecorte: 0,
+      // Total BRUTO: o mock ecoa como achado livre cada valor que leu.
+      achadosLivres: 4,
     });
   });
 
@@ -682,6 +685,134 @@ describe('ConferenciaExtracaoService — evidencia amarrada a conferencia (achad
     });
 
     expect(resultado.conferencia.id).toBe('conferencia-1');
+  });
+});
+
+// A conferencia de consistencia por achados livres (SPEC, Could): o extrator
+// devolve TODO o texto que leu, o servico cruza contra o QR e alarma o que nao
+// bate. A regra de ferro tem teste proprio aqui — alarme nunca vira veredito.
+describe('ConferenciaExtracaoService — achados livres so alarmam', () => {
+  /** Mock que, alem das leituras da demo, "viu" um numero estranho na foto. */
+  function espiaoComTextoEstranho(texto: string): ExtractorEspiao {
+    return new ExtractorEspiao(
+      new MockExtractor(LEITURAS_DEMO, CONFIANCA_MOCK, [texto]),
+    );
+  }
+
+  it('should devolver achadosInconsistentes vazio quando tudo bate com o QR', async () => {
+    // Serigrafia da peca de demo: patrimonio 251328 (esta no QR) e o texto do
+    // cliente (nao numerico, fora do cruzamento). Nada a alarmar.
+    const { service } = montarBancada({
+      evidencias: { [ID_SERIGRAFIA]: foto(ID_SERIGRAFIA, 'serigrafia') },
+    });
+
+    const resultado = await service.executarComFotos({
+      payloadQr: PAYLOAD_QR,
+      fotoEvidenciaIds: [ID_SERIGRAFIA],
+    });
+
+    expect(resultado.achadosInconsistentes).toEqual([]);
+    // Vazio NAO e sinal de peca boa: o resumo mostra que houve texto lido.
+    expect(resultado.extracao.achadosLivres).toBe(2);
+  });
+
+  it('should alarmar o numero que a visao viu e o QR nao conhece', async () => {
+    const { service } = montarBancada({
+      evidencias: { [ID_SERIGRAFIA]: foto(ID_SERIGRAFIA, 'serigrafia') },
+      extractor: espiaoComTextoEstranho('999999'),
+    });
+
+    const resultado = await service.executarComFotos({
+      payloadQr: PAYLOAD_QR,
+      fotoEvidenciaIds: [ID_SERIGRAFIA],
+    });
+
+    expect(resultado.achadosInconsistentes).toEqual([
+      {
+        texto: '999999',
+        ocorrencias: [
+          {
+            fotoEvidenciaId: ID_SERIGRAFIA,
+            confianca: CONFIANCA_MOCK,
+            regiaoLeitura: null,
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('should alarmar a serie da placa da peca de demo, que diverge da etiqueta', async () => {
+    // A peca fisica da demo tem placa 847833 contra etiqueta 847233: o alarme
+    // pega o mesmo defeito que a checklist pega, por outro caminho.
+    const { service } = montarBancada({
+      evidencias: { [ID_PLACA]: foto(ID_PLACA, 'placa') },
+    });
+
+    const resultado = await service.executarComFotos({
+      payloadQr: PAYLOAD_QR,
+      fotoEvidenciaIds: [ID_PLACA],
+    });
+
+    expect(
+      resultado.achadosInconsistentes.map((achado) => achado.texto),
+    ).toEqual(['847833']);
+  });
+
+  it('should manter leituras e veredito IDENTICOS com e sem achado estranho', async () => {
+    // Regra de ferro: achado livre nao entra na engine. As duas execucoes
+    // diferem SO no texto extra que a visao viu.
+    const semAchado = montarBancada({
+      evidencias: { [ID_SERIGRAFIA]: foto(ID_SERIGRAFIA, 'serigrafia') },
+    });
+    const comAchado = montarBancada({
+      evidencias: { [ID_SERIGRAFIA]: foto(ID_SERIGRAFIA, 'serigrafia') },
+      extractor: espiaoComTextoEstranho('999999'),
+    });
+
+    const antes = await semAchado.service.executarComFotos({
+      payloadQr: PAYLOAD_QR,
+      fotoEvidenciaIds: [ID_SERIGRAFIA],
+    });
+    const depois = await comAchado.service.executarComFotos({
+      payloadQr: PAYLOAD_QR,
+      fotoEvidenciaIds: [ID_SERIGRAFIA],
+    });
+
+    // O que a engine recebe e byte a byte o mesmo...
+    expect(comAchado.executar.mock.calls[0][0].leituras).toEqual(
+      semAchado.executar.mock.calls[0][0].leituras,
+    );
+    // ...e o que ela devolveu tambem.
+    expect(depois.conferencia.vereditoGeral).toBe(
+      antes.conferencia.vereditoGeral,
+    );
+    expect(depois.campos).toEqual(antes.campos);
+
+    // A unica diferenca esta no canal de alarme.
+    expect(antes.achadosInconsistentes).toEqual([]);
+    expect(depois.achadosInconsistentes).toHaveLength(1);
+  });
+
+  it('should juntar em UM alarme o mesmo texto visto em duas fotos', async () => {
+    const { service } = montarBancada({
+      evidencias: {
+        [ID_SERIGRAFIA]: foto(ID_SERIGRAFIA, 'serigrafia'),
+        [ID_CHUMBADO]: foto(ID_CHUMBADO, 'chumbado-1'),
+      },
+      extractor: espiaoComTextoEstranho('999999'),
+    });
+
+    const resultado = await service.executarComFotos({
+      payloadQr: PAYLOAD_QR,
+      fotoEvidenciaIds: [ID_SERIGRAFIA, ID_CHUMBADO],
+    });
+
+    expect(resultado.achadosInconsistentes).toHaveLength(1);
+    expect(
+      resultado.achadosInconsistentes[0].ocorrencias.map(
+        (ocorrencia) => ocorrencia.fotoEvidenciaId,
+      ),
+    ).toEqual([ID_SERIGRAFIA, ID_CHUMBADO]);
   });
 });
 

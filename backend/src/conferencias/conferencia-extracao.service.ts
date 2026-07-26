@@ -7,9 +7,14 @@ import {
 } from '@nestjs/common';
 
 import { ExtracaoService } from '../extracao/extracao.service';
-import { FonteImagem, LeituraExtraida } from '../extracao/ports/extractor.port';
+import {
+  AchadoLivre,
+  FonteImagem,
+  LeituraExtraida,
+} from '../extracao/ports/extractor.port';
 import { FotoEvidencia } from '../fotos-evidencia/domain/foto-evidencia';
 import { FotosEvidenciaService } from '../fotos-evidencia/fotos-evidencia.service';
+import { PayloadEtiqueta } from '../transformadores/qr/payload-etiqueta';
 
 import {
   ConferenciaExecucaoService,
@@ -19,6 +24,7 @@ import {
 import { ConferenciasService } from './conferencias.service';
 import { ExecutarComFotosDto } from './dto/executar-com-fotos.dto';
 import { LeituraCampoDto } from './dto/executar-conferencia.dto';
+import { normalizar } from './engine/engine-conformidade';
 
 /** O que a visao efetivamente fez nesta execucao (transparencia de custo). */
 export interface ResumoExtracao {
@@ -35,10 +41,45 @@ export interface ResumoExtracao {
    * deixou de ser pago, explicito para quem le a resposta.
    */
   fotosForaDoRecorte: number;
+  /**
+   * Total BRUTO de achados livres (todo texto lido que nao virou leitura de
+   * campo), antes de qualquer filtro do cruzamento. Transparencia: mostra o
+   * quanto o alarme filtrou — `achadosLivres: 34` com
+   * `achadosInconsistentes: []` significa "34 textos vistos, nenhum parecido
+   * com identificador estranho".
+   */
+  achadosLivres: number;
+}
+
+/** Uma evidencia de onde o texto estranho apareceu. */
+export interface OcorrenciaAchado {
+  fotoEvidenciaId: string | null;
+  confianca: number;
+  regiaoLeitura: string | null;
+}
+
+/**
+ * Texto lido na peca que PARECE um identificador (mesmo formato dos do QR) e
+ * nao bate com nenhum valor da etiqueta. E ALARME, nao veredito: pega placa de
+ * outra peca, etiqueta impressa divergente e peca trocada na esteira, casos que
+ * a checklist sozinha nao ve porque ninguem sabia procurar por eles.
+ */
+export interface AchadoInconsistente {
+  /** Texto como o servico de visao leu (sem normalizacao). */
+  texto: string;
+  /** Todas as vezes que ele apareceu — 1 alarme, N evidencias. */
+  ocorrencias: OcorrenciaAchado[];
 }
 
 export type ResultadoExecucaoComExtracao = ResultadoExecucao & {
   extracao: ResumoExtracao;
+  /**
+   * Alarmes de consistencia (SPEC, Could). SEMPRE informativo: nao entra no
+   * `vereditoGeral` nem em campo nenhum — consistencia nao enxerga ausencia
+   * (peca com uma marcacao so e trivialmente consistente), entao promover
+   * `conforme` a partir daqui seria o falso OK que a regra de ouro proibe.
+   */
+  achadosInconsistentes: AchadoInconsistente[];
 };
 
 /**
@@ -93,10 +134,8 @@ export class ConferenciaExtracaoService {
 
     // UMA chamada de visao por foto, sem retry e sem laco: a politica mora no
     // ExtracaoService e nao se reimplementa aqui.
-    const leituras = await this.extracaoService.extrairDeFotos(
-      fotos,
-      contexto.checklist,
-    );
+    const { leituras, achadosLivres } =
+      await this.extracaoService.extrairDeFotos(fotos, contexto.checklist);
 
     if (leituras.length === 0) {
       // Nao e erro: campo sem leitura vira `nao_conferivel` na engine, que e
@@ -120,6 +159,29 @@ export class ConferenciaExtracaoService {
 
     await this.vincularEvidencias(usadas, resultado.conferencia.id);
 
+    // Cruzamento DEPOIS do veredito, e sem tocar nele: o alarme le o mesmo
+    // payload do QR que a engine leu, mas o resultado ja esta fechado — nao ha
+    // caminho de codigo daqui para `vereditoGeral` ou para CampoConferido.
+    //
+    // PERSISTENCIA: nenhuma nesta rodada. O alarme e efemero, so na resposta;
+    // gravar exigiria entidade nova e trilha de auditoria propria, e o alerta
+    // persistente ja tem dono (T4.3 do PLAN). Recarregar a conferencia por id
+    // nao traz — e assim de proposito ate a decisao de modelagem.
+    const achadosInconsistentes = cruzarAchados(
+      achadosLivres,
+      contexto.payload,
+    );
+
+    if (achadosInconsistentes.length > 0) {
+      this.logger.warn(
+        `achados-inconsistentes: conferencia ${resultado.conferencia.id} viu ` +
+          `${achadosInconsistentes.length} texto(s) com cara de identificador ` +
+          `fora do QR (${achadosInconsistentes
+            .map((achado) => achado.texto)
+            .join(', ')}); alarme informativo, veredito inalterado`,
+      );
+    }
+
     return {
       ...resultado,
       extracao: {
@@ -127,7 +189,9 @@ export class ConferenciaExtracaoService {
         fotos: fotos.length,
         leiturasProduzidas: leituras.length,
         fotosForaDoRecorte: foraDoRecorte.length,
+        achadosLivres: achadosLivres.length,
       },
+      achadosInconsistentes,
     };
   }
 
@@ -282,4 +346,105 @@ function paraLeituraDto(leitura: LeituraExtraida): LeituraCampoDto {
     regiaoLeitura: leitura.regiaoLeitura,
     fotoEvidenciaId: leitura.fotoEvidenciaId,
   };
+}
+
+/** Identificador: so digitos, do primeiro ao ultimo caractere. */
+const PADRAO_SO_DIGITOS = /^\d+$/;
+
+/**
+ * Cruza os achados livres da visao contra os valores do QR. Funcao PURA (sem
+ * I/O, sem Nest), exportada para teste direto — mesmo padrao de
+ * `dedupeLeituras` e `filtrarChecklistPorEtapa`.
+ *
+ * HEURISTICA ANTI-RUIDO (o ponto dificil): a placa de um transformador tem
+ * dezenas de textos tecnicos — tensoes (13800), potencia, pesos, ano, normas.
+ * Alarmar cada numero seria spam, e alarme que todo mundo ignora nao protege
+ * ninguem. Entao:
+ *
+ * 1. CANDIDATO e so o texto normalizado composto exclusivamente de digitos
+ *    cujo COMPRIMENTO e igual ao de algum identificador do QR (numeroSerie,
+ *    patrimonio). O comprimento vem do payload, nunca de constante: hoje a
+ *    TRAEL usa 6 digitos, e um cliente com 7 continuaria funcionando. Texto
+ *    misto ('13.8 kV', '2024/01') nao e candidato; '13800' tem 5 digitos e cai
+ *    fora sozinho quando os identificadores tem 6.
+ * 2. ALARME e o candidato que nao e igual (mesma normalizacao NFC da engine) a
+ *    NENHUM valor do QR — inclusive pedido, seq e codigo do projeto: numero que
+ *    a etiqueta afirma nao e inconsistencia, mesmo nao sendo alvo da checklist.
+ * 3. DEDUPE por texto normalizado: o mesmo 847833 lido em 3 blocos e UM alarme
+ *    com 3 evidencias, nao 3 alarmes.
+ *
+ * FORA desta rodada, de proposito: texto NAO numerico (cliente, descricao,
+ * normas, nome do fabricante). Numa placa, texto livre e ruido >> sinal — cada
+ * linha de norma tecnica viraria alarme —, e a comparacao textual util
+ * (cliente) ja e feita como CAMPO da checklist, com veredito de verdade. Fica
+ * para quando houver posicao/rotulo confiavel para ancorar a comparacao.
+ *
+ * O que esta funcao NUNCA faz: emitir veredito, mexer em campo conferido ou
+ * transformar ausencia de alarme em `conforme`. Consistencia nao enxerga
+ * ausencia — peca lisa, sem marcacao nenhuma, sai daqui sem alarme algum.
+ */
+export function cruzarAchados(
+  achados: AchadoLivre[],
+  payload: PayloadEtiqueta,
+): AchadoInconsistente[] {
+  const identificadores = [payload.numeroSerie, payload.patrimonio]
+    .map((valor) => (valor === null ? '' : normalizar(valor)))
+    .filter((valor) => PADRAO_SO_DIGITOS.test(valor));
+
+  const comprimentos = new Set(identificadores.map((valor) => valor.length));
+  if (comprimentos.size === 0) {
+    // Etiqueta sem identificador numerico (ou so com patrimonio alfanumerico):
+    // sem molde de comparacao, nao ha candidato — silencio e melhor que chute.
+    return [];
+  }
+
+  // Tudo que o QR afirma vira "esperado". Um numero que bate com o pedido ou
+  // com o seq da etiqueta e consistente com a fonte da verdade, ainda que
+  // nenhuma checklist o confira.
+  const valoresDoQr = new Set(
+    [
+      payload.numeroSerie,
+      payload.patrimonio,
+      payload.pedido,
+      payload.seq,
+      payload.cliente,
+      payload.descricao,
+      payload.codigoProjeto,
+    ]
+      .filter(
+        (valor): valor is string =>
+          typeof valor === 'string' && valor.trim().length > 0,
+      )
+      .map(normalizar),
+  );
+
+  const porTexto = new Map<string, AchadoInconsistente>();
+
+  for (const achado of achados) {
+    const texto = normalizar(achado.texto);
+
+    if (!PADRAO_SO_DIGITOS.test(texto) || !comprimentos.has(texto.length)) {
+      continue;
+    }
+    if (valoresDoQr.has(texto)) {
+      continue;
+    }
+
+    const atual = porTexto.get(texto);
+    const ocorrencia: OcorrenciaAchado = {
+      fotoEvidenciaId: achado.fotoEvidenciaId ?? null,
+      confianca: achado.confianca,
+      regiaoLeitura: achado.regiaoLeitura ?? null,
+    };
+
+    if (atual) {
+      atual.ocorrencias.push(ocorrencia);
+      continue;
+    }
+
+    // Primeiro texto CRU vence: e o que o operador vai comparar com a peca.
+    porTexto.set(texto, { texto: achado.texto, ocorrencias: [ocorrencia] });
+  }
+
+  return [...porTexto.values()];
 }

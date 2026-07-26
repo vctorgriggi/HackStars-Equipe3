@@ -1,8 +1,9 @@
 import {
+  AchadoLivre,
   CampoAlvo,
   ExtractorPort,
   FonteImagem,
-  LeituraExtraida,
+  ResultadoExtracao,
 } from '../ports/extractor.port';
 
 /**
@@ -48,6 +49,10 @@ export class MockExtractor extends ExtractorPort {
    * sai com `valorLido: null` e `confianca: null` — o mesmo formato de uma
    * leitura que falhou de verdade.
    * @param confianca confianca aplicada a toda leitura com valor.
+   * @param textosExtras textos que o mock devolve APENAS como achado livre
+   * (nunca como leitura de campo) — e assim que um teste simula "a foto tem um
+   * numero que ninguem esperava". Vazio por default: em modo demo o mock nao
+   * inventa alarme.
    */
   constructor(
     private readonly valoresPorCampo: Record<
@@ -55,11 +60,12 @@ export class MockExtractor extends ExtractorPort {
       string | null
     > = LEITURAS_DEMO,
     private readonly confianca: number = CONFIANCA_MOCK,
+    private readonly textosExtras: string[] = [],
   ) {
     super();
   }
 
-  extrair(fonte: FonteImagem, alvos: CampoAlvo[]): Promise<LeituraExtraida[]> {
+  extrair(fonte: FonteImagem, alvos: CampoAlvo[]): Promise<ResultadoExtracao> {
     const leituras = alvos.map((alvo) => {
       const valorLido = this.valoresPorCampo[alvo.campo] ?? null;
 
@@ -72,6 +78,28 @@ export class MockExtractor extends ExtractorPort {
       };
     });
 
-    return Promise.resolve(leituras);
+    // Espelha o Textract: o que o servico "viu" na foto inclui os proprios
+    // valores lidos. Nao ha texto inventado — no fluxo de demonstracao os
+    // achados batem com o QR e o cruzamento sai vazio; a excecao e a placa da
+    // peca de demo (847833), que e inconsistente na peca FISICA e por isso
+    // deve mesmo alarmar.
+    const achadosLivres: AchadoLivre[] = [
+      ...leituras
+        .filter((leitura) => leitura.valorLido !== null)
+        .map((leitura) => ({
+          texto: leitura.valorLido as string,
+          confianca: this.confianca,
+          regiaoLeitura: null,
+          fotoEvidenciaId: fonte.fotoEvidenciaId,
+        })),
+      ...this.textosExtras.map((texto) => ({
+        texto,
+        confianca: this.confianca,
+        regiaoLeitura: null,
+        fotoEvidenciaId: fonte.fotoEvidenciaId,
+      })),
+    ];
+
+    return Promise.resolve({ leituras, achadosLivres });
   }
 }

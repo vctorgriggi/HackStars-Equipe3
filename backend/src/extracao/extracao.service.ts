@@ -1,11 +1,13 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import {
+  AchadoLivre,
   CampoAlvo,
   EXTRACTOR_PORT,
   ExtractorPort,
   FonteImagem,
   LeituraExtraida,
+  ResultadoExtracao,
 } from './ports/extractor.port';
 
 /**
@@ -56,13 +58,18 @@ export class ExtracaoService {
    *   mesmo que o adapter esqueca — vinculo leitura->evidencia e regra de
    *   ouro, nao cortesia do adapter;
    * - leitura de campo fora dos alvos daquela foto e descartada: adapter nao
-   *   inventa campo.
+   *   inventa campo;
+   * - achado livre (texto que o servico leu e nao virou leitura de alvo) sai
+   *   junto, com o MESMO carimbo de evidencia. Nao ha filtro de campo aqui —
+   *   achado livre nao pertence a checklist nenhuma; quem separa sinal de
+   *   ruido e o cruzamento contra o QR, em `conferencias/`.
    */
   async extrairDeFotos(
     fotos: FonteImagem[],
     checklist: AlvoChecklist[],
-  ): Promise<LeituraExtraida[]> {
+  ): Promise<ResultadoExtracao> {
     const leituras: LeituraExtraida[] = [];
+    const achadosLivres: AchadoLivre[] = [];
 
     for (const foto of fotos) {
       const alvos: CampoAlvo[] = checklist
@@ -90,9 +97,9 @@ export class ExtracaoService {
           `${alvos.length} campo(s)`,
       );
 
-      let brutas: LeituraExtraida[];
+      let bruto: ResultadoExtracao;
       try {
-        brutas = await this.extractor.extrair(foto, alvos);
+        bruto = await this.extractor.extrair(foto, alvos);
       } catch (erro) {
         this.logger.error(
           `adapter "${this.extractor.nome}" falhou na foto ` +
@@ -100,11 +107,20 @@ export class ExtracaoService {
             `${erro instanceof Error ? erro.message : String(erro)}; ` +
             `a foto segue sem leituras`,
         );
+        // Foto que falhou nao tem leitura NEM achado livre: o `continue` cobre
+        // os dois canais de uma vez.
         continue;
       }
       const campos = new Set(alvos.map((alvo) => alvo.campo));
 
-      for (const leitura of brutas) {
+      for (const achado of bruto.achadosLivres) {
+        achadosLivres.push({
+          ...achado,
+          fotoEvidenciaId: achado.fotoEvidenciaId ?? foto.fotoEvidenciaId,
+        });
+      }
+
+      for (const leitura of bruto.leituras) {
         if (!campos.has(leitura.campo)) {
           this.logger.warn(
             `adapter "${this.extractor.nome}" devolveu campo fora dos alvos ` +
@@ -120,6 +136,6 @@ export class ExtracaoService {
       }
     }
 
-    return leituras;
+    return { leituras, achadosLivres };
   }
 }
