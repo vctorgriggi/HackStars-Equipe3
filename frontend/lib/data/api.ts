@@ -1,7 +1,9 @@
-// A COSTURA entre o app e os dados de domínio. Hoje os corpos leem o mock
-// (decisão: backend não tem Cliente/Lote/Projeto/Câmera/KPIs/WS nesta
-// rodada); quando a API real existir, cada corpo vira um fetch e as
-// ASSINATURAS não mudam. Regras estruturais:
+// A COSTURA entre o app e os dados de domínio MOCK. TRANSFORMADORES REAIS
+// migraram para ./transformadores-api.ts (listagem/detalhe integrados à API
+// NestJS via BFF, 2026-07-26) — os acessores de transformador daqui seguem
+// vivos SÓ para as telas ainda mockadas (tempo-real, dashboard, alertas);
+// não os use em tela nova. O restante (Lote/Projeto/Câmera/KPIs/WS) continua
+// mock porque o backend não os tem nesta rodada. Regras estruturais:
 //  - nenhum acessor devolve NOME de etapa — sempre índice/checkpointId
 //    (nome é join no render via useCheckpoints);
 //  - filtro de listagem NÃO é parâmetro (a page filtra em useMemo) até a

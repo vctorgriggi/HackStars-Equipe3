@@ -1,33 +1,50 @@
 "use client";
 
-// Listagem de transformadores. Filtros (busca/status/etapa) vivem na URL —
-// back-button e reload preservam; a filtragem é useMemo sobre a lista
-// completa (a query key não muda por tecla).
+// Listagem de transformadores — API REAL. Filtros (busca/status/etapa) vivem
+// na URL (back-button e reload preservam); a filtragem é useMemo sobre a
+// lista completa (a query key não muda por tecla). Veredito e etapa chegam
+// PRONTOS da API (`vereditoVigente`/`etapaAtual`) — nada é derivado aqui.
 
 import { useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import type { ReadingStatus, Transformador } from "@/lib/domain/types";
-import { READING_LABELS, fmtKva } from "@/lib/domain/status";
-import { useTransformadores } from "@/lib/data/use-transformadores";
-import { useCheckpoints } from "@/lib/data/use-checkpoints";
+import type { TransformadorComSituacaoApi } from "@/lib/domain/transformador-api";
+import { VEREDITO_LABELS } from "@/lib/domain/transformador-api";
+import type { Veredito } from "@/lib/domain/types";
+import {
+  useEtapasLinha,
+  useTransformadoresApi,
+} from "@/lib/data/use-transformadores-api";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
-import { NeutralChip, StatusChip } from "@/components/ui/chip";
+import { NeutralChip } from "@/components/ui/chip";
+import { VereditoChip } from "@/components/vision/veredito-chip";
 import { Select } from "@/components/ui/select";
 import { Icon } from "@/components/ui/icon";
 import { SkeletonListagem } from "@/components/ui/skeleton";
-import { AlertasTransformadores } from "@/components/vision/alertas-transformadores";
 
 const STATUS_OPTIONS = [
   { value: "all", label: "Todos os status" },
-  ...(
-    ["pending", "processing", "success", "lowconf", "mismatch"] as const
-  ).map((s) => ({ value: s, label: READING_LABELS[s] })),
+  ...(Object.entries(VEREDITO_LABELS) as [Veredito, string][]).map(
+    ([value, label]) => ({ value, label }),
+  ),
+  { value: "sem", label: "Sem conferência" },
 ];
 
+function fmtData(iso: string): string {
+  return new Date(iso).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+  });
+}
+
 export default function TransformadoresPage() {
-  const { data: transformadores, isPending } = useTransformadores();
-  const { data: checkpoints = [] } = useCheckpoints();
+  const {
+    data: transformadores,
+    isPending,
+    isError,
+    refetch,
+  } = useTransformadoresApi();
+  const { data: etapas = [] } = useEtapasLinha();
   const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();
@@ -43,30 +60,35 @@ export default function TransformadoresPage() {
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   };
 
-  const nomes = checkpoints.map((c) => c.nome);
+  // Etapas REAIS da linha (seed do backend); o filtro casa por `codigo`, o
+  // identificador estável — nunca por nome nem índice.
   const etapaOptions = [
     { value: "all", label: "Todas as etapas" },
-    ...checkpoints.map((c, i) => ({ value: String(i), label: c.nome })),
+    ...etapas.map((etapa) => ({ value: etapa.codigo, label: etapa.nome })),
   ];
 
   const filtrados = useMemo(() => {
     const busca = q.trim().toLowerCase();
-    return (transformadores ?? []).filter(
-      (t) =>
+    return (transformadores ?? []).filter((t) => {
+      const veredito = t.vereditoVigente?.vereditoGeral ?? null;
+      return (
         (!busca ||
-          t.serie.toLowerCase().includes(busca) ||
-          t.clienteNome.toLowerCase().includes(busca)) &&
-        (fStatus === "all" || t.status === (fStatus as ReadingStatus)) &&
-        (fEtapa === "all" || t.etapaIndex === Number(fEtapa)),
-    );
+          t.numeroSerie.toLowerCase().includes(busca) ||
+          t.cliente.toLowerCase().includes(busca) ||
+          t.patrimonio.toLowerCase().includes(busca)) &&
+        (fStatus === "all" ||
+          (fStatus === "sem" ? veredito === null : veredito === fStatus)) &&
+        (fEtapa === "all" || t.etapaAtual?.checkpoint.codigo === fEtapa)
+      );
+    });
   }, [transformadores, q, fStatus, fEtapa]);
 
-  const columns: Column<Transformador>[] = [
+  const columns: Column<TransformadorComSituacaoApi>[] = [
     {
       id: "serie",
       header: "Série",
       width: "105px",
-      cell: (t) => <span className="t-mono text-sm">{t.serie}</span>,
+      cell: (t) => <span className="t-mono text-sm">{t.numeroSerie}</span>,
     },
     {
       id: "cliente",
@@ -74,42 +96,70 @@ export default function TransformadoresPage() {
       width: "minmax(160px,1fr)",
       truncate: true,
       cell: (t) => (
-        <span className="text-sm text-text-2">
-          {t.clienteNome} ·{" "}
-          <span className="t-mono text-xs">{fmtKva(t.kva)} kVA</span>
-        </span>
+        <span className="text-sm text-text-2">{t.cliente || "—"}</span>
       ),
+    },
+    {
+      id: "patrimonio",
+      header: "Patrimônio",
+      width: "110px",
+      cell: (t) => <span className="t-mono text-sm">{t.patrimonio}</span>,
     },
     {
       id: "etapa",
       header: "Etapa",
-      width: "110px",
+      width: "130px",
       alignStart: true,
-      cell: (t) => <NeutralChip>{nomes[t.etapaIndex] ?? "—"}</NeutralChip>,
+      cell: (t) => (
+        <NeutralChip>{t.etapaAtual?.checkpoint.nome ?? "—"}</NeutralChip>
+      ),
     },
     {
       id: "status",
       header: "Status",
-      width: "110px",
+      width: "150px",
       alignStart: true,
-      cell: (t) => <StatusChip status={t.status} />,
+      cell: (t) => (
+        <span className="inline-flex items-center gap-1.5">
+          <VereditoChip
+            veredito={t.vereditoVigente?.vereditoGeral ?? null}
+          />
+          {t.vereditoVigente?.checkpoint && (
+            // Gate parcial: o veredito não atesta a peça inteira — a etapa
+            // acompanha o chip (gap 14 do CLAUDE.md).
+            <span className="text-2xs text-text-3">
+              {t.vereditoVigente.checkpoint.nome}
+            </span>
+          )}
+        </span>
+      ),
     },
     {
-      id: "entrega",
-      header: "Entrega",
-      width: "90px",
+      id: "cadastro",
+      header: "Cadastro",
+      width: "80px",
       cell: (t) => (
-        <span className="t-mono text-xs text-text-2">{t.entregaPrevista}</span>
+        <span className="t-mono text-xs text-text-2">
+          {fmtData(t.createdAt)}
+        </span>
       ),
     },
   ];
 
   if (isPending) return <SkeletonListagem />;
 
+  if (isError) {
+    return (
+      <EmptyState
+        title="Não foi possível carregar as peças"
+        description="A API não respondeu. Verifique a conexão e tente de novo."
+        action={{ label: "Tentar novamente", onClick: () => void refetch() }}
+      />
+    );
+  }
+
   return (
     <div className="grid gap-4">
-      <AlertasTransformadores />
-
       <div className="flex flex-wrap items-center gap-2">
         <label className="relative min-w-0 flex-1 basis-56">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-3">
@@ -118,8 +168,8 @@ export default function TransformadoresPage() {
           <input
             value={q}
             onChange={(e) => setParam("q", e.target.value)}
-            placeholder="Buscar por série ou cliente"
-            aria-label="Buscar por série ou cliente"
+            placeholder="Buscar por série, cliente ou patrimônio"
+            aria-label="Buscar por série, cliente ou patrimônio"
             className="h-9 w-full rounded-md border border-line bg-surface-2 pl-9 pr-3 text-sm text-text-1 outline-none placeholder:text-text-3 focus-visible:[box-shadow:var(--ring-focus)]"
           />
         </label>
@@ -144,8 +194,8 @@ export default function TransformadoresPage() {
       <DataTable
         rows={filtrados}
         columns={columns}
-        rowKey={(t) => t.serie}
-        rowHref={(t) => `/transformadores/${t.serie}`}
+        rowKey={(t) => t.numeroSerie}
+        rowHref={(t) => `/transformadores/${t.numeroSerie}`}
         label="Transformadores"
         empty={
           <EmptyState
@@ -161,18 +211,20 @@ export default function TransformadoresPage() {
           <div className="grid gap-2">
             <div className="flex items-center justify-between gap-2">
               <span className="t-mono text-sm font-medium text-text-1">
-                {t.serie}
+                {t.numeroSerie}
               </span>
-              <StatusChip status={t.status} />
+              <VereditoChip
+                veredito={t.vereditoVigente?.vereditoGeral ?? null}
+              />
             </div>
             <span className="text-sm text-text-2">
-              {t.clienteNome} ·{" "}
-              <span className="t-mono text-xs">{fmtKva(t.kva)} kVA</span>
+              {t.cliente || "—"} ·{" "}
+              <span className="t-mono text-xs">{t.patrimonio}</span>
             </span>
             <div className="flex items-center justify-between gap-2">
-              <NeutralChip>{nomes[t.etapaIndex] ?? "—"}</NeutralChip>
+              <NeutralChip>{t.etapaAtual?.checkpoint.nome ?? "—"}</NeutralChip>
               <span className="t-mono text-xs text-text-3">
-                {t.entregaPrevista}
+                {fmtData(t.createdAt)}
               </span>
             </div>
           </div>
