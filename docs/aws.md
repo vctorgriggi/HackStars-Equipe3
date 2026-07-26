@@ -58,7 +58,11 @@ geral):
 
 - **Bedrock Opus 5**: ~15–30k tokens de entrada + ~1k de saída ≈ USD 0,10–0,20
   por conferência.
-- **Textract**: ~USD 0,0015 por página → ≈ USD 0,01 por conferência.
+- **Textract**: ~USD 0,0015 por página → ≈ USD 0,01 por conferência. Com a
+  corroboração por recorte da série chumbada (1 leitura da foto + 2 releituras
+  de recorte, só nas fotos com marcação em relevo) o teto sobe para **USD
+  0,0225 por conferência** — ~22 mil conferências dentro dos créditos. Custo
+  não é restrição; o teto é FIXO (3 chamadas por foto), nunca um laço.
 - **S3**: centavos no volume da demo.
 
 Cem conferências de teste + demo custam < USD 25 no pior caso. O risco de

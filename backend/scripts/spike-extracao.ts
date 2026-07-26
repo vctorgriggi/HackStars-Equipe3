@@ -15,7 +15,10 @@
  * adapter contra os valores conhecidos da peca de demo.
  *
  * Cada foto vira UMA chamada por adapter — sem retry, sem laco (constraint 4
- * do SPEC). Custo estimado de uma rodada completa esta em docs/aws.md.
+ * do SPEC) —, mais ate DUAS releituras de recorte quando a vista tem marcacao
+ * em relevo (corroboracao da serie chumbada; teto fixo de 3 por foto).
+ * `EXTRACAO_RECORTE=off` roda o spike no comportamento antigo, com 1 chamada.
+ * Custo estimado de uma rodada completa esta em docs/aws.md.
  */
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';

@@ -157,9 +157,11 @@ decide o campo; os seguintes nem são avaliados:
 
 Os cinco primeiros só produzem `nao_conferivel`. Isso é a regra de ouro em
 forma de estrutura: qualquer dúvida sobre a leitura desvia o campo para o olho
-humano ANTES de chegar ao portão que sabe aprovar. Depois do laço, um
-pós-processamento compara os campos irmãos entre si (R62) — ele rebaixa o
-veredito geral, nunca o de um campo.
+humano ANTES de chegar ao portão que sabe aprovar. Depois do laço vêm DOIS
+pós-processamentos, nesta ordem: a comparação entre campos irmãos (R62), que
+rebaixa o veredito geral, e a regra de corroboração do relevo (R20a), que é a
+única capaz de rebaixar o veredito de um CAMPO já decidido — sempre de
+`divergente` para `nao_conferivel`, nunca na direção do `conforme`.
 
 **R17 — (a) Sem valor esperado.** Campo **opcional** some do resultado (não
 aparece na resposta nem vira `CampoConferido`). Campo **obrigatório** é
@@ -170,7 +172,11 @@ aparece na resposta do endpoint — o resultado sai com 8 campos, não os 9 da c
 **R18 — (b) Sem leitura ou leitura vazia.** `nao_conferivel`, motivo
 `sem-leitura`. Vale tanto para leitura ausente quanto para `valorLido` null,
 string vazia ou só espaços (`temConteudo`). O valor esperado é preservado no
-resultado, para a tela mostrar o que se esperava ver.
+resultado, para a tela mostrar o que se esperava ver. **Exceção de motivo:** se
+a leitura vazia chegou marcada `corroboracao: 'nao-confirmada'`, foi o adapter
+que a ANULOU porque os recortes da mesma região leram números diferentes
+(R37a) — o motivo vira `leitura-nao-corroborada`, que separa "ninguém
+fotografou esta posição" de "li e me contradisse".
 
 **R18a — (b2) Leituras conflitantes.** `nao_conferivel`, motivo
 `leituras-conflitantes`. O campo recebeu DUAS leituras com lastro (valor
@@ -222,6 +228,47 @@ dígito**: só igualdade exata do valor normalizado vira `conforme` — a decis�
 mora em `backend/src/conferencias/engine/normalizacao.ts`, em módulo próprio
 para que a coerência entre irmãos (R62) use exatamente a mesma sem ciclo de
 import; `engine-conformidade.ts` a reexporta para quem já importava de lá.
+
+**R20a — Marcação em RELEVO não é acusada a partir de uma leitura sozinha.**
+Pós-processamento em `backend/src/conferencias/engine/corroboracao.ts`. Para um
+campo em relevo sair `divergente` exige-se: (i) as releituras por recorte
+concordarem (`corroboracao: 'confirmada'`, R37a); (ii) confiança ≥ limiar — já
+garantido, porque só se chega à comparação depois do portão (c); (iii) **nenhuma
+posição irmã** (R62, mesmo valor esperado) ter lido valor diferente. Falhando
+(i) ou (iii), o campo vira `nao_conferivel` com motivo
+`leitura-nao-corroborada`, e o veredito geral é reagregado depois disso.
+
+*Por quê*: na série chumbada a confiança do Textract mede ENQUADRAMENTO, não
+correção — mesma foto e mesmo valor correto oscilaram de 37,3% a 95,5% só
+mudando a margem, e `847233 @ 84,3%` (certo) ficou a 0,3 ponto de
+`847833 @ 84,6%` (errado). Nenhum limiar corta essa faixa (docs/visao-ocr.md).
+
+*Por que não fere "a coerência rebaixa e nunca promove"* (R63): a peça continua
+sem passar — campo obrigatório `nao_conferivel` bloqueia o geral exatamente como
+`divergente`. O que muda é a MENSAGEM ao operador ("não posso afirmar, confira a
+foto" no lugar de "peça defeituosa") e a ação humana correspondente. A regra
+restringe ACUSAÇÃO, nunca aprovação: leitura em relevo não corroborada que BATE
+com o QR continua `conforme` (senão uma falha de recorte derrubaria o critério 3
+do SPEC), e nenhum caminho daqui produz `conforme` novo.
+
+*Quem é "relevo"*: derivado do NOME do campo (`ehMarcacaoEmRelevo`, em
+`backend/src/extracao/ports/marcacao.ts`) — segmento `chumbad*` ou `relevo`. A
+checklist não declara tipo de marcação hoje (gap 5); a limitação está escrita no
+arquivo e sai quando a checklist virar jsonb validado ou a Fase 6 existir.
+`serie-placa` e `patrimonio-*` são tinta/impresso e não passam por esta regra —
+é o que mantém o cenário-âncora (R53).
+
+*Consequência conhecida e aceita*: "irmã" inclui a PLACA. Peça gravada errada
+nas três posições chumbadas, com a placa certa, sai `nao_conferivel` nas três em
+vez de `divergente` — barrada do mesmo jeito, com mensagem mais fraca. Fixado em
+teste; o refino exige agrupar por tipo de marcação.
+
+*Onde a regra é aplicada também na borda*: toda leitura de relevo que chega SEM
+`corroboracao` (digitada pelo endpoint de leituras prontas, vinda do driver
+`mock`, ou de um adapter que não conseguiu recortar) é tratada como
+`nao-confirmada` por `exigirCorroboracaoDeRelevo`
+(`conferencia-execucao.service.ts`). Sem isso, a mesma peça seria acusada por uma
+porta e não pela outra.
 
 **R21 — Agregação do veredito geral: `divergente` > `nao_conferivel` > `conforme`.**
 `divergente` se **qualquer** campo (obrigatório ou opcional) divergir; senão
@@ -349,8 +396,10 @@ colunas opcionais e ambas entram por DTO normal — diferente do veredito (R28).
 
 ## 6. Extração
 
-**R37 — No máximo uma chamada de visão por foto, e falha de uma foto não
-derruba o lote.** Regra escrita na porta (`ExtractorPort.extrair`) e no
+**R37 — Teto FIXO de chamadas de visão por foto, e falha de uma foto não
+derruba o lote.** O teto é **3**: uma leitura da foto inteira + duas releituras
+de recorte (R37a), e só para marcação em relevo — foto sem campo em relevo
+continua custando uma chamada. Regra escrita na porta (`ExtractorPort.extrair`) e no
 roteamento (`ExtracaoService.extrairDeFotos`). Sem retry automático — o loop de
 reprocessamento é o risco de custo que a constraint 4 do SPEC proíbe. O erro do
 adapter (arquivo corrompido, formato recusado, throttle) é CAPTURADO por foto,
@@ -359,6 +408,37 @@ logado como erro e a foto segue sem leituras: os campos dela viram
 humana, não 500) e preserva as chamadas já pagas das outras fotos. Sequencial,
 não paralelo: um lote de 6 fotos de uma vez é pico de custo e de rate limit sem
 ganho.
+
+**R37a — Consenso de recortes: leitura em relevo é relida duas vezes, na mesma
+região.** `TextractExtractor.corroborarRelevos` recorta o buffer ORIGINAL em
+volta do bounding box já devolvido pela primeira passada, com margens **50% e
+150%**, na **resolução nativa** e **sem filtro de pixel** (`adapters/recorte.ts`,
+via `sharp`), e relê cada recorte. A releitura é **ancorada**: vale a linha
+numérica de maior sobreposição com a caixa original, para que a marcação vizinha
+dentro do mesmo recorte não corrobore a posição errada. Três desfechos:
+
+| Situação | Resultado |
+| --- | --- |
+| Os três textos coincidem | valor aceito, `corroboracao: 'confirmada'`, confiança = a **MENOR** das três |
+| Um recorte lê OUTRO número | `valorLido`, `confianca` e `regiaoLeitura` vão a **null** — nunca se elege vencedora |
+| Não deu para corroborar (sem bounding box, sem `sharp`, `EXTRACAO_RECORTE=off`, recorte minúsculo, erro na releitura, orçamento gasto) | valor **preservado**, `corroboracao: 'nao-confirmada'` |
+
+A distinção entre as duas últimas linhas é deliberada: contradição derruba a
+leitura (ela não pode nem sustentar `conforme`); ausência de segunda evidência
+não derruba nada — anular aí faria uma falha de infraestrutura zerar leituras
+boas e quebrar o critério 3 do SPEC. Ampliar o recorte e pré-processar pixel
+foram MEDIDOS e reprovados (docs/visao-ocr.md); quem acrescentar `resize` ou
+`sharpen` está desfazendo uma medição. Custo: USD 0,0225 por conferência.
+
+**R37b — `sharp` é opcional em runtime, e a falta dela degrada.** O import é
+dinâmico dentro de `try/catch` e o resultado fica em cache: binário nativo
+ausente ou quebrado vira log de warn + `abrirImagem` devolvendo `null`, nunca
+API fora do ar. `EXTRACAO_RECORTE=off` desliga a corroboração sem deploy de
+código. Em modo degradado o adapter volta a UMA chamada por foto e todas as
+leituras em relevo saem `nao-confirmada` — ou seja, deixam de poder ACUSAR
+(R20a) e continuam podendo confirmar `conforme`. O build do container foi
+verificado nas duas arquiteturas (`Dockerfile.production`, node 24 alpine/musl,
+arm64 e amd64).
 
 **R38 — Foto cuja `fonteFisica` não aparece no checklist não gera chamada.** Não
 se paga visão por foto que ninguém vai conferir — a foto `geral`, por exemplo,
@@ -408,7 +488,10 @@ chumbadas e `847833` na placa — a mesma história que a demo conta com visão
 real. Confiança fixa `0.99`, acima do limiar padrão. Campo ausente do mapa sai
 com `valorLido: null` e `confianca: null`, o mesmo formato de uma leitura que
 falhou de verdade; passando outro mapa no construtor simula-se tudo conforme ou
-peça ilegível.
+peça ilegível. O mock **não** corrobora nada (não há imagem para recortar): as
+leituras dele em relevo chegam à execução sem `corroboracao` e são tratadas como
+`nao-confirmada` (R20a). Na peça de demo isso não muda nada — as chumbadas do
+mock são `conforme`, e a regra só bloqueia acusação.
 
 **R45 — Driver por variável de ambiente, com `mock` como padrão.**
 `EXTRACTOR_DRIVER` ∈ `mock | textract | bedrock`, lida em
@@ -558,9 +641,18 @@ medido (84,6% lendo `847833` onde as irmãs liam `847233` a 98,8%).
 `conforme` geral em `nao_conferivel` (R21); `divergente` continua vencendo, para
 que defeito real da peça jamais vire "ruído de OCR". Não existe voto
 majoritário: duas posições concordando NÃO aprovam a terceira — as duas podem
-estar gravadas erradas juntas. Nenhum veredito de campo é reescrito por aqui; a
-incoerência viaja na resposta (`incoerencias`, com campos, valores lidos e
-confiança) para o humano decidir qual posição re-inspecionar.
+estar gravadas erradas juntas. Nenhum veredito de campo é reescrito **pela
+coerência**; a incoerência viaja na resposta (`incoerencias`, com campos,
+valores lidos e confiança) para o humano decidir qual posição re-inspecionar.
+
+**R63a — A ÚNICA exceção ao "nenhum veredito de campo é reescrito": R20a.** A
+regra de corroboração do relevo consome a incoerência (item iii) e pode rebaixar
+um campo de `divergente` para `nao_conferivel`. É mudança de política
+deliberada, e o invariante que importa continua de pé: o rebaixamento anda
+sempre na direção cautelosa (`divergente` → `nao_conferivel` → nunca
+`conforme`), a peça segue barrada, e o que muda é a mensagem ao operador. A
+coerência é recalculada DEPOIS do rebaixamento, para que `incoerencias[].leituras[].veredito`
+mostre o veredito final e não o intermediário.
 
 ## 11. `POST /conferencias/executar-com-fotos`
 

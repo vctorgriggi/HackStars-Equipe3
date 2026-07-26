@@ -310,6 +310,36 @@ Depende de: Fase 1 completa.
     não conformidade real passando despercebida. Nenhum item em `base`: a
     vista existe no vocabulário, mas sem foto dela um obrigatório ali tornaria
     o critério 3 do SPEC inalcançável.
+- [x] T2.12 — Consenso de recortes + "antes de acusar, confirme" (descoberta desta rodada) · módulo: extracao (+ conformidade)
+  - Motivo (spike de medição, 2026-07-25): na série CHUMBADA a confiança do
+    Textract mede ENQUADRAMENTO, não correção. Mesma foto e mesmo valor
+    correto, só mudando a margem do recorte: confiança de 37,3% a 95,5% (58
+    pontos). E `847233 @ 84,3%` (certo) contra `847833 @ 84,6%` (errado) —
+    0,3 ponto separando verdades opostas. **Nenhum limiar corta essa faixa**,
+    então o 0.9 da T2.10 não bastava.
+  - Reprovado pelo mesmo spike, não repetir: consenso entre MOTORES diferentes
+    (os LLMs do Bedrock erram com certeza alta), AMPLIAR o recorte (upscale 4×
+    quebrou foto que lia a 99%) e pré-processamento de pixel (grayscale puro
+    virou `8` em `9`).
+  - Feito em 2026-07-25 (agente Opus): (1) o adapter Textract relê cada leitura
+    em relevo em DOIS recortes do buffer original (margens 50% e 150%,
+    resolução nativa, sem filtro, ancorados no próprio bounding box) e só
+    aceita o valor se os três textos coincidirem — confiança final = a MENOR
+    das três; recorte que lê outro número ANULA a leitura, recorte que não lê
+    nada só deixa de corroborar. (2) `engine/corroboracao.ts` recusa emitir
+    `divergente` para marcação em relevo sem corroboração ou com irmã
+    discordante: vira `nao_conferivel` (`leitura-nao-corroborada`).
+  - Aceitação: cenário-âncora intacto — a placa é IMPRESSA, não passa pela
+    regra e segue `divergente` sozinha (critério 2 do SPEC), verificado por
+    teste e ponta a ponta pelo endpoint. Teto de visão por foto virou 3 fixo
+    (USD 0,0225/conferência); `sharp` entra como dependência OPCIONAL em
+    runtime (build do container verificado em arm64 e amd64) e
+    `EXTRACAO_RECORTE=off` degrada sem deploy.
+  - Desvio: a regra é o PRIMEIRO caso em que um `divergente` vira
+    `nao_conferivel` — mudança de política aprovada. A peça continua barrada
+    (obrigatório `nao_conferivel` bloqueia igual); muda a mensagem, de "peça
+    defeituosa" para "não posso afirmar, confira a foto". Limitações
+    registradas nos gaps 19–21 do CLAUDE.md.
 
 ## Fase 3 — Fluxo de conferência ponta a ponta
 
@@ -428,11 +458,14 @@ demo.
 
 ## Riscos e dependências
 
-- **Série chumbada ilegível para OCR** (SPEC, constraint 2) → RISCO DISSOLVIDO
-  em 2026-07-25: o Textract leu o relevo a 99,9% (topo) e 96,7% (diagonal) nas
-  fotos reais (docs/visao-ocr.md). O plano C (campo `nao_conferivel` com foto)
-  segue valendo para foto ruim — medido: um chumbado saiu a 35,4% e a engine o
-  barrou corretamente.
+- **Série chumbada ilegível para OCR** (SPEC, constraint 2) → o risco na forma
+  prevista (ilegibilidade) se dissolveu em 2026-07-25: o Textract leu o relevo a
+  99,9% (topo) e 96,7% (diagonal). **Mas voltou em forma pior no mesmo dia**: no
+  relevo a confiança mede ENQUADRAMENTO, não correção (37,3%–95,5% para o mesmo
+  valor certo; certo a 84,3% × errado a 84,6%). Mitigação atual = consenso de
+  recortes + recusa de acusar sem corroboração (T2.12), não mais só o limiar. O
+  plano C (campo `nao_conferivel` com foto) segue valendo para foto ruim —
+  medido: um chumbado saiu a 35,4% e a engine o barrou corretamente.
 - **Prazo de 2 dias** (SPEC, constraint 1) → Fase 5 opcional; T2.3 com fallback
   de disco local; corte na ordem Could → Should, nunca no Must.
 - **Payload do QR desconhecido** (SPEC, constraint 5) → T1.1 na frente de tudo

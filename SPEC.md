@@ -277,8 +277,15 @@ atrás dessas mesmas fronteiras; engine e portas não mudam.
 2. **Série chumbada de baixo contraste** — relevo da mesma cor do tanque; OCR
    clássico podia falhar. MEDIDO no spike T2.1 (docs/visao-ocr.md): o Textract
    lê o relevo com 99,9% de confiança de cima e 85,8% de lado — o risco não se
-   confirmou. Mantida a mitigação: campo ilegível vira `nao_conferivel` com
-   foto para conferência humana, nunca `conforme` silencioso.
+   confirmou NA FORMA PREVISTA (ilegibilidade). Ele voltou em forma pior na
+   rodada dos recortes: **no relevo, a confiança do OCR mede enquadramento e
+   não correção** — mesma foto e mesmo valor correto oscilaram de 37,3% a
+   95,5% só mudando a margem, e leitura certa (84,3%) e errada (84,6%) convivem
+   na mesma faixa. Nenhum limiar separa isso, então a mitigação deixou de ser
+   só o limiar: leitura em relevo é RELIDA em recortes da própria região
+   (consenso) e, sem corroboração, o campo nunca é acusado `divergente` — vira
+   `nao_conferivel` com foto para conferência humana. `conforme` silencioso
+   continua proibido em qualquer caminho.
 3. **Fonte de imagem variável** — MVP usa fotos de celular; câmeras fixas vêm
    depois. A extração recebe imagens sem saber a origem (mesma porta para
    ambas).

@@ -106,6 +106,13 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
 - Escrita de veredito tem UM caminho: `CamposConferidosService.criarComVeredito`
   (server-side, sem rota HTTP). Nunca crie outro — é o que mantém a regra de
   ouro auditável.
+- **Antes de acusar, confirme** (`conferencia/engine/corroboracao.ts`): campo cuja
+  marcação é RELEVO (série chumbada) não vira `divergente` com uma leitura só —
+  exige releituras de recorte concordantes e nenhuma posição irmã tendo lido
+  outro valor; senão é `nao_conferivel` (`leitura-nao-corroborada`). Motivo:
+  medido, a confiança do OCR no relevo mede enquadramento, não correção
+  (docs/visao-ocr.md). A regra restringe ACUSAÇÃO, nunca aprovação — e a placa
+  IMPRESSA continua `divergente` com uma leitura (cenário-âncora).
 - CampoConferido é IMUTÁVEL via HTTP (update → 422): PATCH no lastro
   (valores/confiança/foto) de um veredito já emitido falsificaria a trilha de
   auditoria (revisão R1). Comparação usa Unicode NFC; confiança <= 0 nunca é
@@ -157,7 +164,14 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
   `FonteFisica` em extracao/ports/extractor.port.ts; fotos-evidencia deriva
   dela com `satisfies` (divergência quebra a compilação).
 - Nenhuma chamada de visão fora de ação explícita do operador — créditos AWS
-  são finitos (SPEC, constraint 4); sem reprocessamento em loop.
+  são finitos (SPEC, constraint 4); sem reprocessamento em loop. O teto por foto
+  é **3 chamadas, fixo**: a foto inteira + 2 recortes de corroboração do relevo
+  (`adapters/recorte.ts`, margens 50%/150%, resolução nativa, sem filtro de
+  pixel — ampliar e pré-processar foram medidos e reprovados). Teto, não laço.
+- `sharp` é dependência OPCIONAL em runtime: import dinâmico em try/catch, e
+  `EXTRACAO_RECORTE=off` desliga a corroboração sem deploy. Sem ela o adapter
+  volta a 1 chamada por foto e leitura em relevo sai `nao-confirmada` (deixa de
+  poder acusar, continua podendo confirmar `conforme`).
 - Leitura retornada pelo adapter sempre carrega: valor, confiança, vista de
   origem (`fonteFisica`: topo, frente, placa…), referência à foto e, quando
   o serviço fornecer, o bounding box da leitura (`regiaoLeitura`) — dado
@@ -334,6 +348,24 @@ do hackathon:
     Correção definitiva: VPC connector no App Runner + SG restrito à VPC,
     e rotação da senha (ela transitou por logs de deploy). Receita e custo
     em docs/deploy.md.
+19. "Esta marcação é relevo?" é DEDUZIDO do nome do campo (`chumbad*` /
+    `relevo`, em `extracao/ports/marcacao.ts`) porque a checklist não declara
+    tipo de marcação (é o gap 5 batendo de novo). Falha segura nos dois
+    sentidos — nome fora do padrão devolve o comportamento anterior; falso
+    positivo custa 2 releituras e um `nao_conferivel` a mais. Sai quando o item
+    da checklist ganhar `tipoMarcacao` (jsonb validado ou Fase 6).
+20. Item (iii) da regra de corroboração usa a definição de irmão da coerência
+    (mesmo valor esperado), que inclui a PLACA: peça com as 3 chumbadas
+    gravadas erradas e placa certa sai `nao_conferivel` nas três, não
+    `divergente`. Continua barrada; perde-se só a força da mensagem. O refino
+    (agrupar por tipo de marcação) depende do gap 19.
+21. A corroboração por recorte ainda NÃO foi medida contra o Textract real
+    dentro da API — esta rodada verificou o mecanismo com dublê do serviço +
+    imagem real e o cenário-âncora ponta a ponta pelo endpoint de leituras
+    digitadas. Antes da demo, rodar uma conferência com fotos reais e
+    `EXTRACTOR_DRIVER=textract` e conferir no log as linhas `chamada-de-visao:
+    recorte` (se o bounding box e a orientação EXIF não casarem, o efeito é
+    tudo `nao-confirmada`, nunca leitura errada aceita).
 
 ## Decisões em aberto
 

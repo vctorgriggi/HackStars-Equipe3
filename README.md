@@ -73,7 +73,7 @@ cd backend && sed 's/^DATABASE_HOST=postgres/DATABASE_HOST=localhost/' env-examp
 cd backend && docker compose up -d postgres && npm run migration:run && npm run seed:run:relational
 cd backend && npm run start:dev   # API em :3001, swagger em /docs
 cd frontend && npm run dev        # app em :3000; API derivada do host da página
-cd backend && npm run test        # 16 suítes / 278 testes (engine, parser, extração, consultas)
+cd backend && npm run test        # 21 suítes / 331 testes (engine, parser, extração, recortes, consultas)
 # CRUD gerado exige JWT: login com o admin seed do boilerplate
 # (admin@example.com / secret) em POST /api/v1/auth/email/login
 ```
@@ -168,7 +168,12 @@ Prazo: demo em 2026-07-27.
 O spike T2.1 foi concluído com as fotos reais da peça: **Textract** leu todas
 as fontes físicas — inclusive o relevo chumbado, que era o risco — e é o
 driver do ambiente no ar (`EXTRACTOR_DRIVER=textract`); medições em
-[docs/visao-ocr.md](docs/visao-ocr.md). **Bedrock foi reprovado para leitura
+[docs/visao-ocr.md](docs/visao-ocr.md). Uma medição posterior mostrou que, no
+relevo, **a confiança do OCR mede enquadramento e não correção** (o mesmo valor
+correto oscilou de 37,3% a 95,5% só mudando a margem do recorte): por isso toda
+leitura chumbada é relida em dois recortes da própria região, e sem consenso o
+campo nunca é acusado `divergente` — vira `nao_conferivel`. A placa, que é
+impressa, continua sendo acusada com uma leitura só. **Bedrock foi reprovado para leitura
 numérica por medição**, não por bloqueio de conta: alucinou um número plausível
 (o patrimônio saiu como o número de série real da peça) onde o Textract
 devolveu null, e LLM não dá confiança calibrada — segue candidato apenas ao

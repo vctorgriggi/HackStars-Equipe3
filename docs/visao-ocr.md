@@ -144,6 +144,11 @@ saíram os nomes atuais.
 | patrimonio-serigrafia (frente) | 251328 | 98,4% | conforme |
 | cliente-serigrafia (frente) | energisa | 99,7% | conforme |
 
+> ATUALIZAÇÃO (rodada dos recortes, mais abaixo): o limiar sozinho **não**
+> resolve o relevo — na faixa de 84% convivem leitura certa e errada. O 0.9
+> continua valendo como piso; o que separa os dois casos é a corroboração por
+> recorte.
+
 ### O limiar 0.9 saiu daqui
 
 As leituras corretas ficaram entre **98,4% e 99,9%**; o único erro de dígito
@@ -168,6 +173,62 @@ definitiva é física e ainda não foi feita: **discriminar tinta de relevo pelo
 contraste** dentro do `regiaoLeitura` que já persistimos — tinta preta é
 escura contra o tanque, relevo tem a cor do fundo. Não exige modelo treinado,
 só amostragem de pixels.
+
+## Rodada dos recortes (2026-07-25): a confiança do relevo mede enquadramento
+
+Medição que desmonta a leitura otimista das rodadas anteriores. Nas séries
+CHUMBADAS (relevo metálico da cor do tanque), **a confiança do Textract não
+mede correção — mede enquadramento**:
+
+| Evidência | Número |
+| --- | --- |
+| Mesma foto, mesmo valor CORRETO, só mudando a margem do recorte | confiança de **37,3% a 95,5%** (58 pontos) |
+| Valor certo × valor errado, na mesma faixa | `847233 @ 84,3%` (certo) × `847833 @ 84,6%` (errado) |
+
+**Nenhum limiar separa essa faixa.** Subir o limiar não resolve: só troca
+`divergente` falso por `nao_conferivel` em massa. O que falta não é um número
+melhor, é uma **segunda evidência**.
+
+### O que o spike reprovou (não repetir)
+
+| Tentativa | Resultado medido |
+| --- | --- |
+| Consenso entre MOTORES diferentes (Bedrock ao lado do Textract) | os LLMs erram com certeza alta — Nova Lite, 4 erros em 4 |
+| AMPLIAR o recorte (upscale 4×) | quebrou até foto que lia a 99%: perdeu o dígito inicial e reportou 93,7% |
+| Pré-processamento de pixel (grayscale, CLAHE, sharpen) | baixou tudo; grayscale puro transformou um `8` em `9` |
+
+### O que o spike aprovou
+
+**Recortar na resolução NATIVA e reler**: 41,0% → 91,4% (margem 15%) e 95,5%
+(margem 150%); acertou o valor em 3/3 fotos de controle e **nunca mudou um
+valor que já estava correto**. Custo: 3 leituras Textract por foto = **USD
+0,0225 por conferência** (~22 mil conferências nos créditos). Custo não é
+restrição.
+
+### O que virou código
+
+1. **Consenso de recortes** (`extracao/adapters/textract.extractor.ts` +
+   `adapters/recorte.ts`): leitura de marcação em relevo é relida em dois
+   recortes do buffer ORIGINAL (margens 50% e 150%, sem ampliar, sem filtro),
+   ancorados no próprio bounding box. Aceita o valor só se os três textos
+   coincidirem; a confiança final é a MENOR das três. Recorte que lê OUTRO
+   número anula a leitura (nunca se elege vencedora); recorte que não lê nada
+   ali só deixa a leitura sem corroboração.
+2. **Regra "antes de acusar, confirme"** (`conferencias/engine/corroboracao.ts`):
+   marcação em relevo não vira `divergente` a partir de uma leitura sozinha —
+   exige recortes concordantes, confiança ≥ limiar e nenhuma posição irmã tendo
+   lido valor diferente. Falhando, sai `nao_conferivel` com motivo
+   `leitura-nao-corroborada`. A peça continua barrada; muda a mensagem, de
+   "peça defeituosa" para "não posso afirmar, confira a foto".
+
+**A placa segue sendo acusada**: é texto IMPRESSO, lê a 99,9% e não passa por
+nenhuma das duas regras — o critério 2 do SPEC (o único campo divergente é a
+série da placa) continua valendo, e está fixado em teste.
+
+O que ainda NÃO foi medido: o efeito dos recortes contra o Textract real
+dentro da API (esta rodada verificou o mecanismo com dublê do serviço e imagem
+real, mais o cenário-âncora ponta a ponta pelo endpoint de leituras
+digitadas). A medição com AWS é a próxima passada com as fotos da peça.
 
 ## Bedrock reavaliado (2026-07-25): reprovado para leitura numérica
 

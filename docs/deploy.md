@@ -94,6 +94,7 @@ configuração do App Runner. Diferenças em relação ao ambiente de dev:
 | `DATABASE_SSL_ENABLED` | `true` | RDS exige TLS (local, `false`) |
 | `FILE_DRIVER` | `s3` | evidências no bucket |
 | `EXTRACTOR_DRIVER` | `textract` | escolhido no spike T2.1; `mock` continua sendo o default do código |
+| `EXTRACAO_RECORTE` | ausente (= ligado) | `off` desliga a corroboração por recorte da série chumbada sem rebuild — botão de pânico se a lib nativa (`sharp`) se comportar mal no ar. Desligado, o adapter volta a 1 chamada por foto e a leitura em relevo deixa de poder acusar `divergente` (vira `nao_conferivel`) |
 | `ACCESS_KEY_ID` / `SECRET_ACCESS_KEY` | **ausentes** | credencial vem da instance role |
 | `NODE_ENV` | `production` | |
 
