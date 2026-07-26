@@ -26,33 +26,38 @@ const infrastructureDatabaseModule = TypeOrmModule.forRootAsync({
   },
 });
 
-import { TransformadorsModule } from './transformadors/transformadors.module';
+import { TransformadoresModule } from './transformadores/transformadores.module';
 
 import { CheckpointsModule } from './checkpoints/checkpoints.module';
 
-import { FotoEvidenciaModule } from './foto-evidencia/foto-evidencia.module';
+import { FotosEvidenciaModule } from './fotos-evidencia/fotos-evidencia.module';
 
-import { ConferenciaModule } from './conferencia/conferencia.module';
+import { ConferenciasModule } from './conferencias/conferencias.module';
 
-import { CampoConferidosModule } from './campo-conferidos/campo-conferidos.module';
+import { CamposConferidosModule } from './campos-conferidos/campos-conferidos.module';
 
-import { EventoPassagemsModule } from './evento-passagems/evento-passagems.module';
+import { PassagensModule } from './passagens/passagens.module';
 
-import { ProjetoModelosModule } from './projeto-modelos/projeto-modelos.module';
+import { ProjetosModeloModule } from './projetos-modelo/projetos-modelo.module';
 
 import { ExtracaoModule } from './extracao/extracao.module';
 
+// Temporário: página de demonstração servida em /demo (remover antes de prod).
+import { DemoModule } from './demo/demo.module';
+
 @Module({
   imports: [
+    DemoModule,
+
     ExtracaoModule,
 
-    ProjetoModelosModule,
-    EventoPassagemsModule,
-    CampoConferidosModule,
-    ConferenciaModule,
-    FotoEvidenciaModule,
+    ProjetosModeloModule,
+    PassagensModule,
+    CamposConferidosModule,
+    ConferenciasModule,
+    FotosEvidenciaModule,
     CheckpointsModule,
-    TransformadorsModule,
+    TransformadoresModule,
     ConfigModule.forRoot({
       isGlobal: true,
       load: [databaseConfig, authConfig, appConfig, mailConfig, fileConfig],

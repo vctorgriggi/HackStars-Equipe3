@@ -1,0 +1,34 @@
+# Imagem de produção (App Runner). Diferenças para o Dockerfile de dev:
+# - o `.env` do repo fica FORA da imagem: quem garante isso é o
+#   `.dockerignore` (o `rm -f .env` lá embaixo NÃO bastava — camada Docker é
+#   aditiva e o arquivo continuava recuperável da camada do `COPY .`).
+#   As variáveis reais vêm da configuração do serviço;
+# - CMD roda migration + seed idempotente + start:prod, sem wait-for-it de
+#   containers vizinhos (o banco é o RDS).
+FROM node:24.14.1-alpine
+
+RUN apk add --no-cache bash
+RUN npm i -g @nestjs/cli typescript ts-node
+
+COPY package*.json /tmp/app/
+RUN cd /tmp/app && npm install
+
+COPY . /usr/src/app
+RUN cp -a /tmp/app/node_modules /usr/src/app
+
+COPY ./startup.production.sh /opt/startup.production.sh
+RUN chmod +x /opt/startup.production.sh
+RUN sed -i 's/\r//g' /opt/startup.production.sh
+
+WORKDIR /usr/src/app
+# O build precisa de um .env presente (config do boilerplate lê no bootstrap);
+# o arquivo de exemplo entra só para o build e é sobrescrito em runtime pelas
+# variáveis do serviço — nenhum valor real de produção vive na imagem.
+RUN cp env-example-relational .env
+RUN npm run build
+# O .env de exemplo sai da imagem: se ficasse, qualquer ferramenta que o
+# carregue (env-cmd) sobrescreveria a configuração real do serviço.
+RUN rm -f .env
+
+EXPOSE 3001
+CMD ["/opt/startup.production.sh"]

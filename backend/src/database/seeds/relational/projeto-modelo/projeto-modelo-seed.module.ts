@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ProjetoModeloEntity } from '../../../../projeto-modelos/infrastructure/persistence/relational/entities/projeto-modelo.entity';
+import { ProjetoModeloEntity } from '../../../../projetos-modelo/infrastructure/persistence/relational/entities/projeto-modelo.entity';
 import { ProjetoModeloSeedService } from './projeto-modelo-seed.service';
 
 @Module({

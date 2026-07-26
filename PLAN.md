@@ -45,7 +45,9 @@ Depende de: nada.
   - Desvio: entidades criadas pelos generators do boilerplate (recipe em
     backend/CLAUDE.md); nomes de pasta ficaram como o gerador pluraliza
     (transformadors, campo-conferidos, evento-passagems) — não vale brigar
-    com o hygen. Mapa conceito → pasta real no CLAUDE.md raiz.
+    com o hygen. Mapa conceito → pasta real no CLAUDE.md raiz. (Pastas e rotas
+    renomeadas para o plural correto do português na rodada nomes-pt,
+    2026-07-25; EventoPassagem virou Passagem.)
   - Verificação: migration roda limpa em banco vazio; tabelas conforme SPEC
     (Entidades). Feito em 2026-07-25: 7 tabelas no Postgres (incl.
     projeto_modelo); GET /api/v1/checkpoints (com JWT do admin seed) devolve
@@ -69,7 +71,7 @@ Depende de: Fase 0 completa.
   - Testes (primeiro): payload real → campos esperados (série, patrimônio,
     pedido, seq, cliente); payload inválido → erro claro.
   - Feito em 2026-07-25 (agente Opus, TDD): parser em
-    `transformadors/qr/` com 26 testes — formatos JSON (com aliases),
+    `transformadores/qr/` com 26 testes — formatos JSON (com aliases),
     chave:valor (acentos normalizados) e código de lookup; fixture simulando a
     etiqueta real; erros tipados (`PayloadInvalidoError`).
   - Desvio: o QR físico ainda não foi decodificado — a decisão em aberto do
@@ -82,7 +84,7 @@ Depende de: Fase 0 completa.
     do veredito geral na precedência divergente > nao_conferivel > conforme;
     caso da peça de demo (847233 × 847833) acusando só a série da placa.
   - Feito em 2026-07-25 (agente Opus, TDD): `conferir()` pura em
-    `conferencia/engine/` com 39 testes, incluindo o teste-âncora. Regras
+    `conferencias/engine/` com 39 testes, incluindo o teste-âncora. Regras
     extras fixadas: valor igual com confiança baixa NUNCA vira conforme;
     opcional `nao_conferivel` não bloqueia o conforme geral; opcional sem
     valor esperado é omitido do resultado.
@@ -93,7 +95,7 @@ Depende de: Fase 0 completa.
 - [x] T1.3 — Endpoints de conferência com leituras mockadas · módulo: conformidade
   - Verificação: criar conferência via curl com leituras simuladas e receber
     vereditos campo a campo persistidos. Feito em 2026-07-25 (agente Opus +
-    verificação do orquestrador): `POST /api/v1/conferencia/executar` → 201
+    verificação do orquestrador): `POST /api/v1/conferencias/executar` → 201
     com veredito divergente só em serie-placa, 7 campos persistidos com
     veredito e confiança; POST repetido não duplica transformador; 422 para
     payload inválido/só-código/etapa inexistente.
@@ -103,8 +105,8 @@ Depende de: Fase 0 completa.
   - Desvios: checkpoint resolvido ANTES de qualquer escrita (etapa inválida
     não deixa transformador órfão); codigoProjeto do QR sem cadastro não é
     erro — cai para vínculo da peça → projeto único do banco; escrita de
-    veredito só por `CampoConferidosService.criarComVeredito` (server-side,
-    sem rota HTTP); `forwardRef` nos módulos conferencia ↔ campo-conferidos;
+    veredito só por `CamposConferidosService.criarComVeredito` (server-side,
+    sem rota HTTP); `forwardRef` nos módulos conferencias ↔ campos-conferidos;
     colunas NOT NULL recebem `''` quando o valor não existe (valorEsperado de
     campo sem esperado; cliente de etiqueta sem cliente) — sentinela a revisar
     se algum dia virar filtro de consulta.
@@ -114,28 +116,47 @@ Depende de: Fase 0 completa.
 Objetivo: fotos reais → campos com confiança e evidência.
 Depende de: Fase 1 completa.
 
-- [ ] T2.1 — Spike Textract vs Bedrock com as fotos reais · módulo: extracao
+- [x] T2.1 — Spike Textract vs Bedrock com as fotos reais · módulo: extracao
   - Verificação: tabela de acerto por fonte física (placa, serigrafia, série
     chumbada) para cada serviço; timebox de 2h. Incluir no timebox um prompt
     de check qualitativo de layout via Bedrock (marcações presentes e na
     disposição do projeto da demo) — decide se o Could de layout entra.
-  - Bloqueio externo (atualizado 2026-07-25): credenciais entraram e S3 +
-    Textract estão FUNCIONANDO (docs/aws.md, "Estado da conta"). Restam DOIS
-    itens: (1) formulário "Anthropic use case details" no console Bedrock —
-    sem ele todo invoke Claude falha; (2) fotos da peça em arquivo. O
-    executável do spike já existe: `npx ts-node -r tsconfig-paths/register
-    scripts/spike-extracao.ts <dir-fotos>`. Desvio autorizado: a Fase 3 pode
-    iniciar em modo mock (EXTRACTOR_DRIVER=mock) sem esperar este item.
+  - Bloqueio externo (histórico do dia, ENCERRADO na noite de 2026-07-25): o
+    Bedrock ficou o dia inteiro inacessível — cotas de inferência Claude
+    zeradas (4 pedidos PENDING no Service Quotas) e invoke negado —, enquanto
+    S3 e Textract já funcionavam; o spike seguiu com Textract e a Fase 3 foi
+    liberada a iniciar em modo mock (EXTRACTOR_DRIVER=mock). O bloqueio caiu
+    à noite (a conta liberou os modelos Amazon Nova), e o que a medição então
+    possível mostrou está no T2.1 abaixo: Bedrock REPROVADO para leitura
+    numérica. Executável: `npx ts-node -r tsconfig-paths/register
+    scripts/spike-extracao.ts <dir-fotos>`.
+  - Feito em 2026-07-25 com as fotos reais da peça (fotos-demo/): TEXTRACT
+    ESCOLHIDO — leu placa 847833 (99,8%), chumbado 847233 (99,9% de cima,
+    85,8% de lado), serigrafia 251328/energisa (97-99%) e a etiqueta (100%).
+    Medição e aprendizados em docs/visao-ocr.md.
+  - Desvio: a constraint 2 do SPEC (relevo derrubaria OCR clássico) NÃO se
+    confirmou — Bedrock deixou de ser pré-requisito.
+  - Reavaliação do Bedrock (2026-07-25, noite): com a conta destravada (só
+    modelos Amazon Nova; os Claude 3 estão bloqueados como "legacy" por
+    desuso), o Bedrock foi medido contra o mesmo gabarito e REPROVADO para
+    leitura numérica — o Nova Lite inventou o patrimônio como `847233`, que é
+    o número de série real da peça, onde o Textract devolveu null. Alucinação
+    plausível é falso OK, o bug mais caro do domínio; e LLM não devolve
+    confiança calibrada, que a regra de ouro exige por leitura. Não é mais
+    "reforço opcional para foto ruim": fica FORA do caminho de leitura, e
+    segue candidato só ao check qualitativo de layout (Could do SPEC), onde
+    não há concorrente OCR. O adapter permanece no código atrás da porta.
+    Medição em docs/visao-ocr.md.
   - Aceitação: escolha registrada como decisão resolvida aqui e no CLAUDE.md;
-    se render aprendizado caro (prompts, pré-processamento), vira
-    docs/visao-ocr.md.
+    aprendizado caro registrado em docs/visao-ocr.md.
 - [x] T2.2 — ExtractorPort e adapter do serviço escolhido · módulo: extracao
   - Testes (primeiro): consumidores da porta testados com mock; adapter real
     verificado manualmente com as fotos da demo.
   - Feito em 2026-07-25 (agente Opus): módulo `extracao/` com ExtractorPort,
     adapters textract/bedrock/mock e factory por env EXTRACTOR_DRIVER (mock
     default — sistema funcional sem AWS); 31 testes novos (96 no total).
-    Verificação com fotos reais fica no T2.1 (bloqueado externamente).
+    Verificação com fotos reais fica no T2.1 (bloqueado externamente quando
+    esta tarefa fechou; concluído no mesmo dia).
   - Desvios: os DOIS adapters foram implementados (a escolha do spike vira
     troca de env, não código novo); heurística do Textract extraída como
     função pura testável (`interpretarBlocos`); ambiguidade numérica (série ×
@@ -149,7 +170,7 @@ Depende de: Fase 1 completa.
     fornecer) e vínculo à foto; nenhuma chamada AWS fora do adapter.
 - [x] T2.3 — Upload de fotos e storage S3 · módulo: evidencias
   - Verificação: foto sobe pelo endpoint, URL (assinada) abre no navegador.
-    Feito em 2026-07-25 (agente Opus): POST /foto-evidencia/upload multipart
+    Feito em 2026-07-25 (agente Opus): POST /fotos-evidencia/upload multipart
     com fonteFisica validada por whitelist canônica (422 fora dela), url
     fetchável sem auth via rota de files do boilerplate, vínculo opcional a
     conferência validado; driver local ativo, S3 = troca de FILE_DRIVER.
@@ -162,6 +183,248 @@ Depende de: Fase 1 completa.
     literal de extracao/ports (satisfies quebra o build se divergir).
   - Aceitação: FotoEvidencia persistida e vinculável a CampoConferido; plano B
     registrado: storage em disco local se S3 atrasar a demo (constraint 1).
+
+- [x] T2.4 — Deploy da API na AWS (descoberta desta rodada) · módulo: backend
+  - Verificação: API pública respondendo com banco RDS e fotos no S3. Feito em
+    2026-07-25: ECR + App Runner + IAM roles; health 200, login, cenário-âncora
+    `divergente` só em serie-placa e upload com URL assinada — tudo pela URL
+    pública. Receita e as 4 armadilhas em docs/deploy.md.
+  - Motivo de existir: a Fase 3 precisa de HTTPS (câmera do navegador só abre
+    em origem segura); sem deploy, T3.1 não roda no celular.
+- [x] T2.5 — Página /demo servida pela API (descoberta desta rodada) · módulo: backend
+  - Verificação: abrir /demo no celular, escolher etapa, fotografar, disparar
+    conferência e ver veredito campo a campo. Feito em 2026-07-25 (agente
+    Opus): tela única sem dependência externa, presets com as confianças
+    medidas no spike, foto indo para o S3, veredito 100% vindo da API.
+  - Desvio: é ferramenta TEMPORÁRIA de inspeção, fora de `frontend/` — não
+    substitui a Fase 3; serve para validar a API sem esperar o app.
+  - Atualizada na rodada nomes-e-analise (2026-07-25): virou fluxo GUIADO
+    0→5 (entrar → etapa → etiqueta → fotos → extrair → veredito) com
+    contexto "em produção" por passo e o Textract como único caminho de
+    destaque; leituras digitadas viraram "modo avançado". Motivo: usuário
+    real se perdeu na bancada. `?etapa=` passou a ser respeitado.
+  - Reformulada na rodada atribuicao-de-marcacao (2026-07-26), a pedido do
+    time: assistente de UM passo por vez (concluídos colapsam em linha
+    clicável, futuros inertes), avanço automático onde não há ambiguidade,
+    etapa lembrada no aparelho (a URL vence a memória — cada celular simula
+    uma câmera fixa, então a etapa é praticamente constante), veredito como
+    protagonista abrindo com as DUAS perguntas do time (serigrafia × etiqueta;
+    séries irmãs), campos agrupados por resultado e 11 códigos de erro
+    traduzidos com o caminho de saída.
+  - Bug de conceito corrigido na mesma rodada, achado pelo usuário testando no
+    celular ("na primeira etapa ela pede foto da placa"): a página tratava
+    "checklist ainda não chegou" como ALVO e pedia as 9 vistas — ausência de
+    informação virando afirmação, o MESMO erro que o backend passou a rodada
+    corrigindo. Havia uma segunda metade: `carregarRecorte()` sem `await`
+    deixava a grade de etapas clicável com os dados em voo, então quem tocasse
+    rápido furava a proteção. Correção: máquina de estados explícita da
+    checklist, alvo vazio fora de `pronta`, e o login espera a busca. Falha na
+    busca NÃO bloqueia — o fallback permissivo continua, mas ANUNCIADO, nunca
+    disfarçado de instrução.
+- [x] T2.6 — Conferência parcial por etapa (descoberta desta rodada) · módulo: conformidade
+  - Feito em 2026-07-25 (agente Opus): itens da checklist ganharam `etapa`
+    (codigo do Checkpoint em que a marcação passa a existir);
+    `filtrarChecklistPorEtapa()` pura com semântica CUMULATIVA (o gate N
+    reconfere o que os anteriores gravaram — detecta troca de peça);
+    resposta expõe `etapaAvaliada` e `camposAvaliados`; recorte vazio → 422.
+    Resolve o gap 11 do CLAUDE.md; item sem `etapa` é sempre avaliado.
+- [x] T2.7 — Extração plugada no fluxo: POST /conferencias/executar-com-fotos (descoberta desta rodada) · módulo: conformidade (+ extracao, evidencias)
+  - Feito em 2026-07-25 (agente Opus + rodada de análise): fotos já enviadas
+    → bytes (S3/disco) → ExtractorPort → MESMO `executar()` — engine segue
+    única. Endurecido pela revisão: `prepararExecucao()` resolve QR, etapa,
+    projeto e recorte ANTES de pagar visão (422 barato) e antes de qualquer
+    escrita; recorte filtra as fotos enviadas (resumo com
+    `fotosForaDoRecorte`); evidência vinculada à conferência após o
+    veredito; leituras conflitantes da mesma fonte → `nao_conferivel`
+    (nunca escolha silenciosa). Antecipa o lado servidor da T3.2.
+  - Verificação no ar: cenário-âncora com foto real via Textract →
+    `divergente` só em serie-placa; 152 testes unitários.
+- [x] T2.8 — Achados livres: consistência cruzada contra o QR (descoberta desta rodada) · módulo: extracao (+ conformidade)
+  - Feito em 2026-07-25 (agente Opus): o Textract já devolvia TODO o texto de
+    cada foto e a heurística descartava o que não era alvo; agora o descarte
+    vira sinal com custo AWS ZERO (mesma resposta, nenhuma chamada a mais). A
+    porta passou a devolver `ResultadoExtracao { leituras, achadosLivres }` —
+    objeto explícito de propósito: adapter que "esquecer" os achados quebra a
+    compilação em vez de perder dado calado. `cruzarAchados()` é pura: molde =
+    comprimento dos identificadores DO PAYLOAD (nunca constante), candidato =
+    só dígitos nesse comprimento, alarme = candidato que não bate com NENHUM
+    valor do QR (pedido, seq e codigoProjeto contam como esperados).
+  - Verificação: na peça de demo o alarme acusa a placa `847833` por um
+    caminho independente da checklist; `/demo` desenha o bloco âmbar (nunca
+    vermelho — vermelho é do `divergente`) com foto de origem por ocorrência.
+  - Desvio: entrega um Could do SPEC dentro da Fase 2, porque o dado já estava
+    pago. Regra de ferro provada por teste: achado livre NUNCA altera veredito
+    de campo nem geral — consistência não enxerga ausência (peça com uma
+    marcação só é trivialmente consistente). Sem persistência nesta rodada; o
+    alerta persistente continua sendo a T4.3.
+- [x] T2.9 — Hardening da superfície pública (descoberta desta rodada) · módulo: backend (+ conformidade)
+  - Motivo: auditoria adversarial mostrou que o paliativo do gap 1 ("só existe
+    o admin seed") era FALSO — `POST /auth/email/register` gravava a conta
+    antes de mandar o e-mail, então sem SMTP a rota dava 500 com o usuário JÁ
+    criado e o login seguinte funcionava: qualquer anônimo emitia o próprio
+    JWT em duas requests.
+  - Feito em 2026-07-25 (agente Opus): registro público desativado;
+    POST/PATCH/DELETE de `projetos-modelo` fechados (a única escrita legítima
+    da rodada é o seed) e POST/DELETE de `campos-conferidos` idem. O PATCH de
+    `campos-conferidos` FICA, devolvendo 422 `campo-conferido-imutavel` — erro
+    explícito informa melhor que 404. Provado pelo mapa de rotas no boot.
+  - Aceitação: nenhum caminho HTTP autenticado produz `conforme` sem passar
+    pela engine. Com o JWT anônimo dava para editar a checklist do
+    ProjetoModelo até o cenário-âncora responder `conforme` — o falso OK
+    emitido pela nossa própria API.
+  - Desvio: o que não quebrava a demo nem produzia falso OK ficou aberto de
+    propósito (gap 16 do CLAUDE.md): a correção honesta é RolesGuard + soft
+    delete, trabalho de pós-demo. De carona na mesma rodada, o `.env` saiu da
+    imagem Docker (o `.dockerignore` não o excluía e a camada do `COPY .`
+    guardava as chaves AWS no ECR).
+- [x] T2.10 — Coerência entre campos irmãos (descoberta desta rodada) · módulo: conformidade
+  - Motivo: a série é gravada 3× no metal DE PROPÓSITO, mais uma vez na placa —
+    redundância física da fábrica que o sistema desperdiçava, julgando cada
+    posição isolada contra o QR. Medido: numa foto lateral o Textract leu
+    `847833` onde a peça diz `847233` (84,6%), enquanto as outras duas
+    posições leram `847233` a 98,8%. Com o limiar 0.9 o campo já saía
+    `nao_conferivel` ("foto ruim"), mas ninguém ficava sabendo que ele tinha
+    lido OUTRO NÚMERO — a diferença entre "tire a foto de novo" e "vá olhar
+    aquela posição".
+  - Feito em 2026-07-25 (agente Opus): `detectarIncoerencias()` pura em
+    `conferencias/engine/coerencia.ts`, derivada do resultado por campo (não
+    repete comparação, não entra no laço). O grupo de irmãos é descoberto por
+    VALOR ESPERADO idêntico, nunca por lista em código: modelo com 2 ou 4
+    chumbados funciona sem tocar código. A resposta ganhou `incoerencias`.
+  - Aceitação: incoerência REBAIXA e nunca promove — `divergente` continua
+    vencendo (defeito real da peça jamais vira "ruído de OCR") e o único
+    caminho que ela abre é `conforme` → `nao_conferivel`. Não há voto
+    majoritário: duas posições concordando NÃO aprovam a terceira.
+  - Desvio: junto entrou a guarda de troca de campo (`leitura-de-outro-campo`)
+    e o limiar medido 0.9, que fecharam a decisão em aberto mais antiga do
+    projeto (campo parcialmente legível). Ficaram fora da comparação entre
+    irmãos as leituras `conflitante` e `trocado` — não afirmam nada sobre a
+    posição, e usá-las produziria alarme não determinista.
+- [x] T2.11 — `fonteFisica` passa a ser a VISTA da peça (descoberta desta rodada) · módulo: extracao (+ evidencias, conformidade)
+  - Motivo (decisão do time, 2026-07-25): (1) é o que a câmera fixa enxerga em
+    produção — uma câmera vê *a lateral direita*, nunca "o chumbado 2" — e é
+    como o desenho técnico se organiza; (2) elimina a numeração arbitrária
+    `chumbado-1/2/3`, que obrigava o operador a decidir qual posição era a "1"
+    sem gabarito nenhum.
+  - Feito em 2026-07-25 (agente Opus): união literal `FonteFisica` passou a
+    `base | topo | frente | traseira | lateral-esquerda | lateral-direita |
+    placa | etiqueta | geral` (as 6 primeiras são orientações; `placa` e
+    `etiqueta` continuam porque ZOOM é eixo separado de orientação — são
+    closes com captura própria). Nomes de campo distinguem a posição pela
+    vista (`serie-chumbada-topo`, `patrimonio-serigrafia-frente`), e o seed
+    ganhou o mapa medido nas fotos reais.
+  - Aceitação: `ORIGENS_DO_ESPERADO` casa por PREFIXO e não precisou mudar;
+    `fotos-evidencia` continua derivando a whitelist com `satisfies`; nenhuma
+    migration (a coluna é varchar — o valor é dado, não enum de schema).
+  - Desvio deliberado: uma vista declara MAIS DE UM alvo (o topo tem série
+    chumbada e patrimônio serigrafado), então a foto com um número legível só
+    deixa de casar 1-para-1 e sai `nao_conferivel`. É a correção estrutural do
+    bug medido da tampa (o patrimônio em tinta era lido como a série chumbada):
+    a ambiguidade fica explícita em vez de virar um `divergente` falso. Fixado
+    em `textract.extractor.spec.ts` ("vista com duas marcações").
+  - Desvio 2: o desdobramento do patrimônio serigrafado em DUAS vistas (topo e
+    frente) entrou no seed — é o que o desenho pede (docs/visao-ocr.md), e a
+    checklist antiga tinha um item só; "faltou o patrimônio de uma face" era
+    não conformidade real passando despercebida. Nenhum item em `base`: a
+    vista existe no vocabulário, mas sem foto dela um obrigatório ali tornaria
+    o critério 3 do SPEC inalcançável.
+- [x] T2.12 — Consenso de recortes + "antes de acusar, confirme" (descoberta desta rodada) · módulo: extracao (+ conformidade)
+  - Motivo (spike de medição, 2026-07-25): na série CHUMBADA a confiança do
+    Textract mede ENQUADRAMENTO, não correção. Mesma foto e mesmo valor
+    correto, só mudando a margem do recorte: confiança de 37,3% a 95,5% (58
+    pontos). E `847233 @ 84,3%` (certo) contra `847833 @ 84,6%` (errado) —
+    0,3 ponto separando verdades opostas. **Nenhum limiar corta essa faixa**,
+    então o 0.9 da T2.10 não bastava.
+  - Reprovado pelo mesmo spike, não repetir: consenso entre MOTORES diferentes
+    (os LLMs do Bedrock erram com certeza alta), AMPLIAR o recorte (upscale 4×
+    quebrou foto que lia a 99%) e pré-processamento de pixel (grayscale puro
+    virou `8` em `9`).
+  - Feito em 2026-07-25 (agente Opus): (1) o adapter Textract relê cada leitura
+    em relevo em DOIS recortes do buffer original (margens 50% e 150%,
+    resolução nativa, sem filtro, ancorados no próprio bounding box) e só
+    aceita o valor se os três textos coincidirem — confiança final = a MENOR
+    das três; recorte que lê outro número ANULA a leitura, recorte que não lê
+    nada só deixa de corroborar. (2) `engine/corroboracao.ts` recusa emitir
+    `divergente` para marcação em relevo sem corroboração ou com irmã
+    discordante: vira `nao_conferivel` (`leitura-nao-corroborada`).
+  - Aceitação: cenário-âncora intacto — a placa é IMPRESSA, não passa pela
+    regra e segue `divergente` sozinha (critério 2 do SPEC), verificado por
+    teste e ponta a ponta pelo endpoint. Teto de visão por foto virou 3 fixo
+    (USD 0,0225/conferência); `sharp` entra como dependência OPCIONAL em
+    runtime (build do container verificado em arm64 e amd64) e
+    `EXTRACAO_RECORTE=off` degrada sem deploy.
+  - Desvio: a regra é o PRIMEIRO caso em que um `divergente` vira
+    `nao_conferivel` — mudança de política aprovada. A peça continua barrada
+    (obrigatório `nao_conferivel` bloqueia igual); muda a mensagem, de "peça
+    defeituosa" para "não posso afirmar, confira a foto". Limitações
+    registradas nos gaps 19–21 do CLAUDE.md.
+- [x] T2.13 — Discriminar tinta de relevo pelo contraste (descoberta desta rodada) · módulo: extracao
+  - ACHADO QUE REORIENTOU A SOLUÇÃO (2026-07-26): o `847833 @ 84,6%` da foto
+    lateral — que a T2.12 tratava como "erro de dígito no relevo" e que
+    sustentava a tese de que nenhum limiar corta a faixa dos 84% — NÃO era erro
+    de leitura. Era o Textract lendo a PLACA, que aparece no canto daquela
+    foto, com toda a competência dele. Errou a ATRIBUIÇÃO, não o
+    reconhecimento. Isso explica em retrospecto por que as 17 variantes de
+    realce (T2.12) e o consenso entre motores falharam: nenhum ataca "qual
+    marcação é qual".
+  - Feito em 2026-07-26 (agente Opus, ideia do time): `adapters/contraste.ts`
+    recorta o bounding box que o Textract já devolve e compara com um anel em
+    volta — tinta serigrafada é escura contra o tanque, relevo tem a cor do
+    fundo, placa é claro sobre escuro (terceira classe, que existe para
+    EXCLUIR). Margens medidas em 7 fotos reais: escuridão relevo ≤0,114 ×
+    tinta ≥0,502 (4,4×); claridade relevo ≤0,122 × claro ≥0,290 (2,4×);
+    textura de região chapada 1,3 × relevo ≥11,3 (8,7×). Limiares no meio dos
+    vazios, com faixa morta: quem cai nela é `indeterminado`, e indeterminado
+    não resolve campo nenhum. Calibração reexecutável em
+    `scripts/spike-contraste.ts`.
+  - Invariante (custou 5 testes vermelhos até ficar certo): AUSÊNCIA de
+    evidência (indeterminado, sem `sharp`, flag off, região lisa) cai na regra
+    anterior INTACTA; só EVIDÊNCIA CONTRÁRIA anula leitura. A discriminação
+    existe para resolver ambiguidade que se perdia, nunca para introduzir
+    perda nova.
+  - Aceitação: os 3 irmãos e os 2 patrimônios voltaram a ler com atribuição
+    correta (topo 98,4%, lateral 58,3%, traseira 97,7%, patrimônio-topo
+    98,5%); cenário-âncora intacto (`serie-placa` 847833 @ 99,9%). Cobre parte
+    do gap 21 — medido contra o Textract real.
+  - Desvio: achado colateral, bug que sabotava em silêncio —
+    `sharp(buf,{autoOrient:true}).metadata()` devolve dimensões CRUAS, então
+    em foto com rotação EXIF o recorte era calculado num referencial e
+    aplicado noutro, cortando região vazia. O Textract respeita EXIF; nossa
+    conta não respeitava.
+- [x] T2.14 — Swagger documenta as RESPOSTAS (descoberta desta rodada) · módulo: backend
+  - Motivo: os 6 endpoints que o front vai consumir tinham schema de resposta
+    VAZIO. O NestJS só documenta CLASSES, e os endpoints desta rodada
+    devolviam interfaces TypeScript, que somem na compilação — o front
+    receberia rotas e corpos de requisição, mas teria de ADIVINHAR o formato
+    das respostas, inclusive `incoerencias`, `achadosInconsistentes` e
+    `extracao`.
+  - Feito em 2026-07-26 (agente Opus): interfaces viraram classes no lugar,
+    re-exportadas dos arquivos originais (nenhum import quebrou). Duas
+    exceções deliberadas: `IncoerenciaEntreCampos` e `LeituraDoGrupo` vivem na
+    engine, que é pura e não importa framework — as classes de resposta
+    correspondentes têm a equivalência checada pelo COMPILADOR nos dois
+    sentidos (campo a mais ou a menos de qualquer lado quebra o build).
+  - Aceitação: a REGRA DE NEGÓCIO documentada onde ela vive, não só o tipo —
+    precedência do veredito, a união completa de `motivo` com uma linha
+    operacional por valor, `incoerencias` rebaixa e nunca promove e não é
+    persistida, `etapaAvaliada` significa conferência PARCIAL, e a URL da
+    evidência expira em 1h. Exemplos com os valores reais da peça.
+- [x] T2.15 — Releitura do veredito: `GET /conferencias/:id/campos` (descoberta desta rodada) · módulo: conformidade
+  - Motivo: o veredito campo a campo só existia na resposta do POST.
+    `GET /conferencias/:id` devolvia apenas cabeçalho, e os campos só saíam da
+    paginação global de `campos-conferidos`. Um app com navegação (fotos numa
+    tela, veredito noutra) ou um simples refresh não conseguia remontar a tela
+    — e o critério 1 do SPEC exige a foto-evidência por valor lido.
+  - Feito em 2026-07-26 (agente Opus): projeção própria em
+    `conferencias/consultas/`, com `fotoEvidencia {id, url, fonteFisica}` de
+    URL pronta; peça inexistente → 404 `conferencia-inexistente`; sem
+    paginação de propósito (paginar veredito esconderia campo divergente na
+    segunda página).
+  - Desvio: `@TransformUrlEvidencia` só dispara sobre INSTÂNCIA de classe —
+    objeto literal devolveria a key crua do bucket, ou seja, funcionaria local
+    e falharia sob S3, exatamente no ambiente da demo. Por isso a projeção da
+    foto é classe, com teste que serializa e afirma a URL pronta. O que se
+    perde na releitura está no gap 22.
 
 ## Fase 3 — Fluxo de conferência ponta a ponta
 
@@ -189,22 +452,57 @@ Depende de: Fase 2 completa.
 ## Fase 4 — Rastreabilidade de trânsito e alerta
 
 Objetivo: critérios de aceitação 5 e 6 do SPEC passando.
-Depende de: Fase 3 completa.
+Depende de: Fase 3 completa — **e a dependência foi quebrada de propósito**
+(2026-07-25). O BACKEND desta fase (T4.1–T4.3) entrou ANTES da Fase 3, contra
+a convenção deste plano, porque a Fase 3 estava bloqueada por ele: o
+`POST /passagens` gerado exige dois UUIDs (checkpoint e transformador) que um
+front que só lê QR não conhece, e não havia como resolver `numeroSerie` →
+peça. Sem esses endpoints, os critérios 5 e 6 eram impossíveis de implementar
+na UI. A UI da fase (T4.4–T4.6) continua depois da Fase 3, na ordem original.
 
-- [ ] T4.1 — EventoPassagem via scan de QR no checkpoint · módulo: transito (+ frontend)
-  - Verificação manual: selecionar checkpoint, ler QR, evento criado com
-    timestamp.
-  - Aceitação: scans repetidos no mesmo checkpoint não corrompem o histórico
-    (eventos distintos, ordenados).
-- [ ] T4.2 — Tela de histórico da peça · módulo: frontend
-  - Verificação manual: critério 5 do SPEC executado ponta a ponta.
-  - Aceitação: histórico em ordem cronológica com nome do checkpoint e hora.
-- [ ] T4.3 — Alerta de divergência · módulo: conformidade (+ frontend)
+- [x] T4.1 — Passagem via scan de QR: endpoint · módulo: transito
+  - Feito em 2026-07-25 (agente Opus): `POST /passagens/registrar`
+    `{payloadQr, etapaCodigo, observacao?}` resolve a peça pelo QR
+    (find-or-create por `numeroSerie`, o QR é a fonte da verdade), grava a
+    passagem e devolve `ultimaConferencia` junto — o scan já traz o que o
+    alerta do critério 6 precisa, sem segunda chamada.
+  - Verificação: smoke local com scan repetido (passagens distintas e
+    ordenadas), etapa desconhecida → 422 antes de qualquer escrita, peça
+    inexistente → 404 (diferente de lista vazia).
+  - Desvio: a identidade da peça passou a ter UM dono
+    (`TransformadoresService.lerPayloadDoQr` e `.buscarOuCriarPorPayload`); a
+    cópia privada que vivia na execução de conferência foi apagada, porque
+    duas cópias divergentes já tinham causado achado nesta rodada.
+- [x] T4.2 — Histórico da peça: endpoints de consulta · módulo: transito (+ transformadores)
+  - Feito em 2026-07-25 (agente Opus): `GET /transformadores/:id/passagens`
+    (ASC, critério 5), `GET /transformadores/:id/conferencias?limit=` (DESC —
+    a primeira é o veredito vigente) e `GET /transformadores?numeroSerie=&pedido=`.
+    Os três recortam o payload em vez de devolver o eager do gerador.
+  - Aceitação: fecham parte do gap 4 do CLAUDE.md (listagens sem filtro por
+    relação). `checkpoint` viaja junto do veredito de propósito — gap 14:
+    `conforme` de gate parcial não atesta a peça inteira.
+- [x] T4.3 — Alerta de divergência: dado do alerta na API · módulo: conformidade
   - Desvio: promovido da Fase 5 — alerta virou Should porque divergência para
     a produção até correção (2026-07-25).
+  - Feito em 2026-07-25: o scan (`/passagens/registrar`) devolve
+    `ultimaConferencia` e o histórico devolve as conferências da peça com
+    veredito e etapa; o front tem o dado do alerta sem recalcular nada.
+  - Falta (T4.6): a UI que torna isso inconfundível. Persistir a COBERTURA da
+    conferência (gap 14) continua em aberto — hoje o alerta lê veredito e
+    etapa e o consumidor decide.
+- [ ] T4.4 — Tela de scan de passagem no checkpoint · módulo: frontend
+  - Verificação manual: selecionar checkpoint, ler QR, passagem criada com
+    timestamp.
+  - Aceitação: scans repetidos no mesmo checkpoint não corrompem o histórico
+    (passagens distintas, ordenadas).
+- [ ] T4.5 — Tela de histórico da peça · módulo: frontend
+  - Verificação manual: critério 5 do SPEC executado ponta a ponta.
+  - Aceitação: histórico em ordem cronológica com nome do checkpoint e hora.
+- [ ] T4.6 — Alerta de divergência na UI · módulo: frontend
   - Verificação manual: critério 6 do SPEC executado ponta a ponta.
   - Aceitação: alerta inconfundível fora da tela de veredito e no scan em
-    checkpoint de peça divergente.
+    checkpoint de peça divergente; o front exibe o veredito que a API gravou,
+    nunca um recalculado.
 
 ## Fase 5 (opcional) — Dashboard e indicadores
 
@@ -226,12 +524,18 @@ Depende de: Fase 3 completa (adapter Bedrock existente); pode ser pulada;
 concorre com a Fase 5 pelo tempo restante — priorizar a que render mais na
 demo.
 
-- [ ] T6.1 — Upload do PDF e extração da checklist via Bedrock · módulo: extracao (+ projeto-modelos)
+- [ ] T6.1 — Upload do PDF e extração da checklist via Bedrock · módulo: extracao (+ projetos-modelo)
   - Verificação manual: subir o EPT-163-PI-676 e comparar a checklist extraída
     com a seedada na Fase 0 (gabarito conhecido).
   - Aceitação: proposta de checklist com campo, fonte física e obrigatoriedade;
     nunca cria ProjetoModelo direto — sempre passa pela revisão (T6.2).
-- [ ] T6.2 — Tela de revisão e aprovação da checklist · módulo: frontend (+ projeto-modelos)
+  - Nota (rodada de análise, 2026-07-25): o PDF é só o projeto de SERIGRAFIA —
+    placa e chumbados não nascem dele. A proposta deve vir pré-populada com o
+    esqueleto padrão (serie-chumbada-topo/-lateral-direita/-traseira,
+    serie-placa, patrimonio-placa) e o PDF contribui os itens de serigrafia;
+    em quais VISTAS cada marcação está é decisão em aberto no SPEC (o mapa do
+    seed foi medido nas fotos, não lido do desenho).
+- [ ] T6.2 — Tela de revisão e aprovação da checklist · módulo: frontend (+ projetos-modelo)
   - Verificação manual: editar um item extraído errado e aprovar; ProjetoModelo
     criado reflete a edição.
   - Aceitação: aprovação é por modelo (uma vez), não por peça — checklist
@@ -239,25 +543,50 @@ demo.
 
 ## Riscos e dependências
 
-- **Série chumbada ilegível para OCR** (SPEC, constraint 2) → T2.1 decide o
-  serviço; plano B: Bedrock com modelo de visão; plano C: campo
-  `nao_conferivel` com foto para conferência humana — a demo continua válida
-  pelo critério 4.
+- **Série chumbada ilegível para OCR** (SPEC, constraint 2) → o risco na forma
+  prevista (ilegibilidade) se dissolveu em 2026-07-25: o Textract leu o relevo a
+  99,9% (topo) e 96,7% (diagonal). Voltou em forma pior no mesmo dia (a
+  confiança no relevo mede ENQUADRAMENTO, não correção: 37,3%–95,5% para o
+  mesmo valor certo), e em 2026-07-26 **mudou de natureza**: o caso que
+  sustentava "certo a 84,3% × errado a 84,6%" era ATRIBUIÇÃO errada, não
+  leitura errada — o Textract lia a placa que aparece no canto da foto lateral
+  e a heurística entregava o número ao campo do chumbado (T2.13). Mitigação
+  atual, em camadas: discriminação por contraste resolve a atribuição; consenso
+  de recortes recupera confiança; a recusa de acusar sem corroboração (T2.12)
+  cobre o resto. O plano C (`nao_conferivel` com foto) segue valendo para foto
+  ruim — medido: um chumbado saiu a 35,4% e a engine o barrou corretamente.
+- **Confiança de OCR não é calibrada para relevo** (risco novo, medido em
+  2026-07-26) → nenhum limiar separa a faixa dos 84%, e 17 variantes de realce
+  de imagem foram medidas e REPROVADAS (25,9% das leituras tratadas saíram
+  erradas ou sumiram; uma produziu valor errado a 83,6%). A alavanca que sobrou
+  não é software: ~60 pontos de confiança separam a melhor da pior direção de
+  luz na MESMA foto, e a direção ótima muda por foto. Vira requisito de
+  hardware para os gates (SPEC, câmeras fixas), não tarefa de código.
 - **Prazo de 2 dias** (SPEC, constraint 1) → Fase 5 opcional; T2.3 com fallback
   de disco local; corte na ordem Could → Should, nunca no Must.
 - **Payload do QR desconhecido** (SPEC, constraint 5) → T1.1 na frente de tudo
   que depende dele; plano B: digitação manual dos valores esperados.
 - **Créditos AWS** (SPEC, constraint 4) → visão só sob disparo explícito
-  (T3.2); spike com timebox (T2.1).
+  (T3.2, e no servidor uma chamada por foto com teto de 10); spike com timebox
+  (T2.1). O bloqueio de cotas do Bedrock que assombrou o dia CAIU na noite de
+  2026-07-25, e deixou de ser risco por outro motivo: medido, o Bedrock foi
+  REPROVADO para leitura numérica (docs/visao-ocr.md) e a demo não depende
+  dele. O custo real medido é irrisório — 15 chamadas Textract ≈ USD 0,023.
 
 ## Decisões em aberto
 
-- [ ] **Política para campo parcialmente legível** — rejeitar sempre ou
-      similaridade ≥ N% com revisão humana; afeta T1.2.
+- [x] **Política para campo parcialmente legível** — resolvido: rejeitar
+      sempre (limiar 0.9, medido com a peça real na T2.1/rodada
+      nomes-e-analise); similaridade aproximada fica fora — em série de
+      transformador, "quase igual" é divergente (2026-07-25).
 - [ ] **Formato do payload do QR** — campos embutidos ou código de lookup;
       afeta T1.1 e T3.1.
-- [ ] **Textract vs Bedrock para extração** — resolver em T2.1 com as fotos
-      reais; afeta T2.2.
+- [x] **Textract vs Bedrock para extração** — resolvido: TEXTRACT, medido com
+      as fotos reais (docs/visao-ocr.md); leu inclusive o relevo chumbado, que
+      era o risco. Reavaliado na noite de 2026-07-25, com a conta destravada:
+      o Bedrock foi reprovado para leitura numérica POR MEDIÇÃO (alucinou
+      número plausível onde o Textract devolveu null, e não dá confiança
+      calibrada); segue candidato só ao check qualitativo de layout.
 - [x] **Framework do front** — resolvido: Next.js 16, scaffold já subido pelo
       time venceu o Angular combinado; T0.2 virou verificação e o módulo `web`
       passou a `frontend` (2026-07-25).
@@ -269,4 +598,4 @@ demo.
       checklist do banco desde a T1.2; ingestão automática do PDF virou Fase 6
       opcional (2026-07-25).
 
-<!-- rodada: nucleo @ 3472869 -->
+<!-- rodada: atribuicao-de-marcacao @ 2827fc1 -->

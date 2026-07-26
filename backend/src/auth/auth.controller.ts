@@ -19,7 +19,6 @@ import { AuthConfirmEmailDto } from './dto/auth-confirm-email.dto';
 import { AuthResetPasswordDto } from './dto/auth-reset-password.dto';
 import { AuthUpdateDto } from './dto/auth-update.dto';
 import { AuthGuard } from '@nestjs/passport';
-import { AuthRegisterLoginDto } from './dto/auth-register-login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { NullableType } from '../utils/types/nullable.type';
 import { User } from '../users/domain/user';
@@ -45,11 +44,23 @@ export class AuthController {
     return this.service.validateLogin(loginDto);
   }
 
-  @Post('email/register')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async register(@Body() createUserDto: AuthRegisterLoginDto): Promise<void> {
-    return this.service.register(createUserDto);
-  }
+  // REGISTRO PÚBLICO DESATIVADO (auditoria de superfície, 2026-07-25).
+  // O boilerplate criava a conta ANTES de mandar o e-mail; como o SMTP da
+  // demo não existe, a rota devolvia 500 com o usuário já gravado — e o
+  // login seguinte funcionava (JwtStrategy valida só o payload, nunca o
+  // status). Resultado: qualquer visitante anônimo emitia o próprio JWT em
+  // duas requests e, com ele, editava a checklist do ProjetoModelo até o
+  // cenário-âncora responder `conforme`. O gap 1 do CLAUDE.md (CRUD sem
+  // RolesGuard) só é aceitável porque as credenciais são controladas —
+  // esta rota era o furo que anulava esse paliativo.
+  // Reativar exige: confirmação de e-mail funcionando, papel padrão sem
+  // acesso ao domínio e RolesGuard nos CRUDs.
+  //
+  // @Post('email/register')
+  // @HttpCode(HttpStatus.NO_CONTENT)
+  // async register(@Body() createUserDto: AuthRegisterLoginDto): Promise<void> {
+  //   return this.service.register(createUserDto);
+  // }
 
   @Post('email/confirm')
   @HttpCode(HttpStatus.NO_CONTENT)

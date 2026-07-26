@@ -4,16 +4,21 @@
  * Uso:
  *   npx ts-node -r tsconfig-paths/register scripts/spike-extracao.ts <dir-fotos> [textract|bedrock|ambos]
  *
- * As fotos sao lidas pelo NOME, que precisa ser a fonte fisica:
- *   placa.jpg  serigrafia.jpg  chumbado-1.jpg  chumbado-2.jpg
- *   chumbado-3.jpg  geral.jpg           (aceita .jpg, .jpeg e .png)
+ * As fotos sao lidas pelo NOME, que precisa ser a fonte fisica — hoje a VISTA
+ * da peca (ver `FonteFisica` em src/extracao/ports/extractor.port.ts):
+ *   topo.jpg  frente.jpg  traseira.jpg  lateral-esquerda.jpg
+ *   lateral-direita.jpg  base.jpg  placa.jpg  etiqueta.jpg  geral.jpg
+ *                                        (aceita .jpg, .jpeg e .png)
  *
  * Roda os adapters DIRETO (sem Nest, sem banco), imprime a tabela comparativa
  * adapter x campo x valorLido x confianca x tempo e fecha com o acerto de cada
  * adapter contra os valores conhecidos da peca de demo.
  *
  * Cada foto vira UMA chamada por adapter — sem retry, sem laco (constraint 4
- * do SPEC). Custo estimado de uma rodada completa esta em docs/aws.md.
+ * do SPEC) —, mais ate DUAS releituras de recorte quando a vista tem marcacao
+ * em relevo (corroboracao da serie chumbada; teto fixo de 3 por foto).
+ * `EXTRACAO_RECORTE=off` roda o spike no comportamento antigo, com 1 chamada.
+ * Custo estimado de uma rodada completa esta em docs/aws.md.
  */
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -37,14 +42,15 @@ carregarDotenv();
 
 /** Checklist da peca de demo (mesma do seed do ProjetoModelo EPT-163-PI-676). */
 const CHECKLIST: { campo: string; fonteFisica: string }[] = [
-  { campo: 'serie-chumbada-1', fonteFisica: 'chumbado-1' },
-  { campo: 'serie-chumbada-2', fonteFisica: 'chumbado-2' },
-  { campo: 'serie-chumbada-3', fonteFisica: 'chumbado-3' },
+  { campo: 'serie-chumbada-topo', fonteFisica: 'topo' },
+  { campo: 'serie-chumbada-lateral-direita', fonteFisica: 'lateral-direita' },
+  { campo: 'serie-chumbada-traseira', fonteFisica: 'traseira' },
+  { campo: 'patrimonio-serigrafia-topo', fonteFisica: 'topo' },
+  { campo: 'patrimonio-serigrafia-frente', fonteFisica: 'frente' },
+  { campo: 'cliente-serigrafia-frente', fonteFisica: 'frente' },
+  { campo: 'potencia-serigrafia-frente', fonteFisica: 'frente' },
   { campo: 'serie-placa', fonteFisica: 'placa' },
   { campo: 'patrimonio-placa', fonteFisica: 'placa' },
-  { campo: 'patrimonio-serigrafia', fonteFisica: 'serigrafia' },
-  { campo: 'cliente-serigrafia', fonteFisica: 'serigrafia' },
-  { campo: 'potencia-serigrafia', fonteFisica: 'serigrafia' },
 ];
 
 /**
@@ -55,18 +61,19 @@ const CHECKLIST: { campo: string; fonteFisica: string }[] = [
  *   codigo ('143091 - Energisa Rondonia'); aqui a pergunta e "o adapter leu o
  *   cliente?", nao "o valor bate exatamente" — comparacao estrita e da engine.
  *
- * `potencia-serigrafia` fica fora: a potencia nao vem do QR, entao nao ha
- * valor esperado para conferir nesta rodada (ver ORIGENS_DO_ESPERADO em
+ * `potencia-serigrafia-frente` fica fora: a potencia nao vem do QR, entao nao
+ * ha valor esperado para conferir nesta rodada (ver ORIGENS_DO_ESPERADO em
  * conferencia-execucao.service.ts).
  */
 const ESPERADOS: Record<string, { valor: string; modo: 'exato' | 'contem' }> = {
-  'serie-chumbada-1': { valor: '847233', modo: 'exato' },
-  'serie-chumbada-2': { valor: '847233', modo: 'exato' },
-  'serie-chumbada-3': { valor: '847233', modo: 'exato' },
+  'serie-chumbada-topo': { valor: '847233', modo: 'exato' },
+  'serie-chumbada-lateral-direita': { valor: '847233', modo: 'exato' },
+  'serie-chumbada-traseira': { valor: '847233', modo: 'exato' },
+  'patrimonio-serigrafia-topo': { valor: '251328', modo: 'exato' },
+  'patrimonio-serigrafia-frente': { valor: '251328', modo: 'exato' },
+  'cliente-serigrafia-frente': { valor: 'Energisa', modo: 'contem' },
   'serie-placa': { valor: '847233', modo: 'exato' },
   'patrimonio-placa': { valor: '251328', modo: 'exato' },
-  'patrimonio-serigrafia': { valor: '251328', modo: 'exato' },
-  'cliente-serigrafia': { valor: 'Energisa', modo: 'contem' },
 };
 
 const EXTENSOES: { sufixo: string; mimeType: string }[] = [
@@ -223,7 +230,10 @@ async function rodarAdapter(
     let leituras: LeituraExtraida[];
 
     try {
-      leituras = await extractor.extrair(foto, alvos);
+      // `achadosLivres` do retorno nao entra na tabela do spike de proposito:
+      // o que o spike mede e acerto por campo alvo. Os achados alimentam o
+      // alarme de consistencia, verificavel pelo endpoint.
+      ({ leituras } = await extractor.extrair(foto, alvos));
     } catch (erro) {
       const tempoMs = String(Date.now() - inicio);
       const motivo = erro instanceof Error ? erro.message : String(erro);

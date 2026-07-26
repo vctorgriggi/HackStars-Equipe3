@@ -1,8 +1,9 @@
 import {
+  AchadoLivre,
   CampoAlvo,
   ExtractorPort,
   FonteImagem,
-  LeituraExtraida,
+  ResultadoExtracao,
 } from '../ports/extractor.port';
 
 /**
@@ -16,7 +17,10 @@ import {
  * mesma leitura.
  */
 
-/** Confianca fixa das leituras do mock (acima do limiar padrao de 0.8). */
+/**
+ * Confianca fixa das leituras do mock — acima do limiar padrao do endpoint
+ * (`LIMIAR_CONFIANCA_PADRAO = 0.9`, em conferencia-execucao.service.ts).
+ */
 export const CONFIANCA_MOCK = 0.99;
 
 /**
@@ -29,14 +33,21 @@ export const CONFIANCA_MOCK = 0.99;
  * (tudo conforme, peca ilegivel), passe o mapa desejado no construtor.
  */
 export const LEITURAS_DEMO: Record<string, string | null> = {
-  'serie-chumbada-1': '847233',
-  'serie-chumbada-2': '847233',
-  'serie-chumbada-3': '847233',
+  // Chaves = os `campo` da checklist seedada (vistas da peca, nao numeracao de
+  // posicao). Uma vista com duas marcacoes (o topo tem serie chumbada E
+  // patrimonio serigrafado) rende DUAS entradas aqui: o mock responde por
+  // campo, entao ele nunca reproduz sozinho a ambiguidade que o Textract vive
+  // — quem fixa esse comportamento e textract.extractor.spec.ts.
+  'serie-chumbada-topo': '847233',
+  'serie-chumbada-lateral-direita': '847233',
+  'serie-chumbada-traseira': '847233',
+  'patrimonio-serigrafia-topo': '251328',
+  'patrimonio-serigrafia-frente': '251328',
+  'cliente-serigrafia-frente':
+    '143091 - Energisa Rondônia Distribuidora de Energia S.A',
+  'potencia-serigrafia-frente': '10 kVA',
   'serie-placa': '847833',
   'patrimonio-placa': '251328',
-  'patrimonio-serigrafia': '251328',
-  'cliente-serigrafia': '143091 - Energisa Rondonia',
-  'potencia-serigrafia': '10 kVA',
 };
 
 export class MockExtractor extends ExtractorPort {
@@ -47,6 +58,11 @@ export class MockExtractor extends ExtractorPort {
    * sai com `valorLido: null` e `confianca: null` — o mesmo formato de uma
    * leitura que falhou de verdade.
    * @param confianca confianca aplicada a toda leitura com valor.
+   * @param textosExtras textos que o mock devolve como achado livre — a UNICA
+   * fonte de `achadosLivres` aqui, como no Textract, onde achado livre e o que
+   * sobrou depois de os alvos consumirem suas linhas. E assim que um teste
+   * simula "a foto tem um numero que ninguem esperava". Vazio por default: em
+   * modo demo o mock nao inventa alarme.
    */
   constructor(
     private readonly valoresPorCampo: Record<
@@ -54,11 +70,12 @@ export class MockExtractor extends ExtractorPort {
       string | null
     > = LEITURAS_DEMO,
     private readonly confianca: number = CONFIANCA_MOCK,
+    private readonly textosExtras: string[] = [],
   ) {
     super();
   }
 
-  extrair(fonte: FonteImagem, alvos: CampoAlvo[]): Promise<LeituraExtraida[]> {
+  extrair(fonte: FonteImagem, alvos: CampoAlvo[]): Promise<ResultadoExtracao> {
     const leituras = alvos.map((alvo) => {
       const valorLido = this.valoresPorCampo[alvo.campo] ?? null;
 
@@ -71,6 +88,20 @@ export class MockExtractor extends ExtractorPort {
       };
     });
 
-    return Promise.resolve(leituras);
+    // Achado livre e o que a visao leu e NAO virou leitura de campo — no
+    // Textract, `achadosDasLinhas` remove justamente as linhas consumidas pelos
+    // alvos. Por isso aqui so saem os `textosExtras`: ecoar tambem os valores
+    // dos campos (como este mock fazia) invertia o comportamento do adapter
+    // real e sustentava teste verde que a producao nao reproduz — com
+    // EXTRACTOR_DRIVER=textract o 847833 da placa e consumido como
+    // `serie-placa` e nunca chega ao cruzamento (achado A4 da revisao).
+    const achadosLivres: AchadoLivre[] = this.textosExtras.map((texto) => ({
+      texto,
+      confianca: this.confianca,
+      regiaoLeitura: null,
+      fotoEvidenciaId: fonte.fotoEvidenciaId,
+    }));
+
+    return Promise.resolve({ leituras, achadosLivres });
   }
 }

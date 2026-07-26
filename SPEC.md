@@ -45,8 +45,11 @@ linha, dando rastreabilidade de trânsito.
   Patrimônio é numeração do cliente — único por cliente, não globalmente;
   nunca serve de chave.
 - **ProjetoModelo** — o projeto de serigrafia de um modelo como dado: código
-  (ex.: EPT-163-PI-676), descrição e checklist de campos a conferir (nome,
-  fonte física, obrigatoriedade). É de onde a engine tira a lista de campos —
+  (ex.: EPT-163-PI-676), descrição e checklist de campos a conferir. Cada item
+  da checklist tem quatro chaves: `campo`, `fonteFisica`, `obrigatorio` e
+  `etapa` (o `codigo` do Checkpoint em que a marcação passa a existir na peça —
+  é o que permite a conferência parcial por gate; item sem `etapa` é conferido
+  em qualquer etapa). É de onde a engine tira a lista de campos —
   nunca de constante no código. Seed do MVP: o modelo da peça de demo,
   transcrito manualmente do desenho; ingestão automática do PDF é evolução
   (Could).
@@ -59,30 +62,46 @@ linha, dando rastreabilidade de trânsito.
   subconjunto de campos: no fluxo real da TRAEL a conferência acontece em
   gates parciais (pós-serigrafia e pós-placa), não de uma vez só.
 - **CampoConferido** — um campo comparado: nome (ex.: serie-placa,
-  serie-chumbada-1..3, patrimonio-serigrafia, patrimonio-placa, cliente), valor
+  serie-chumbada-topo, serie-chumbada-lateral-direita, serie-chumbada-traseira,
+  patrimonio-serigrafia-topo, patrimonio-serigrafia-frente, patrimonio-placa,
+  cliente-serigrafia-frente), valor
   esperado (do QR), valor lido (da visão), score de confiança, veredito
   (`conforme` | `divergente` | `nao_conferivel`), referência à FotoEvidencia e
   `regiaoLeitura` opcional (bounding box de onde o valor foi lido na foto —
   matéria-prima da conferência posicional futura, custo zero com Textract).
-- **FotoEvidencia** — foto enviada pelo operador, armazenada com URL e vínculo
-  aos campos extraídos dela.
+  O nome do campo diz o que ele carrega (prefixo `serie-`/`patrimonio-`/
+  `cliente-`, que é por onde o valor esperado do QR é achado), como a marcação
+  foi gravada (`-chumbada-` em relevo, `-serigrafia-` em tinta) e em qual VISTA
+  da peça ela está — nunca por número de posição.
+- **FotoEvidencia** — foto enviada pelo operador, armazenada com URL, a
+  `fonteFisica` que ela mostra e vínculo aos campos extraídos dela.
+  `fonteFisica` é a **VISTA da peça**, não a marcação: `base`, `topo`,
+  `frente`, `traseira`, `lateral-esquerda`, `lateral-direita` (as orientações
+  do desenho técnico), mais `placa` e `etiqueta` — closes, porque zoom é um
+  eixo separado de orientação: as duas ficam sobre uma face, mas o texto é
+  pequeno demais para uma foto de vista inteira — e `geral` como escape. É o
+  eixo que a câmera fixa enxerga em produção (uma câmera vê *a lateral
+  direita*, não "o chumbado 2") e o que elimina a numeração arbitrária de
+  posição. Consequência: uma vista pode conter mais de uma marcação (o topo
+  tem série chumbada e patrimônio serigrafado), e a ambiguidade daí decorrente
+  é resolvida como `nao_conferivel`, nunca por chute.
 - **Checkpoint** — etapa ordenada da linha de produção, com posição na
   sequência e `codigo` estável de máquina (slug único, ex.: `serigrafia`):
   regras de gate casam por ele, nunca por nome exibido nem por ordem. Etapas
   reais informadas pelo time: adesivação/separação da etiqueta → serigrafia →
   enchimento de óleo e conferência → fixação da placa de identificação
   (última). Seed do MVP com essas etapas; nomes ajustáveis com a TRAEL.
-- **EventoPassagem** — registro peça × checkpoint × timestamp, criado por scan
+- **Passagem** — registro peça × checkpoint × timestamp, criado por scan
   do QR no checkpoint, com `observacao` opcional (ex.: "parou por erro aceito
-  pelo time — motivo"). A posição atual da peça na linha é derivada (último
-  evento), nunca coluna duplicada.
+  pelo time — motivo"). A posição atual da peça na linha é derivada (última
+  passagem), nunca coluna duplicada.
 
 ```mermaid
 erDiagram
     PROJETO_MODELO |o--o{ TRANSFORMADOR : "define a checklist de"
     TRANSFORMADOR ||--o{ CONFERENCIA : "e conferido em"
-    TRANSFORMADOR ||--o{ EVENTO_PASSAGEM : "passa por"
-    CHECKPOINT ||--o{ EVENTO_PASSAGEM : "registra"
+    TRANSFORMADOR ||--o{ PASSAGEM : "passa por"
+    CHECKPOINT ||--o{ PASSAGEM : "registra"
     CHECKPOINT |o--o{ CONFERENCIA : "gate opcional"
     CONFERENCIA ||--o{ CAMPO_CONFERIDO : "compara"
     CONFERENCIA |o--o{ FOTO_EVIDENCIA : "recebe"
@@ -92,7 +111,7 @@ erDiagram
         uuid id PK
         string codigo "ex: EPT-163-PI-676"
         string descricao "opcional"
-        string checklist "JSON: campo, fonteFisica, obrigatorio"
+        string checklist "JSON: campo, fonteFisica, obrigatorio, etapa"
     }
     TRANSFORMADOR {
         uuid id PK
@@ -120,7 +139,7 @@ erDiagram
     CAMPO_CONFERIDO {
         uuid id PK
         uuid conferenciaId FK
-        string nomeCampo "serie-placa, serie-chumbada-1..3, patrimonio-placa, patrimonio-serigrafia, cliente-serigrafia"
+        string nomeCampo "serie-placa, serie-chumbada-topo|lateral-direita|traseira, patrimonio-placa, patrimonio-serigrafia-topo|frente, cliente-serigrafia-frente"
         string valorEsperado "do QR"
         string valorLido "da visao; null se ilegivel"
         number confianca "score 0..1 (double precision)"
@@ -131,10 +150,10 @@ erDiagram
     FOTO_EVIDENCIA {
         uuid id PK
         string url
-        string fonteFisica "obrigatoria: placa | serigrafia | chumbado-1..3"
+        string fonteFisica "vista da peca: base | topo | frente | traseira | lateral-esquerda | lateral-direita | placa | etiqueta | geral"
         uuid conferenciaId FK "opcional"
     }
-    EVENTO_PASSAGEM {
+    PASSAGEM {
         uuid id PK
         uuid transformadorId FK
         uuid checkpointId FK
@@ -151,7 +170,8 @@ erDiagram
 
 - Ler o QR da etiqueta pelo navegador do celular e decodificar o payload nos
   campos esperados.
-- Upload de fotos da peça (placa, serigrafia, série chumbada nas 3 posições).
+- Upload de fotos da peça por VISTA (topo, frente, traseira, laterais) mais os
+  closes de placa e etiqueta — cada foto pode conter mais de uma marcação.
 - Extração por visão computacional dos valores físicos, cada valor com score de
   confiança e vínculo à foto de origem.
 - Comparação campo a campo na API entre valor esperado e valor lido, com
@@ -164,7 +184,7 @@ erDiagram
 - Tela de veredito campo a campo com a foto-evidência de cada valor lido.
 - Fluxo de conferência abre fixado em uma etapa via URL
   (`?etapa=<codigo do checkpoint>`): cada celular simula a câmera daquela
-  etapa, e conferências/eventos criados por ele herdam a etapa
+  etapa, e conferências/passagens criadas por ele herdam a etapa
   automaticamente — em produção, cada câmera fixa é provisionada amarrada ao
   mesmo `codigo`.
 
@@ -173,7 +193,7 @@ erDiagram
 **Rastreabilidade de trânsito**
 
 - Registrar passagem da peça por checkpoint via scan do QR.
-- Tela de histórico da peça: eventos de passagem em ordem cronológica.
+- Tela de histórico da peça: passagens em ordem cronológica.
 
 **Alerta de divergência**
 
@@ -186,12 +206,27 @@ erDiagram
 
 ### Could
 
+- Conferência de consistência por achados livres: o extrator já devolve TODO
+  o texto de cada foto e hoje descarta o que não é alvo — custo AWS zero em
+  reaproveitar. Cada achado é cruzado contra o conjunto TIPADO de valores do
+  QR (série, patrimônio, cliente); achado que não bate com nenhum vira
+  alarme de inconsistência (pega placa errada mesmo sem rótulo de fonte,
+  peça trocada na esteira e etiqueta impressa divergente do próprio QR).
+  Regra de ferro: achado livre só rebaixa ou alerta, NUNCA promove a
+  `conforme` — consistência não enxerga ausência (peça com uma marcação só
+  é trivialmente consistente), então o `conforme` continua nascendo
+  exclusivamente da checklist. Cruzamento é contra o QR, nunca "tudo contra
+  tudo": série e patrimônio são números diferentes por design.
 - Dashboard de linha: peças × último checkpoint × status de conformidade.
 - Indicadores de auditoria: contagem de divergências por etapa (checkpoint) e
   por campo, agregando os dados que o Must já persiste.
 - Check qualitativo de layout via Bedrock: marcações da face presentes e na
-  disposição esperada do projeto da demo — condicionado ao spike T2.1 mostrar
-  confiabilidade; nunca rebaixa um `divergente` textual.
+  disposição esperada do projeto da demo. É o ÚNICO papel que sobrou para o
+  Bedrock depois da medição de 2026-07-25 (reprovado para ler número —
+  docs/visao-ocr.md), e sobrou porque aqui alucinação pesa menos e não há
+  concorrente OCR: a pergunta é "as marcações estão presentes e dispostas como
+  o projeto manda?", não "qual é o número?". Nunca rebaixa um `divergente`
+  textual nem promove nada a `conforme`.
 - Ingestão do projeto: upload do PDF, extração da checklist via Bedrock e
   tela de revisão/aprovação que cria o ProjetoModelo (Fase 6 do PLAN).
 
@@ -213,7 +248,7 @@ API decide. Detalhe das fronteiras no CLAUDE.md.
 - **extracao** — porta `ExtractorPort` e adapters de visão AWS; único lugar que
   fala com serviço de visão.
 - **evidencias** — upload e storage das fotos (S3).
-- **transito** — checkpoints e eventos de passagem.
+- **transito** — checkpoints e passagens da peça pela linha.
 - **frontend** — Next.js: leitura de QR, captura de fotos, veredito, histórico.
 
 O que nunca atravessa fronteiras: comparação de campos fora de `conformidade`;
@@ -229,18 +264,28 @@ atrás dessas mesmas fronteiras; engine e portas não mudam.
 - **Next.js** — front web mobile-first (16, React 19, Tailwind 4); roda no
   navegador do celular do operador.
 - **PostgreSQL** — banco relacional (default do boilerplate).
-- **AWS** — S3 para fotos; Textract ou Bedrock (modelo com visão) para
-  extração — escolha por spike com fotos reais (constraint 2). USD 500 em
-  créditos disponíveis.
+- **AWS** — S3 para fotos; **Textract** para extração, escolhido no spike com
+  fotos reais (constraint 2) e mantido depois de medir a peça inteira. Bedrock
+  ficou FORA da leitura numérica por medição, não por bloqueio: os modelos
+  disponíveis na conta alucinaram número plausível onde o Textract admitiu não
+  ter lido (docs/visao-ocr.md). USD 500 em créditos disponíveis.
 
 ## Constraints técnicas
 
 1. **Prazo** — demo do hackathon em 2026-07-27 (2 dias). Corte de escopo segue
    a ordem MoSCoW invertida: Could cai primeiro, depois Should.
 2. **Série chumbada de baixo contraste** — relevo da mesma cor do tanque; OCR
-   clássico pode falhar. Mitigação: spike Textract vs Bedrock com as fotos
-   reais antes de fechar a escolha; se ilegível, o campo vira `nao_conferivel`
-   com foto para conferência humana, nunca `conforme` silencioso.
+   clássico podia falhar. MEDIDO no spike T2.1 (docs/visao-ocr.md): o Textract
+   lê o relevo com 99,9% de confiança de cima e 85,8% de lado — o risco não se
+   confirmou NA FORMA PREVISTA (ilegibilidade). Ele voltou em forma pior na
+   rodada dos recortes: **no relevo, a confiança do OCR mede enquadramento e
+   não correção** — mesma foto e mesmo valor correto oscilaram de 37,3% a
+   95,5% só mudando a margem, e leitura certa (84,3%) e errada (84,6%) convivem
+   na mesma faixa. Nenhum limiar separa isso, então a mitigação deixou de ser
+   só o limiar: leitura em relevo é RELIDA em recortes da própria região
+   (consenso) e, sem corroboração, o campo nunca é acusado `divergente` — vira
+   `nao_conferivel` com foto para conferência humana. `conforme` silencioso
+   continua proibido em qualquer caminho.
 3. **Fonte de imagem variável** — MVP usa fotos de celular; câmeras fixas vêm
    depois. A extração recebe imagens sem saber a origem (mesma porta para
    ambas).
@@ -253,9 +298,11 @@ atrás dessas mesmas fronteiras; engine e portas não mudam.
 ## Critérios de aceitação
 
 1. Lido o QR da etiqueta e enviadas as fotos da peça de demo, a tela de
-   conferência exibe comparação campo a campo cobrindo: série chumbada (3
-   posições), série da placa, patrimônio da placa, patrimônio serigrafado e
-   cliente — cada valor lido com link para sua foto-evidência.
+   conferência exibe comparação campo a campo cobrindo: série chumbada nas 3
+   vistas em que ela está gravada (topo, lateral direita, traseira), série da
+   placa, patrimônio da placa, patrimônio serigrafado nas 2 vistas do desenho
+   (topo e frente) e cliente — cada valor lido com link para sua
+   foto-evidência.
 2. Com as fotos da peça de demo (placa 847833; etiqueta e chumbado 847233), o
    veredito geral é `divergente` e o único campo apontado como divergente é a
    série da placa.
@@ -263,9 +310,10 @@ atrás dessas mesmas fronteiras; engine e portas não mudam.
    veredito geral é `conforme`.
 4. Campo com leitura ilegível ou confiança abaixo do limiar resulta
    `nao_conferivel`, e o veredito geral nunca é `conforme` enquanto existir
-   campo não conferível.
-5. Scan do QR em um checkpoint cria EventoPassagem com timestamp, e a tela da
-   peça lista os eventos em ordem cronológica.
+   campo OBRIGATÓRIO não conferível (campo opcional ilegível não bloqueia o
+   conforme — decisão da rodada nucleo, PLAN T1.2).
+5. Scan do QR em um checkpoint cria Passagem com timestamp, e a tela da
+   peça lista as passagens em ordem cronológica.
 6. Conferência com veredito `divergente` gera alerta visível fora da tela de
    veredito, e o scan dessa peça em um checkpoint exibe o alerta no ato.
 
@@ -291,6 +339,19 @@ parcial daquele gate sem ação do operador, com as mesmas garantias dos
 critérios 1–4, e divergência impede o registro de avanço para a etapa
 seguinte.
 
+**Requisito de hardware que saiu de medição, não de opinião: iluminação
+rasante de direção fixa sobre a região da série chumbada** — idealmente duas
+direções alternadas a 90°, para cobrir traço de qualquer orientação. O spike
+de realce de imagem (2026-07-26, docs/visao-ocr.md) mediu que **~60 pontos de
+confiança separam a melhor da pior direção de luz na MESMA foto**, e que a
+direção ótima muda de foto para foto — porque cada uma foi tirada com a luz
+ambiente incidindo num ângulo diferente. O relevo é definido por gradiente de
+sombra: o que decide a legibilidade é o ângulo entre a luz e o traço, e esse
+ângulo é a variável não controlada da captura manual. Não há filtro que o
+corrija depois (17 variantes testadas e reprovadas), mas o gate pode fixá-lo
+antes. É o item de maior alavancagem para levar à TRAEL no projeto das
+câmeras.
+
 ### Integração ERP / sistemas de projeto
 
 O valor esperado passa a ser cruzado com o ERP além do QR; divergência
@@ -304,7 +365,15 @@ aprovar a extração do projeto (uma vez por modelo), corrigir a peça física
 quando um gate acusa, e registrar exceção deliberada (observacao na
 conferência divergente, que libera o avanço com o aceite gravado; com perfis,
 exigirá papel autorizado). A identidade da etapa vem do dispositivo: cada
-câmera é provisionada amarrada ao `codigo` de um Checkpoint.
+câmera é provisionada amarrada ao `codigo` de um Checkpoint E à fonte
+física que o seu ponto de vista enxerga (câmera do topo → `topo`; o eixo de
+`fonteFisica` é a VISTA justamente por isso) — o
+rótulo que o operador dá por foto no MVP vira dado de provisionamento; a
+identificação é a geometria da instalação, nunca análise em runtime. Modelo
+com menos marcações passa no mesmo gate sem reconfigurar câmera: quadro cuja
+fonte não tem campo na checklist do modelo é descartado sem custo (mesma
+regra da foto `geral` hoje), e cada gate cobra a interseção "recorte da
+etapa ∩ fontes cobertas pelas câmeras dele".
 
 1. Engenharia sobe o PDF do projeto do modelo → IA (Bedrock) extrai marcações,
    posições e obrigatoriedade → engenharia revisa e aprova → vira
@@ -318,7 +387,7 @@ câmera é provisionada amarrada ao `codigo` de um Checkpoint.
    referência).
 3. Em cada etapa instrumentada, câmera fixa captura ao detectar a peça →
    extração → engine compara contra QR + checklist do projeto → conforme:
-   EventoPassagem automático e a peça segue; divergente: alerta e bloqueio de
+   Passagem automática e a peça segue; divergente: alerta e bloqueio de
    avanço até correção.
 4. Gate final (pós-placa): última conferência total → libera expedição.
 5. Indicadores de auditoria alimentados automaticamente por etapa e campo.
@@ -370,7 +439,7 @@ resulta `conforme`; peça de outro projeto conferida contra X é acusada.
 
 Relatórios de desvios, retrabalho e gargalos por etapa, na linha do doc do
 desafio (não conformidades, OTIF). O modelo de dados do Must já registra a
-matéria-prima — Conferencia, CampoConferido e EventoPassagem com timestamps e
+matéria-prima — Conferencia, CampoConferido e Passagem com timestamps e
 evidências; esta evolução é leitura agregada, não mudança de escrita.
 Aceitação futura: relatório de divergências por etapa e por campo em um
 período escolhido, batendo com os registros brutos.
@@ -383,10 +452,14 @@ consegue criar Conferencia.
 
 ## Decisões em aberto (a confirmar)
 
-- [ ] **Política para campo parcialmente legível** — uma letra ilegível no
-      cliente ou um dígito duvidoso no número: rejeitar sempre
-      (`nao_conferivel`) ou aceitar similaridade ≥ N% com marcação para revisão
-      humana? Afeta a engine de comparação (PLAN T1.2).
+- [x] **Política para campo parcialmente legível** — resolvido: **rejeitar
+      sempre**, com limiar de confiança 0.9. O número saiu de medição, não de
+      arbítrio: com a peça real, as leituras corretas do Textract ficaram
+      entre 98,4% e 99,9%, e o único erro de dígito (2 lido como 8 numa foto
+      lateral do chumbado) veio a 84,6% — dentro do limiar antigo de 0.8, o
+      que produzia um `divergente` falso. Similaridade aproximada fica fora
+      por princípio: em número de série, "quase igual" é divergente. Leitura
+      fraca vira `nao_conferivel` com a foto anexada (2026-07-25).
 - [ ] **Formato do payload do QR** — decodificar uma etiqueta real para saber
       se o QR carrega os campos ou só um código de lookup, e se referencia o
       projeto/modelo (a etiqueta impressa traz o código TPD-408136, então o
@@ -394,6 +467,50 @@ consegue criar Conferencia.
       isso, fallback: operador escolhe o modelo no primeiro scan). Se for só
       código, o MVP precisa de fallback de digitação manual. Afeta T1.1 e
       T3.1.
+- [ ] **Código do ProjetoModelo: TPD ou EPT?** — o desenho da TRAEL traz dois
+      números (Projeto TPD-408136, Desenho EPT-163-PI-676) e a etiqueta
+      imprime o TPD; o seed usa o EPT. Hoje a demo resolve pelo fallback
+      "único projeto do banco" — funciona, mas cadastrar um SEGUNDO projeto
+      quebraria a resolução (422 projeto-modelo-indeterminado). Confirmar com
+      a TRAEL qual número identifica o projeto e alinhar seed + cascata.
+      Afeta T2.1/T6.1 (achado da revisão R2, rodada revisao).
+- [ ] **Em QUAIS vistas cada marcação está** — desde a troca de eixo de
+      `fonteFisica` (2026-07-25), a checklist não diz mais "chumbado 1/2/3" e
+      sim em qual VISTA cada marcação vive. O mapa do seed foi MEDIDO nas
+      fotos reais (docs/visao-ocr.md: série chumbada em topo, lateral direita
+      e traseira; patrimônio serigrafado em topo e frente), não lido do
+      desenho — **confirmar face a face com a TRAEL**. Duas perguntas juntas:
+      (a) o 3× do chumbado é padrão de fábrica (vira esqueleto fixo de
+      checklist) ou varia por modelo (segue dado por modelo — a checklist
+      suporta os dois)? (b) as vistas medidas são as do desenho ou coincidência
+      de como a peça de demo foi posicionada? Nada em `base` hoje: a vista
+      existe no vocabulário, mas sem foto dela um item obrigatório ali tornaria
+      o critério 3 inalcançável. Consequência na T6.1: a ingestão do PDF só
+      produz os itens de serigrafia; placa e chumbados entram pré-populados
+      como esqueleto padrão na tela de revisão (T6.2). Evolução conexa: o
+      Textract devolve um bounding box por ocorrência (`regiaoLeitura`, já
+      persistido) — N caixas distintas no MESMO quadro provam N posições, o
+      que habilita uma vista panorâmica satisfazer mais de uma posição.
+- [ ] **As marcações técnicas da face lateral entram na conferência?** — o
+      spike de 2026-07-26 leu na lateral esquerda `G-07/28`, `AL` e `V`
+      (aparentemente lote/data, alumínio e óleo vegetal), marcações reais da
+      peça que a checklist NÃO confere. O time definiu o foco desta rodada em
+      identidade (serigrafia × etiqueta e séries irmãs entre si) e ADIOU estas:
+      se o desenho as exige, hoje é não conformidade passando batido.
+      Confirmar com a TRAEL quais são obrigatórias; incluir é acrescentar itens
+      à checklist, não mexer em código.
+- [ ] **Distinguir a ETIQUETA da serigrafia por contraste** — a discriminação
+      de 2026-07-26 separa três classes (relevo, tinta sobre tanque, claro
+      sobre escuro na placa), mas a etiqueta é texto escuro sobre papel claro e
+      cai na MESMA classe da serigrafia. Consequência medida como risco
+      residual: se a serigrafia estiver ausente ou ilegível e a etiqueta
+      aparecer no quadro, o número dela pode virar a leitura do patrimônio
+      serigrafado — e, sendo a etiqueta a fonte da verdade, o valor SEMPRE
+      bate, produzindo `conforme` para marcação que não existe na peça. A regra
+      de unicidade protege quando as duas aparecem (duas tintas → não resolve).
+      Correção proposta: acrescentar a luminância ABSOLUTA do entorno como
+      quarto sinal — papel é muito mais claro que chapa pintada, e a medida sai
+      do mesmo recorte que já é feito.
 - [ ] **Unicidade do patrimônio entre clientes** — padrão do setor: série do
       fabricante é única, patrimônio é numeração do cliente (único por
       cliente). Confirmar com a TRAEL. Consequência já adotada: find-or-create
@@ -412,3 +529,13 @@ consegue criar Conferencia.
 - [x] **Prioridade do alerta de divergência** — resolvido: promovido de Could
       para Should; divergência para a produção até correção, e o alerta é o
       que sustenta essa parada no MVP (2026-07-25).
+- [x] **Eixo de `fonteFisica`: marcação ou vista?** — resolvido: **VISTA da
+      peça** (`base`, `topo`, `frente`, `traseira`, `lateral-esquerda`,
+      `lateral-direita`, mais os closes `placa` e `etiqueta` e o escape
+      `geral`). É o que a câmera fixa enxerga em produção e como o desenho
+      técnico se organiza, e elimina a numeração arbitrária `chumbado-1/2/3`,
+      que o operador tinha de decidir sem gabarito. `serigrafia` e `chumbado-N`
+      saíram do vocabulário — são processos de marcação, não vistas; seguem no
+      NOME do campo. Efeito assumido: vista com duas marcações torna a
+      ambiguidade explícita (`nao_conferivel`) em vez de escondê-la num falso
+      match (2026-07-25).

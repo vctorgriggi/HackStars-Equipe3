@@ -30,7 +30,12 @@ export class TypeOrmConfigService implements TypeOrmOptionsFactory {
 
         subscribersDir: 'subscriber',
       },
-      ssl: { rejectUnauthorized: false },
+      // SSL condicionado ao env: o RDS exige TLS (DATABASE_SSL_ENABLED=true),
+      // o Postgres local do docker não suporta — fixo, o boot quebra local
+      // com "server does not support SSL connections".
+      ssl: this.configService.get('database.sslEnabled', { infer: true })
+        ? { rejectUnauthorized: false }
+        : undefined,
     } as TypeOrmModuleOptions;
   }
 }
