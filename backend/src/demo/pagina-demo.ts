@@ -204,9 +204,29 @@ export const PAGINA_DEMO = `<!doctype html>
     font-size: 15px;
     cursor: pointer;
   }
+  .botao-foto.grande { min-height: 60px; min-width: 150px; font-size: 16px; font-weight: 600; }
+  .botao-foto.desativado { opacity: .5; cursor: default; font-weight: 400; }
   .miniatura {
     width: 46px; height: 46px; object-fit: cover;
     border: 1px solid var(--borda); border-radius: 4px; background: #e6e9ec;
+  }
+  .item-foto.grupo { display: block; }
+  .cabeca-grupo { display: flex; align-items: center; gap: 10px; }
+  .item-foto.grupo .dica, .item-foto.grupo .contexto { margin-top: 8px; }
+  .item-foto.grupo .contexto { margin-bottom: 0; font-size: 12px; }
+  .tiras { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .tira {
+    width: 104px; padding: 6px; text-align: center;
+    border: 1px solid var(--borda); border-radius: 4px; background: #fff;
+  }
+  .tira img {
+    display: block; width: 90px; height: 68px; object-fit: cover;
+    border-radius: 3px; background: #e6e9ec;
+  }
+  .tira .rotulo { display: block; font-size: 12px; color: var(--tinta-fraca); margin: 5px 0; }
+  .tira button {
+    width: 100%; min-height: 44px; padding: 6px; font-size: 13px;
+    background: #fff; color: var(--vermelho); border-color: var(--vermelho);
   }
   .item-leitura { padding: 10px 0; border-bottom: 1px solid var(--borda); }
   .item-leitura:last-child { border-bottom: 0; }
@@ -428,6 +448,10 @@ export const PAGINA_DEMO = `<!doctype html>
     token: null,
     etapa: null,
     fotos: {},
+    // Slot reservado enquanto o upload está em voo: garante que duas capturas
+    // seguidas não disputem a mesma fonte canônica.
+    enviando: {},
+    falhas: {},
     camera: null,
     // Vindos da API depois do login (null = ainda não carregados/falharam):
     checklist: null,      // itens do ProjetoModelo único
@@ -651,10 +675,70 @@ export const PAGINA_DEMO = `<!doctype html>
     return { situacao: 'fora-etapa', campos: registro.campos, entraEm: nome };
   }
 
+  var PESO_SITUACAO = {
+    'desta-etapa': 0,
+    'sem-etapa': 1,
+    'indefinido': 1,
+    'fora-etapa': 2,
+    'fora-da-checklist': 3
+  };
+
   function fontesDesta(situacaoAlvo) {
     return fontesOrdenadas().filter(function (fonte) {
       return situacaoDaFonte(fonte).situacao === situacaoAlvo;
     });
+  }
+
+  // Os 3 chumbados carregam o MESMO número de propósito: pedir ao operador que
+  // decida qual é o "1" é convenção arbitrária. A página trata as posições como
+  // um grupo e atribui a fonte canônica sozinha — a API continua recebendo
+  // chumbado-1..3 exatamente como antes.
+  function ehChumbado(fonte) { return /^chumbado-\\d+$/.test(fonte); }
+
+  function fontesChumbadas() {
+    return fontesOrdenadas().filter(ehChumbado).sort(function (a, b) {
+      return Number(a.split('-')[1]) - Number(b.split('-')[1]);
+    });
+  }
+
+  // Situação do cartão de grupo: a MELHOR entre as posições (todas nascem na
+  // mesma etapa; se um dia divergirem, a foto que ajuda o gate manda) e a
+  // união dos campos que elas conferem.
+  function situacaoDoGrupo(fontes) {
+    var melhor = null;
+    var campos = [];
+    fontes.forEach(function (fonte) {
+      var info = situacaoDaFonte(fonte);
+      info.campos.forEach(function (campo) {
+        if (campos.indexOf(campo) === -1) { campos.push(campo); }
+      });
+      if (melhor === null || PESO_SITUACAO[info.situacao] < PESO_SITUACAO[melhor.situacao]) {
+        melhor = info;
+      }
+    });
+    return {
+      situacao: melhor ? melhor.situacao : 'indefinido',
+      campos: campos,
+      entraEm: melhor ? melhor.entraEm : null
+    };
+  }
+
+  function proximoSlotLivre(fontes) {
+    for (var i = 0; i < fontes.length; i += 1) {
+      if (!estado.fotos[fontes[i]] && !estado.enviando[fontes[i]]) { return fontes[i]; }
+    }
+    return null;
+  }
+
+  // Fontes viram texto de operador: as posições chumbadas aparecem contadas,
+  // nunca numeradas (a numeração canônica é assunto da API).
+  function resumoDeFontes(lista) {
+    var chumbadas = lista.filter(ehChumbado).length;
+    var partes = lista.filter(function (fonte) { return !ehChumbado(fonte); });
+    if (chumbadas) {
+      partes.push(chumbadas + (chumbadas === 1 ? ' posição chumbada' : ' posições chumbadas'));
+    }
+    return partes.join(', ');
   }
 
   // Ordem de exibição: primeiro as vistas que a etapa confere.
@@ -665,15 +749,8 @@ export const PAGINA_DEMO = `<!doctype html>
         if (lista.indexOf(fonte) === -1) { lista.push(fonte); }
       });
     }
-    var peso = {
-      'desta-etapa': 0,
-      'sem-etapa': 1,
-      'indefinido': 1,
-      'fora-etapa': 2,
-      'fora-da-checklist': 3
-    };
     return lista.map(function (fonte, indice) {
-      return { fonte: fonte, indice: indice, peso: peso[situacaoDaFonte(fonte).situacao] };
+      return { fonte: fonte, indice: indice, peso: PESO_SITUACAO[situacaoDaFonte(fonte).situacao] };
     }).sort(function (a, b) {
       return a.peso === b.peso ? a.indice - b.indice : a.peso - b.peso;
     }).map(function (item) { return item.fonte; });
@@ -691,7 +768,7 @@ export const PAGINA_DEMO = `<!doctype html>
       alvo.textContent = 'A etapa "' + estado.etapa + '" não está cadastrada como checkpoint — sem recorte, todas as vistas aparecem sem destaque.';
       return;
     }
-    alvo.textContent = 'Esta etapa confere ' + doGate.length + ' vista(s): ' + doGate.join(', ') +
+    alvo.textContent = 'Esta etapa confere: ' + resumoDeFontes(doGate) +
       '. A conferência é cumulativa — a etapa confere o que ela e as anteriores gravaram na peça. As demais vistas ainda não existem aqui, mas o upload continua liberado.';
   }
 
@@ -829,71 +906,168 @@ export const PAGINA_DEMO = `<!doctype html>
     return '';
   }
 
-  function montarFotos() {
-    var html = fontesOrdenadas().map(function (fonte) {
-      var info = situacaoDaFonte(fonte);
-      var foto = estado.fotos[fonte];
-      var classe = 'item-foto';
-      if (info.situacao === 'desta-etapa') { classe += ' desta-etapa'; }
-      if (info.situacao === 'fora-etapa') { classe += ' fora-etapa'; }
-      var rotulo = rotuloDaSituacao(info);
-      var campos = info.campos && info.campos.length
-        ? '<span class="estado">confere: ' + esc(info.campos.join(', ')) + '</span>'
-        : '';
-      return '<div class="' + classe + '" data-fonte="' + esc(fonte) + '">' +
-        '<img class="miniatura" alt="" ' + (foto && foto.url ? 'src="' + esc(foto.url) + '"' : 'hidden') + '>' +
-        '<span class="nome">' + esc(fonte) +
-        (rotulo ? '<span class="marca-etapa">' + esc(rotulo) + '</span>' : '') +
-        campos +
-        '<span class="estado envio">' + (foto ? 'enviada' : 'sem foto') + '</span></span>' +
-        '<label class="botao-foto">' + (foto ? 'Refotografar' : 'Fotografar') +
-        '<input type="file" accept="image/*" capture="environment" hidden></label>' +
+  function classeDoCartao(info) {
+    var classe = 'item-foto';
+    if (info.situacao === 'desta-etapa') { classe += ' desta-etapa'; }
+    if (info.situacao === 'fora-etapa') { classe += ' fora-etapa'; }
+    return classe;
+  }
+
+  function trechoDosCampos(info) {
+    return info.campos && info.campos.length
+      ? '<span class="estado">confere: ' + esc(info.campos.join(', ')) + '</span>'
+      : '';
+  }
+
+  function trechoDaMarca(info) {
+    var rotulo = rotuloDaSituacao(info);
+    return rotulo ? '<span class="marca-etapa">' + esc(rotulo) + '</span>' : '';
+  }
+
+  function textoDoEnvio(fonte) {
+    if (estado.enviando[fonte]) { return 'enviando...'; }
+    if (estado.falhas[fonte]) { return 'falhou'; }
+    return estado.fotos[fonte] ? 'enviada' : 'sem foto';
+  }
+
+  // Cartão de UMA fonte (placa, serigrafia, geral): inalterado.
+  function cartaoSimples(fonte, info) {
+    var foto = estado.fotos[fonte];
+    return '<div class="' + classeDoCartao(info) + '" data-fonte="' + esc(fonte) + '">' +
+      '<img class="miniatura" alt="" ' + (foto && foto.url ? 'src="' + esc(foto.url) + '"' : 'hidden') + '>' +
+      '<span class="nome">' + esc(fonte) +
+      trechoDaMarca(info) + trechoDosCampos(info) +
+      '<span class="estado envio' + (estado.falhas[fonte] ? ' falhou' : '') + '">' +
+      esc(textoDoEnvio(fonte)) + '</span></span>' +
+      '<label class="botao-foto">' + (foto ? 'Refotografar' : 'Fotografar') +
+      '<input type="file" accept="image/*" capture="environment" hidden></label>' +
+      '</div>';
+  }
+
+  // Cartão ÚNICO das posições chumbadas: um botão de captura, contador e as
+  // miniaturas já enviadas. O operador nunca escolhe o número da posição.
+  function cartaoChumbados(fontes, info) {
+    var enviadas = fontes.filter(function (fonte) { return !!estado.fotos[fonte]; });
+    var emVoo = fontes.filter(function (fonte) { return !!estado.enviando[fonte]; });
+    var falhadas = fontes.filter(function (fonte) { return !!estado.falhas[fonte]; });
+    var contador = enviadas.length + ' de ' + fontes.length + ' posições fotografadas' +
+      (emVoo.length ? ' · ' + emVoo.length + ' enviando...' : '') +
+      (falhadas.length ? ' · ' + falhadas.length + ' falhou' : '');
+
+    var tiras = enviadas.map(function (fonte, indice) {
+      return '<div class="tira" title="' + esc(fonte) + '">' +
+        '<img alt="" src="' + esc(estado.fotos[fonte].url || '') + '">' +
+        '<span class="rotulo">Posição ' + (indice + 1) + '</span>' +
+        '<button type="button" class="remover" data-fonte="' + esc(fonte) + '">Remover</button>' +
         '</div>';
+    }).join('');
+
+    var temSlot = proximoSlotLivre(fontes) !== null;
+    var captura = temSlot
+      ? '<label class="botao-foto grande">Fotografar posição' +
+        '<input type="file" accept="image/*" capture="environment" hidden></label>'
+      : '<span class="botao-foto grande desativado">' + fontes.length + ' de ' + fontes.length +
+        ' — remova uma para refazer</span>';
+
+    return '<div class="' + classeDoCartao(info) + ' grupo" data-grupo="chumbados">' +
+      '<div class="cabeca-grupo">' +
+      '<span class="nome">Chumbados — ' + fontes.length + ' posições no metal' +
+      trechoDaMarca(info) + trechoDosCampos(info) +
+      '<span class="estado envio">' + esc(contador) + '</span></span>' +
+      captura +
+      '</div>' +
+      '<p class="dica">Fotografe cada uma das ' + fontes.length + ' posições (topo e laterais). ' +
+      'A numeração é automática — o que importa é que sejam posições diferentes.</p>' +
+      '<p class="contexto">Em produção, cada posição é uma câmera fixa provisionada — ninguém rotula nada.</p>' +
+      (tiras ? '<div class="tiras">' + tiras + '</div>' : '') +
+      '</div>';
+  }
+
+  function montarFotos() {
+    var chumbados = fontesChumbadas();
+    var grupoPosto = false;
+
+    var html = fontesOrdenadas().map(function (fonte) {
+      if (ehChumbado(fonte)) {
+        // O grupo ocupa a posição do primeiro chumbado da lista ordenada.
+        if (grupoPosto) { return ''; }
+        grupoPosto = true;
+        return cartaoChumbados(chumbados, situacaoDoGrupo(chumbados));
+      }
+      return cartaoSimples(fonte, situacaoDaFonte(fonte));
     }).join('');
     el('lista-fotos').innerHTML = html;
 
-    Array.prototype.forEach.call(el('lista-fotos').querySelectorAll('.item-foto'), function (linha) {
-      var fonte = linha.getAttribute('data-fonte');
-      linha.querySelector('input[type=file]').addEventListener('change', function (evento) {
-        var arquivo = evento.target.files && evento.target.files[0];
-        if (!arquivo) { return; }
-        enviarFoto(fonte, arquivo, linha);
+    Array.prototype.forEach.call(el('lista-fotos').querySelectorAll('.item-foto'), function (cartao) {
+      var ehGrupo = cartao.getAttribute('data-grupo') === 'chumbados';
+      var entrada = cartao.querySelector('input[type=file]');
+      if (entrada) {
+        entrada.addEventListener('change', function (evento) {
+          var arquivos = evento.target.files;
+          if (!arquivos || !arquivos.length) { return; }
+          Array.prototype.forEach.call(arquivos, function (arquivo) {
+            // No grupo, o destino é o menor slot canônico livre — decidido
+            // aqui, nunca pelo operador.
+            var destino = ehGrupo
+              ? proximoSlotLivre(fontesChumbadas())
+              : cartao.getAttribute('data-fonte');
+            if (!destino) {
+              aviso('fotos-aviso', 'As posições chumbadas já estão preenchidas — remova uma para refazer.', 'neutro');
+              return;
+            }
+            enviarFoto(destino, arquivo);
+          });
+        });
+      }
+      Array.prototype.forEach.call(cartao.querySelectorAll('.remover'), function (botao) {
+        botao.addEventListener('click', function () {
+          removerFoto(botao.getAttribute('data-fonte'));
+        });
       });
     });
   }
 
-  function enviarFoto(fonte, arquivo, linha) {
-    var estadoTexto = linha.querySelector('.envio');
-    var miniatura = linha.querySelector('.miniatura');
-    estadoTexto.className = 'estado envio';
-    estadoTexto.textContent = 'enviando...';
+  function enviarFoto(fonte, arquivo) {
+    estado.enviando[fonte] = true;
+    delete estado.falhas[fonte];
     aviso('fotos-aviso', '');
+    montarFotos();
 
     var dados = new FormData();
     dados.append('file', arquivo);
     dados.append('fonteFisica', fonte);
 
+    var encerrar = function () {
+      delete estado.enviando[fonte];
+      montarFotos();
+      atualizarBotaoExtrair();
+    };
+
     pedir(API + '/fotos-evidencia/upload', { method: 'POST', body: dados })
       .then(function (resposta) {
         if (!resposta.ok || !resposta.corpo || !resposta.corpo.id) {
-          estadoTexto.className = 'estado envio falhou';
-          estadoTexto.textContent = 'falhou';
-          aviso('fotos-aviso', fonte + ' — ' + mensagemDeErro(resposta.corpo, resposta.status), 'erro');
+          estado.falhas[fonte] = true;
+          aviso('fotos-aviso', mensagemDeErro(resposta.corpo, resposta.status), 'erro');
           return;
         }
         estado.fotos[fonte] = { id: resposta.corpo.id, url: resposta.corpo.url };
-        estadoTexto.textContent = 'enviada';
-        if (resposta.corpo.url) {
-          miniatura.src = resposta.corpo.url;
-          miniatura.hidden = false;
-        }
-        atualizarBotaoExtrair();
       })
       .catch(function (erro) {
-        estadoTexto.className = 'estado envio falhou';
-        estadoTexto.textContent = 'falhou';
-        aviso('fotos-aviso', fonte + ' — falha de rede: ' + erro.message, 'erro');
-      });
+        estado.falhas[fonte] = true;
+        aviso('fotos-aviso', 'Falha de rede no envio: ' + erro.message, 'erro');
+      })
+      .then(encerrar);
+  }
+
+  // Remoção é LOCAL: solta o slot para a próxima captura e tira a foto desta
+  // conferência. A evidência já enviada continua no storage — nenhuma rota
+  // nova, nenhuma mudança de contrato.
+  function removerFoto(fonte) {
+    delete estado.fotos[fonte];
+    delete estado.falhas[fonte];
+    montarFotos();
+    atualizarBotaoExtrair();
+    aviso('fotos-aviso', 'Posição liberada — a próxima foto ocupa o lugar dela.', 'neutro');
   }
 
   function fotosEnviadas() {
@@ -907,7 +1081,7 @@ export const PAGINA_DEMO = `<!doctype html>
     el('btn-extrair').disabled = enviadas.length === 0;
     el('extrair-dica').textContent = enviadas.length === 0
       ? 'Envie ao menos uma foto no passo 3 para liberar a extração.'
-      : 'Vai enviar ' + enviadas.length + ' foto(s) (' + enviadas.join(', ') +
+      : 'Vai enviar ' + enviadas.length + ' foto(s) (' + resumoDeFontes(enviadas) +
         ') à visão da API. Uma chamada por foto, sem repetição automática.';
   }
 
@@ -1023,13 +1197,19 @@ export const PAGINA_DEMO = `<!doctype html>
 
   function faixaDaExtracao(extracao) {
     if (!extracao) { return ''; }
+    // Transparência de custo: fotos fora do recorte da etapa NÃO foram
+    // enviadas à visão (dinheiro que deixou de ser gasto) — mostrar para o
+    // operador entender por que "mandei 4 fotos e só 2 contaram".
+    var fora = extracao.fotosForaDoRecorte > 0
+      ? ' · ' + esc(extracao.fotosForaDoRecorte) + ' foto(s) fora desta etapa (não enviadas à visão)'
+      : '';
     if (extracao.leiturasProduzidas === 0) {
       return '<div class="faixa-extracao vazia">Extração: driver ' + esc(extracao.driver) +
         ' · ' + esc(extracao.fotos) + ' foto(s) · 0 leitura(s) — nenhuma leitura extraída: ' +
-        'verifique enquadramento e iluminação.</div>';
+        'verifique enquadramento e iluminação.' + fora + '</div>';
     }
     return '<div class="faixa-extracao">Extração: driver ' + esc(extracao.driver) +
-      ' · ' + esc(extracao.fotos) + ' foto(s) · ' + esc(extracao.leiturasProduzidas) + ' leitura(s)</div>';
+      ' · ' + esc(extracao.fotos) + ' foto(s) · ' + esc(extracao.leiturasProduzidas) + ' leitura(s)' + fora + '</div>';
   }
 
   function renderizar(resposta) {
