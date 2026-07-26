@@ -18,6 +18,7 @@ import { ConferenciaConsultasService } from './consultas/conferencia-consultas.s
 import { IndicadoresService } from './consultas/indicadores.service';
 import { ConferenciaExecucaoService } from './conferencia-execucao.service';
 import { ConferenciaExtracaoService } from './conferencia-extracao.service';
+import { ConferenciaLaudoService } from './laudo/conferencia-laudo.service';
 import { ConferenciaPlanoService } from './plano/conferencia-plano.service';
 import { ConferenciasController } from './conferencias.controller';
 import { ConferenciaEntity } from './infrastructure/persistence/relational/entities/conferencia.entity';
@@ -65,6 +66,7 @@ import { RelationalConferenciaPersistenceModule } from './infrastructure/persist
     ConferenciaExecucaoService,
     ConferenciaExtracaoService,
     ConferenciaConsultasService,
+    ConferenciaLaudoService,
     ConferenciaPlanoService,
     IndicadoresService,
   ],
@@ -73,6 +75,7 @@ import { RelationalConferenciaPersistenceModule } from './infrastructure/persist
     ConferenciaExecucaoService,
     ConferenciaExtracaoService,
     ConferenciaConsultasService,
+    ConferenciaLaudoService,
     ConferenciaPlanoService,
     IndicadoresService,
     RelationalConferenciaPersistenceModule,

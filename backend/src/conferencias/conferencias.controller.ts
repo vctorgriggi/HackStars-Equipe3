@@ -15,6 +15,7 @@ import { ConferenciasService } from './conferencias.service';
 import { ConferenciaConsultasService } from './consultas/conferencia-consultas.service';
 import { ConferenciaExecucaoService } from './conferencia-execucao.service';
 import { ConferenciaExtracaoService } from './conferencia-extracao.service';
+import { ConferenciaLaudoService } from './laudo/conferencia-laudo.service';
 import { ConferenciaPlanoService } from './plano/conferencia-plano.service';
 import { IndicadoresService } from './consultas/indicadores.service';
 import { CreateConferenciaDto } from './dto/create-conferencia.dto';
@@ -30,10 +31,12 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiServiceUnavailableResponse,
   ApiTags,
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import { Conferencia } from './domain/conferencia';
+import { LaudoDaConferencia } from './dto/laudo.dto';
 import { ResultadoExecucao } from './dto/resultado-execucao.dto';
 import { ResultadoExecucaoComExtracao } from './dto/resultado-execucao-com-extracao.dto';
 import { VereditoConferencia } from './consultas/veredito-conferencia';
@@ -58,6 +61,7 @@ export class ConferenciasController {
     private readonly conferenciaExecucaoService: ConferenciaExecucaoService,
     private readonly conferenciaExtracaoService: ConferenciaExtracaoService,
     private readonly conferenciaConsultasService: ConferenciaConsultasService,
+    private readonly conferenciaLaudoService: ConferenciaLaudoService,
     private readonly conferenciaPlanoService: ConferenciaPlanoService,
     private readonly indicadoresService: IndicadoresService,
   ) {}
@@ -160,6 +164,70 @@ export class ConferenciasController {
     return this.conferenciaExtracaoService.executarComFotos(
       executarComFotosDto,
     );
+  }
+
+  // ORDEM DE ROTA: `:id/laudo` tem dois segmentos e nao colide com os POSTs
+  // estaticos de um segmento acima (`executar`, `executar-com-fotos`) — mas
+  // fica depois deles de proposito, para manter a regra local "estatica antes
+  // de dinamica" valendo sem que ninguem precise conferir a contagem de
+  // segmentos ao acrescentar a proxima rota.
+  @Post(':id/laudo')
+  @HttpCode(HttpStatus.OK)
+  @ApiParam({
+    name: 'id',
+    type: String,
+    required: true,
+  })
+  @ApiOperation({
+    summary: 'LAUDO POR IA: redige em prosa o veredito que a engine já emitiu',
+    description:
+      'Manda os FATOS JÁ DECIDIDOS de uma conferência a um Claude no Bedrock ' +
+      'e devolve um laudo curto, em linguagem de chão de fábrica, para o ' +
+      'operador ler ou anexar.\n\n' +
+      'O LAUDO NÃO DECIDE NADA. Ele não compara campo, não reclassifica, não ' +
+      'suaviza e não completa veredito — é REDAÇÃO sobre fato, e o veredito ' +
+      'gravado continua sendo o que vale. O texto sempre termina dizendo ' +
+      'isso, e a API carimba a frase caso o modelo a esqueça.\n\n' +
+      'FONTE DOS FATOS: exatamente a mesma de `GET /conferencias/{id}/campos` ' +
+      '— o que está PERSISTIDO no banco. Consequência direta do gap 22 do ' +
+      'CLAUDE.md: `motivo` do campo, `incoerencias` e `achadosInconsistentes` ' +
+      'não são gravados, então o laudo não fala deles. Ele relata veredito ' +
+      'geral, etapa avaliada, e campo a campo o esperado, o lido e a ' +
+      'confiança. Nada é recalculado na leitura: rodar a engine de novo aqui ' +
+      'abriria a chance de o laudo contradizer o veredito que a tela mostra.\n\n' +
+      'CUSTO E DISPARO: uma única chamada paga por requisição (~US$ 0,01), ' +
+      'SÓ sob ação explícita do operador — mesma constraint 4 do SPEC que ' +
+      'rege a visão. Sem retry automático e sem laço.\n\n' +
+      'NÃO PERSISTE NADA: nem o laudo, nem o fato de ele ter sido pedido. ' +
+      'Dois cliques geram dois textos possivelmente diferentes; o veredito, ' +
+      'esse sim gravado, é sempre o mesmo. Persistir o laudo (com o modelo e ' +
+      'o horário) é assunto da rodada de auditoria.\n\n' +
+      'Modelo por env `LAUDO_MODEL_ID`; driver por `LAUDO_DRIVER` ' +
+      '(`bedrock` default | `mock`). Com `mock`, `modelo` volta como `mock` e ' +
+      'o texto se anuncia como SIMULADO — exiba isso, não esconda.',
+  })
+  @ApiOkResponse({
+    type: LaudoDaConferencia,
+    description:
+      'Laudo redigido: `laudo` (texto em parágrafos, terminando no ' +
+      'disclaimer obrigatório), `modelo` (qual modelo escreveu) e `geradoEm`.',
+  })
+  @ApiNotFoundResponse({
+    description:
+      '`conferencia-inexistente: <id>` — mesma checagem da releitura do ' +
+      'veredito, feita ANTES de qualquer chamada paga.',
+  })
+  @ApiServiceUnavailableResponse({
+    description:
+      '`laudo-indisponivel: <detalhe>` quando o serviço de redação falha ' +
+      '(sem credencial, modelo não habilitado na conta, timeout, resposta ' +
+      'vazia). É erro EXPLÍCITO de propósito: devolver texto vazio ou um ' +
+      '"não foi possível analisar" ao lado de uma peça divergente seria lido ' +
+      'como "nada a relatar". O veredito da conferência segue intacto e ' +
+      'legível pelas outras rotas.',
+  })
+  gerarLaudo(@Param('id') id: string): Promise<LaudoDaConferencia> {
+    return this.conferenciaLaudoService.gerarLaudo(id);
   }
 
   // ATENCAO A ORDEM: esta rota tem de vir ANTES de `@Get(':id')`, senao o
