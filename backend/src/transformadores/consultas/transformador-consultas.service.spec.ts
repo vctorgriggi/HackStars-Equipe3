@@ -138,11 +138,19 @@ describe('listarComSituacao — listagem com veredito vigente e etapa atual', ()
       vigentes: new Map([
         [
           'transformador-1',
-          conferencia('conferencia-9', 'divergente', checkpoint('serigrafia', 2), 60),
+          conferencia(
+            'conferencia-9',
+            'divergente',
+            checkpoint('serigrafia', 2),
+            60,
+          ),
         ],
       ]),
       ultimasPassagens: new Map([
-        ['transformador-1', passagem('passagem-9', checkpoint('serigrafia', 2), 55)],
+        [
+          'transformador-1',
+          passagem('passagem-9', checkpoint('serigrafia', 2), 55),
+        ],
       ]),
     });
 

@@ -48,6 +48,16 @@ export const LEITURAS_DEMO: Record<string, string | null> = {
   'potencia-serigrafia-frente': '10 kVA',
   'serie-placa': '847833',
   'patrimonio-placa': '251328',
+  // QR DA PLACA — a marcacao que o adapter real decodifica localmente, sem
+  // AWS (`qr-imagem.ts`). Os valores sao os do payload posicional medido no QR
+  // fisico da peca (fixture em `transformadores/qr/qr-payload.parser.spec.ts`),
+  // e eles contam a historia inteira do defeito: o QR da placa carrega a serie
+  // CORRETA (847233), o numero IMPRESSO na mesma placa diz 847833. Em modo
+  // mock a conferencia da placa sai com um `divergente` (serie-placa) e uma
+  // INCOERENCIA entre irmaos dentro da propria placa — que e exatamente o que
+  // a peca fisica tem.
+  'serie-placa-qr': '847233',
+  'patrimonio-placa-qr': '251328',
 };
 
 export class MockExtractor extends ExtractorPort {

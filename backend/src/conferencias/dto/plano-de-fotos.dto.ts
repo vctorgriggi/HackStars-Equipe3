@@ -24,6 +24,7 @@ import { EtapaResumo } from './resumos-compartilhados.dto';
 export const TIPOS_DE_MARCACAO: TipoDeMarcacao[] = [
   'relevo',
   'tinta',
+  'qr',
   'indefinido',
 ];
 
@@ -37,6 +38,11 @@ export const DESCRICAO_TIPO_MARCACAO =
   'com uma leitura só.\n' +
   '- `tinta`: serigrafia preta sobre o tanque (`*-serigrafia-*`). Alto ' +
   'contraste, lê bem.\n' +
+  '- `qr`: QR Code impresso na peça (`serie-placa-qr`, `patrimonio-placa-qr`). ' +
+  'A API decodifica LOCALMENTE, sem OCR e sem custo de visão — enquadre o QR ' +
+  'inteiro e reto no close da placa. Ou decodifica exato, ou não decodifica: ' +
+  'não existe leitura parcial, então o campo é `conforme`/`divergente` com ' +
+  'uma leitura só, e QR ilegível vira `nao_conferivel`.\n' +
   '- `indefinido`: o nome do campo não diz. Inclui de propósito os campos de ' +
   'PLACA (`serie-placa`, `patrimonio-placa`) — a placa resolve por RÓTULO ' +
   '(`N°`, `PATRIMONIO`), evidência melhor que física de pixel.';

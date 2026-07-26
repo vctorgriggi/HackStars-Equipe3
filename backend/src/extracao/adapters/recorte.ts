@@ -88,6 +88,13 @@ export interface ImagemRecortavel {
  * UMA chamada por foto. Existe para a hipotese de a lib nativa se comportar
  * mal em producao no dia da demo — desligar e uma variavel, nao um deploy de
  * codigo.
+ *
+ * O NOME ficou estreito e o alcance nao: a chave e o disjuntor de TODA leitura
+ * de pixel feita pela lib nativa — recorte, medicao de contraste e, desde
+ * 2026-07-26, a decodificacao do QR da placa (`qr-imagem.ts`). Se sharp e o
+ * problema, nao adianta desligar dois dos tres usos dela. Efeito de desligar:
+ * relevo sai `nao-confirmada` e os campos `*-qr` saem sem leitura
+ * (`nao_conferivel`) — degradacao, nunca valor chutado.
  */
 export function recorteLigado(
   valor: string | undefined = process.env.EXTRACAO_RECORTE,
@@ -97,7 +104,7 @@ export function recorteLigado(
 
 const logger = new Logger('Recorte');
 
-type Sharp = (typeof import('sharp'))['default'];
+export type Sharp = (typeof import('sharp'))['default'];
 
 let sharpCarregado: Sharp | null | undefined;
 
@@ -109,8 +116,13 @@ let sharpCarregado: Sharp | null | undefined;
  * binario nativo em imagem musl e um risco real e o hackathon tem 2 dias:
  * import dinamico dentro de try/catch faz a falta da lib virar DEGRADACAO
  * (uma chamada por foto, leitura sem corroboracao) em vez de a API nao subir.
+ *
+ * EXPORTADA para `qr-imagem.ts` (decodificacao do QR da placa) usar o MESMO
+ * loader: um cache, um aviso e um unico ponto onde a lib nativa pode faltar.
+ * Duas tentativas de import independentes acabariam com metade do sistema
+ * degradando e a outra metade nao.
  */
-async function carregarSharp(): Promise<Sharp | null> {
+export async function carregarSharp(): Promise<Sharp | null> {
   if (sharpCarregado !== undefined) {
     return sharpCarregado;
   }

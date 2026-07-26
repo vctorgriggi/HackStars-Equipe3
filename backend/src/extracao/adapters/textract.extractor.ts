@@ -14,7 +14,11 @@ import {
   LeituraExtraida,
   ResultadoExtracao,
 } from '../ports/extractor.port';
-import { ehMarcacaoEmRelevo, tipoDeMarcacaoDoCampo } from '../ports/marcacao';
+import {
+  ehMarcacaoEmRelevo,
+  ehMarcacaoQr,
+  tipoDeMarcacaoDoCampo,
+} from '../ports/marcacao';
 import {
   AlvoTipado,
   ClasseDeContraste,
@@ -22,6 +26,7 @@ import {
   classificarMarcacao,
   medicaoConclusiva,
 } from './contraste';
+import { lerQrDaFoto } from './qr-imagem';
 import {
   CaixaNormalizada,
   ImagemRecortavel,
@@ -91,6 +96,12 @@ import {
  * (SPEC, Could "conferencia de consistencia por achados livres"). O adapter
  * nao interpreta nem filtra: quem decide o que e ruido e o cruzamento contra
  * os valores do QR, em `conferencias/`.
+ *
+ * QR DA PLACA (2026-07-26): campo cujo nome declara `qr`
+ * (`serie-placa-qr`, `patrimonio-placa-qr`) NAO passa por nada disto. Ele e
+ * decodificado localmente em `qr-imagem.ts`, sem Textract, sem contraste e sem
+ * recorte — o porque de cada exclusao esta la. Este adapter so faz o
+ * roteamento, em `extrair`.
  */
 
 /** Distancia maxima (coordenadas normalizadas) entre numero e rotulo vizinho. */
@@ -230,6 +241,23 @@ function leituraVazia(campo: string, fonte: FonteImagem): LeituraExtraida {
     regiaoLeitura: null,
     fotoEvidenciaId: fonte.fotoEvidenciaId,
   };
+}
+
+/**
+ * Leituras reordenadas pela ordem dos ALVOS, com buraco preenchido por leitura
+ * vazia. Existe porque os dois canais (OCR e decode de QR) produzem listas
+ * separadas, e a ordem da checklist e contrato de quem le a resposta.
+ */
+function naOrdemDosAlvos(
+  alvos: CampoAlvo[],
+  leituras: LeituraExtraida[],
+  fonte: FonteImagem,
+): LeituraExtraida[] {
+  const porCampo = new Map(leituras.map((leitura) => [leitura.campo, leitura]));
+
+  return alvos.map(
+    (alvo) => porCampo.get(alvo.campo) ?? leituraVazia(alvo.campo, fonte),
+  );
 }
 
 function leituraDaLinha(
@@ -378,8 +406,13 @@ function resolverNumericos(
   consumidas: Set<LinhaOcr>,
   classes: ClassesPorRegiao,
 ): string[] {
+  // Campo `*-qr` NUNCA disputa numero de OCR, mesmo tendo prefixo `serie-` ou
+  // `patrimonio-`: ele e resolvido por decode local (`qr-imagem.ts`). O adapter
+  // ja o separa antes de chegar aqui; a guarda repetida protege quem chama
+  // `interpretarBlocos` direto (spike, teste) de ver o QR "vencer" o numero
+  // impresso da placa por ordem de checklist.
   const alvosNumericos = alvos.filter(
-    (alvo) => familiaDoCampo(alvo.campo) !== null,
+    (alvo) => familiaDoCampo(alvo.campo) !== null && !ehMarcacaoQr(alvo.campo),
   );
   if (alvosNumericos.length === 0) {
     return [];
@@ -784,7 +817,53 @@ export class TextractExtractor extends ExtractorPort {
     this.cliente = new TextractClient({ region: regiao });
   }
 
+  /**
+   * DOIS CANAIS DE LEITURA NA MESMA FOTO, e um deles nao passa pela AWS.
+   *
+   * Os alvos sao separados por TIPO DE MARCACAO (`ports/marcacao.ts`):
+   * - campo `*-qr` (o QR da placa) e decodificado LOCALMENTE, em `qr-imagem.ts`
+   *   — Reed-Solomon sobre pixels que ja estao na memoria, sem rede e sem
+   *   custo. Ele nao entra no OCR, nao entra na discriminacao por contraste e
+   *   nao e relido em recortes: essas tres regras existem para texto lido por
+   *   confianca, e QR ou fecha ou nao fecha;
+   * - todo o resto segue o caminho de sempre (Textract + contraste +
+   *   corroboracao), sem uma linha de comportamento alterada.
+   *
+   * FOTO SO COM ALVO DE QR NAO CHAMA O TEXTRACT. E o unico jeito honesto de
+   * respeitar a constraint 4 do SPEC aqui: pagar OCR para uma vista cujos
+   * campos sao todos decodificaveis de graca seria queimar credito por
+   * definicao. Na checklist de hoje a vista `placa` tem os dois tipos, entao a
+   * chamada acontece de qualquer forma — o ramo existe para o dia em que uma
+   * vista so tiver QR.
+   */
   async extrair(
+    fonte: FonteImagem,
+    alvos: CampoAlvo[],
+  ): Promise<ResultadoExtracao> {
+    if (alvos.length === 0) {
+      return { leituras: [], achadosLivres: [] };
+    }
+
+    const alvosQr = alvos.filter((alvo) => ehMarcacaoQr(alvo.campo));
+    const alvosDeTexto = alvos.filter((alvo) => !ehMarcacaoQr(alvo.campo));
+
+    const doQr = await lerQrDaFoto(fonte, alvosQr);
+    const doTexto = await this.extrairPorOcr(fonte, alvosDeTexto);
+
+    return {
+      // Ordem dos alvos preservada mesmo com os dois canais: quem chamou monta
+      // a tabela do spike (e a resposta do endpoint) na ordem da checklist.
+      leituras: naOrdemDosAlvos(
+        alvos,
+        [...doTexto.leituras, ...doQr.leituras],
+        fonte,
+      ),
+      achadosLivres: [...doTexto.achadosLivres, ...doQr.achadosLivres],
+    };
+  }
+
+  /** O caminho de OCR: Textract + contraste + corroboracao por recorte. */
+  private async extrairPorOcr(
     fonte: FonteImagem,
     alvos: CampoAlvo[],
   ): Promise<ResultadoExtracao> {

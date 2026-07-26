@@ -90,7 +90,12 @@ function montarBancada(
   // e o findById (que o create/update do service usa para validar o vinculo)
   // ecoa o registro.
   const buscarOuCriarClientePorNome = jest.fn((nome: string) =>
-    Promise.resolve({ id: 'cliente-1', nome, createdAt: AGORA, updatedAt: AGORA }),
+    Promise.resolve({
+      id: 'cliente-1',
+      nome,
+      createdAt: AGORA,
+      updatedAt: AGORA,
+    }),
   );
   const clienteService = {
     buscarOuCriarPorNome: buscarOuCriarClientePorNome,

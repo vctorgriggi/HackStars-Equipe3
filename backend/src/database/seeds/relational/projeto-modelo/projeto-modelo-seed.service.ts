@@ -44,6 +44,8 @@ export class ProjetoModeloSeedService {
     // | potencia-serigrafia-frente     | frente           | NAO    | serigrafia    |
     // | serie-placa                    | placa (close)    | sim    | fixacao-placa |
     // | patrimonio-placa               | placa (close)    | sim    | fixacao-placa |
+    // | serie-placa-qr                 | placa (close)    | sim    | fixacao-placa |
+    // | patrimonio-placa-qr            | placa (close)    | sim    | fixacao-placa |
     //
     // PATRIMÔNIO EM DUAS FACES: o desenho pede a marcação no topo E na frente
     // (medido: 2 patrimônios em faces diferentes, 100% e 98,5%). A checklist
@@ -112,6 +114,47 @@ export class ProjetoModeloSeedService {
       },
       {
         campo: 'patrimonio-placa',
+        fonteFisica: 'placa',
+        obrigatorio: true,
+        etapa: 'fixacao-placa',
+      },
+      // O QR DA PLACA É UMA MARCAÇÃO DA PLACA, e passou a ser conferido em
+      // 2026-07-26. A placa de identificação não traz só números impressos:
+      // traz um QR próprio, e na peça de demo ele carrega a série CORRETA
+      // (847233) enquanto o número IMPRESSO ao lado dele diz 847833. Até aqui
+      // o sistema conferia o texto e ignorava a evidência que estava a dois
+      // centímetros — a mesma placa se contradizendo.
+      //
+      // POR QUE ISTO É BARATO: QR não é OCR. O adapter decodifica a imagem
+      // LOCALMENTE (`extracao/adapters/qr-imagem.ts`, sharp + jsqr), sem
+      // chamada de visão, sem custo e sem tocar no teto de 3 chamadas por foto
+      // (SPEC, constraint 4). A vista é a mesma `placa`: a foto que já se tira
+      // do close resolve os quatro campos de uma vez.
+      //
+      // POR QUE NÃO PRECISOU DE REGRA NOVA em lugar nenhum:
+      // - o PREFIXO continua sendo o contrato — `serie-`/`patrimonio-` é como
+      //   `ORIGENS_DO_ESPERADO` acha o valor esperado no QR da etiqueta;
+      // - o segmento `qr` no nome é o que diz ao adapter que a marcação se lê
+      //   por decode (`extracao/ports/marcacao.ts`), do mesmo jeito que
+      //   `-chumbada-` diz relevo e `-serigrafia-` diz tinta;
+      // - a COERÊNCIA entre irmãos agrupa por VALOR ESPERADO, então estes dois
+      //   entram sozinhos no grupo da série e do patrimônio. Placa com
+      //   impressão errada e QR certo vira incoerência DENTRO da própria placa
+      //   — o caso real da peça de demo, que antes não tinha como aparecer.
+      //
+      // LIMITE CONHECIDO, para não parecer garantia que não é: se o operador
+      // escanear o PRÓPRIO QR da placa como payload da etiqueta, este campo
+      // compara o QR consigo mesmo e sai trivialmente `conforme`. A fonte da
+      // verdade continua sendo a ETIQUETA adesiva (SPEC, constraint 5); é o
+      // cruzamento entre as duas fontes que dá valor a estes dois itens.
+      {
+        campo: 'serie-placa-qr',
+        fonteFisica: 'placa',
+        obrigatorio: true,
+        etapa: 'fixacao-placa',
+      },
+      {
+        campo: 'patrimonio-placa-qr',
         fonteFisica: 'placa',
         obrigatorio: true,
         etapa: 'fixacao-placa',
