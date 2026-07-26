@@ -50,12 +50,22 @@ import { ClientesModule } from './clientes/clientes.module';
 // servida em /esteira, para o telão da demo. Remover os DOIS logo após a
 // apresentação — a página faz login sem guard, como a /demo.
 import { EsteiraModule } from './esteira/esteira.module';
+// O app de producao web/ e exportado estatico (next output: export) e servido
+// pela PROPRIA API em /app: mesmo dominio HTTPS do App Runner (camera do
+// celular exige origem segura) e nenhum servico novo. O diretorio web-app/ e
+// artefato de build (fora do git); receita no docs/deploy.md.
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 
 @Module({
   imports: [
     ClientesModule,
     DemoModule,
     EsteiraModule,
+    ServeStaticModule.forRoot({
+      rootPath: join(process.cwd(), 'web-app'),
+      serveRoot: '/app',
+    }),
 
     ExtracaoModule,
 
