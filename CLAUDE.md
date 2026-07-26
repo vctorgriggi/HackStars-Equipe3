@@ -53,6 +53,10 @@ backend/                  # NestJS (base brocoders/nestjs-boilerplate)
     fotos-evidencia/      # CRUD FotoEvidencia (gerado); recebe upload/S3 (T2.3)
     checkpoints/          # CRUD Checkpoint (gerado); seed das etapas ordenadas da linha
     passagens/            # CRUD Passagem (gerado); trânsito (T4.1)
+    clientes/             # Cliente (gerado, LEITURA); nasce por find-or-create do QR;
+                          #   GET lista com contadores server-side (consultas/)
+    cameras/              # CRUD Camera (gerado): provisionamento câmera fixa —
+                          #   vínculo a Checkpoint + fonteFisica (vista); seed 1/gate
     extracao/             # ExtractorPort + adapters textract|bedrock|mock;
                           #   driver por env EXTRACTOR_DRIVER (mock default)
     auth/, files/, i18n/  # herdados do boilerplate; não usados nesta rodada

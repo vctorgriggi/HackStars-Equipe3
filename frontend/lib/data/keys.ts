@@ -16,6 +16,12 @@ export const keys = {
       ["transformadores-api", id, "conferencias"] as const,
   },
   etapasLinha: { all: ["etapas-linha"] as const },
+  // API real de clientes/projetos/câmeras — sufixo próprio para não colidir
+  // com o cache mock abaixo (keys.cameras segue vivo no detalhe de
+  // checkpoint, ainda não integrado).
+  clientesApi: { all: ["clientes-api"] as const },
+  projetosApi: { all: ["projetos-api"] as const },
+  camerasApi: { all: ["cameras-api"] as const },
   clientes: { all: ["clientes"] as const },
   lotes: { all: ["lotes"] as const },
   projetos: { all: ["projetos"] as const },

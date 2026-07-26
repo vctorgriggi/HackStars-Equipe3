@@ -14,8 +14,11 @@ import { CheckpointSeedModule } from './checkpoint/checkpoint-seed.module';
 
 import { ProjetoModeloSeedModule } from './projeto-modelo/projeto-modelo-seed.module';
 
+import { CameraSeedModule } from './camera/camera-seed.module';
+
 @Module({
   imports: [
+    CameraSeedModule,
     ProjetoModeloSeedModule,
     CheckpointSeedModule,
     RoleSeedModule,

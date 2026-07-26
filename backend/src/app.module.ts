@@ -57,8 +57,11 @@ import { EsteiraModule } from './esteira/esteira.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 
+import { CamerasModule } from './cameras/cameras.module';
+
 @Module({
   imports: [
+    CamerasModule,
     ClientesModule,
     DemoModule,
     EsteiraModule,

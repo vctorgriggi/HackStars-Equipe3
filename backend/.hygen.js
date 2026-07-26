@@ -20,6 +20,8 @@ const PLURAIS_IRREGULARES = [
   ['FotoEvidencia', 'FotosEvidencia'],
   ['ProjetoModelo', 'ProjetosModelo'],
   ['Passagem', 'Passagens'],
+  // Coincide com o plural ingles, mas fica registrado (regra do CLAUDE.md).
+  ['Camera', 'Cameras'],
 ];
 
 const chave = (str) =>

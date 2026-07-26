@@ -1,8 +1,11 @@
 import { Controller, Get, Param, UseGuards, Query } from '@nestjs/common';
 import { ClientesService } from './clientes.service';
+import { ClientesConsultasService } from './consultas/clientes-consultas.service';
+import { ClienteComContadores } from './consultas/cliente-com-contadores';
 import {
   ApiBearerAuth,
   ApiOkResponse,
+  ApiOperation,
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
@@ -23,7 +26,10 @@ import { FindAllClientesDto } from './dto/find-all-clientes.dto';
   version: '1',
 })
 export class ClientesController {
-  constructor(private readonly clientesService: ClientesService) {}
+  constructor(
+    private readonly clientesService: ClientesService,
+    private readonly clientesConsultasService: ClientesConsultasService,
+  ) {}
 
   // ESCRITA DESATIVADA (mesmo padrão de projetos-modelo, T2.9). O cadastro
   // nasce exclusivamente do find-or-create server-side quando a identidade da
@@ -36,12 +42,17 @@ export class ClientesController {
   // service para o caminho server-side; reabrir só com RolesGuard (pós-demo).
 
   @Get()
+  @ApiOperation({
+    summary:
+      'Lista clientes com contadores derivados no servidor: total de peças ' +
+      'vinculadas e peças cujo veredito vigente é divergente',
+  })
   @ApiOkResponse({
-    type: InfinityPaginationResponse(Cliente),
+    type: InfinityPaginationResponse(ClienteComContadores),
   })
   async findAll(
     @Query() query: FindAllClientesDto,
-  ): Promise<InfinityPaginationResponseDto<Cliente>> {
+  ): Promise<InfinityPaginationResponseDto<ClienteComContadores>> {
     const page = query?.page ?? 1;
     let limit = query?.limit ?? 10;
     if (limit > 50) {
@@ -49,7 +60,7 @@ export class ClientesController {
     }
 
     return infinityPagination(
-      await this.clientesService.findAllWithPagination({
+      await this.clientesConsultasService.listarComContadores({
         paginationOptions: {
           page,
           limit,

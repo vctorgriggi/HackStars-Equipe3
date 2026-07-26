@@ -7,6 +7,7 @@ import { Transformador } from '../../../../domain/transformador';
 import {
   FiltroTransformador,
   TransformadorRepository,
+  VinculoClienteTransformador,
 } from '../../transformador.repository';
 import { TransformadorMapper } from '../mappers/transformador.mapper';
 import { IPaginationOptions } from '../../../../../utils/types/pagination-options';
@@ -78,6 +79,43 @@ export class TransformadorRelationalRepository implements TransformadorRepositor
     });
 
     return entity ? TransformadorMapper.toDomain(entity) : null;
+  }
+
+  async findVinculosPorClientes(
+    clienteIds: string[],
+  ): Promise<VinculoClienteTransformador[]> {
+    if (clienteIds.length === 0) {
+      return [];
+    }
+
+    // getRawMany de proposito: so os dois ids atravessam o fio — hidratar a
+    // entity dispararia o eager de cliente e projeto (checklist inteira) para
+    // cada peca da pagina (gap 3).
+    return this.transformadorRepository
+      .createQueryBuilder('transformador')
+      .select('transformador.id', 'transformadorId')
+      .addSelect('cliente.id', 'clienteId')
+      .innerJoin('transformador.clienteVinculado', 'cliente')
+      .where('cliente.id IN (:...clienteIds)', { clienteIds })
+      .getRawMany<VinculoClienteTransformador>();
+  }
+
+  async contarPorProjetos(projetoIds: string[]): Promise<Map<string, number>> {
+    if (projetoIds.length === 0) {
+      return new Map();
+    }
+
+    const linhas = await this.transformadorRepository
+      .createQueryBuilder('transformador')
+      .select('projeto.id', 'projetoId')
+      .addSelect('COUNT(*)', 'total')
+      .innerJoin('transformador.projetoModelo', 'projeto')
+      .where('projeto.id IN (:...projetoIds)', { projetoIds })
+      .groupBy('projeto.id')
+      .getRawMany<{ projetoId: string; total: string }>();
+
+    // COUNT chega como string do driver pg.
+    return new Map(linhas.map((l) => [l.projetoId, Number(l.total)]));
   }
 
   async update(

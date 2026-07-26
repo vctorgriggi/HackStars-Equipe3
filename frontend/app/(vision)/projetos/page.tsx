@@ -1,71 +1,65 @@
 "use client";
 
-import type { Projeto } from "@/lib/domain/types";
-import { useProjetos } from "@/lib/data/use-listagens";
-import { READING_VAR } from "@/lib/domain/status";
+// Listagem de projetos-modelo — API REAL. Os contadores (totalPecas,
+// totalCampos) chegam PRONTOS do servidor. Lotes/progresso/entrega do mock
+// saíram: não existem no domínio real (ProjetoModelo = código do desenho +
+// checklist que a engine consome).
+
+import type { ProjetoModeloComContadoresApi } from "@/lib/domain/projeto-api";
+import { useProjetosApi } from "@/lib/data/use-projetos-api";
 import { DataTable, type Column } from "@/components/ui/data-table";
-import { ProgressBar } from "@/components/ui/progress-bar";
+import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonListagem } from "@/components/ui/skeleton";
 
-const columns: Column<Projeto>[] = [
+const columns: Column<ProjetoModeloComContadoresApi>[] = [
   {
-    id: "projeto",
+    id: "codigo",
     header: "Projeto",
-    width: "minmax(120px,1.2fr)",
+    width: "minmax(140px,0.8fr)",
     truncate: true,
     cell: (p) => (
-      <span className="text-sm font-medium text-text-1">{p.nome}</span>
+      <span className="t-mono text-sm font-medium text-text-1">{p.codigo}</span>
     ),
   },
   {
-    id: "cliente",
-    header: "Cliente",
-    width: "minmax(100px,1fr)",
+    id: "descricao",
+    header: "Descrição",
+    width: "minmax(160px,1.4fr)",
     truncate: true,
-    cell: (p) => <span className="text-sm text-text-2">{p.clienteNome}</span>,
-  },
-  {
-    id: "lotes",
-    header: "Lotes",
-    width: "44px",
-    cell: (p) => <span className="t-mono text-sm">{p.lotes}</span>,
-  },
-  {
-    id: "unidades",
-    header: "Unid.",
-    width: "62px",
-    cell: (p) => <span className="t-mono text-sm">{p.unidades}</span>,
-  },
-  {
-    id: "progresso",
-    header: "Progresso",
-    width: "minmax(84px,1fr)",
     cell: (p) => (
-      <span className="flex items-center gap-2">
-        <span className="min-w-0 flex-1">
-          <ProgressBar
-            value={p.progresso}
-            color={READING_VAR[p.status]}
-            label={`Progresso de ${p.nome}`}
-          />
-        </span>
-        <span className="t-mono text-xs text-text-2">{p.progresso}%</span>
-      </span>
+      <span className="text-sm text-text-2">{p.descricao ?? "—"}</span>
     ),
   },
   {
-    id: "entrega",
-    header: "Entrega",
-    width: "66px",
+    id: "pecas",
+    header: "Peças",
+    width: "80px",
+    cell: (p) => <span className="t-mono text-sm">{p.totalPecas}</span>,
+  },
+  {
+    id: "campos",
+    header: "Campos na checklist",
+    width: "150px",
     cell: (p) => (
-      <span className="t-mono text-xs text-text-2">{p.entrega}</span>
+      <span className="t-mono text-sm text-text-2">{p.totalCampos}</span>
     ),
   },
 ];
 
 export default function ProjetosPage() {
-  const { data: projetos, isPending } = useProjetos();
+  const { data: projetos, isPending, isError, refetch } = useProjetosApi();
+
   if (isPending) return <SkeletonListagem />;
+
+  if (isError) {
+    return (
+      <EmptyState
+        title="Não foi possível carregar os projetos"
+        description="A API não respondeu. Verifique a conexão e tente de novo."
+        action={{ label: "Tentar novamente", onClick: () => void refetch() }}
+      />
+    );
+  }
 
   return (
     <DataTable
@@ -73,32 +67,26 @@ export default function ProjetosPage() {
       columns={columns}
       rowKey={(p) => p.id}
       label="Projetos"
+      empty={
+        <EmptyState
+          title="Nenhum projeto cadastrado"
+          description="O projeto-modelo entra por seed (e, no futuro, pela ingestão do PDF com revisão) — não há cadastro manual."
+        />
+      }
       renderCard={(p) => (
         <div className="grid gap-2">
           <div className="flex items-center justify-between gap-2">
-            <span className="truncate text-sm font-medium text-text-1">
-              {p.nome}
+            <span className="t-mono truncate text-sm font-medium text-text-1">
+              {p.codigo}
             </span>
             <span className="t-mono flex-none text-xs text-text-3">
-              {p.entrega}
+              {p.totalPecas} {p.totalPecas === 1 ? "peça" : "peças"}
             </span>
           </div>
-          <p className="text-sm text-text-2">
-            {p.clienteNome} ·{" "}
-            <span className="t-mono text-xs">
-              {p.lotes} {p.lotes === 1 ? "lote" : "lotes"} · {p.unidades} unid.
-            </span>
+          <p className="truncate text-sm text-text-2">{p.descricao ?? "—"}</p>
+          <p className="t-mono text-xs text-text-3">
+            {p.totalCampos} campos na checklist
           </p>
-          <div className="flex items-center gap-2">
-            <span className="min-w-0 flex-1">
-              <ProgressBar
-                value={p.progresso}
-                color={READING_VAR[p.status]}
-                label={`Progresso de ${p.nome}`}
-              />
-            </span>
-            <span className="t-mono text-xs text-text-2">{p.progresso}%</span>
-          </div>
         </div>
       )}
     />

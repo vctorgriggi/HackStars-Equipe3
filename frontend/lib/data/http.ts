@@ -18,15 +18,25 @@ async function tentarRefresh(): Promise<boolean> {
   return refreshResponse.ok;
 }
 
-export async function fetchJson<T>(url: string): Promise<T> {
-  let response = await fetch(url);
+export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+  let response = await fetch(url, init);
 
   if (response.status === 401 && (await tentarRefresh())) {
-    response = await fetch(url);
+    response = await fetch(url, init);
   }
 
   if (!response.ok) {
-    throw new ApiError(response.status, `GET ${url} → ${response.status}`);
+    throw new ApiError(
+      response.status,
+      `${init?.method ?? "GET"} ${url} → ${response.status}`,
+    );
+  }
+
+  // DELETE do CRUD gerado (e 204 em geral) responde sem corpo — chamar
+  // response.json() aqui estouraria em SyntaxError.
+  const contentType = response.headers.get("content-type") ?? "";
+  if (response.status === 204 || !contentType.includes("application/json")) {
+    return undefined as T;
   }
 
   return response.json() as Promise<T>;
