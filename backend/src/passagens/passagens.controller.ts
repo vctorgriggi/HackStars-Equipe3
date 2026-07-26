@@ -8,16 +8,22 @@ import {
   Delete,
   UseGuards,
   Query,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { PassagensService } from './passagens.service';
+import { PassagemRegistroService } from './passagem-registro.service';
 import { CreatePassagemDto } from './dto/create-passagem.dto';
+import { RegistrarPassagemDto } from './dto/registrar-passagem.dto';
 import { UpdatePassagemDto } from './dto/update-passagem.dto';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
   ApiOkResponse,
+  ApiOperation,
   ApiParam,
   ApiTags,
+  ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import { Passagem } from './domain/passagem';
 import { AuthGuard } from '@nestjs/passport';
@@ -36,7 +42,10 @@ import { FindAllPassagensDto } from './dto/find-all-passagens.dto';
   version: '1',
 })
 export class PassagensController {
-  constructor(private readonly passagensService: PassagensService) {}
+  constructor(
+    private readonly passagensService: PassagensService,
+    private readonly passagemRegistroService: PassagemRegistroService,
+  ) {}
 
   @Post()
   @ApiCreatedResponse({
@@ -44,6 +53,34 @@ export class PassagensController {
   })
   create(@Body() createPassagemDto: CreatePassagemDto) {
     return this.passagensService.create(createPassagemDto);
+  }
+
+  @Post('registrar')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Registra a passagem da peca por uma etapa, a partir do QR',
+    description:
+      'Caminho do operador: le o QR e informa a etapa em que o dispositivo ' +
+      'esta fixado. A peca sai por find-or-create pelo numero de serie (o QR ' +
+      'e a fonte da verdade: patrimonio/cliente/pedido divergentes atualizam ' +
+      'o registro) e a etapa e resolvida pelo `codigo` do Checkpoint. A ' +
+      'resposta traz `ultimaConferencia` — o ultimo veredito conhecido da ' +
+      'peca, ou null se ela nunca foi conferida — para o alerta de ' +
+      'divergencia aparecer no ato do scan. Scans repetidos na mesma etapa ' +
+      'geram eventos distintos, de proposito: sao passagens reais.',
+  })
+  @ApiCreatedResponse({
+    description:
+      'Passagem criada: { passagem, checkpoint, transformador, ' +
+      'ultimaConferencia }.',
+  })
+  @ApiUnprocessableEntityResponse({
+    description:
+      'payloadQr ilegivel/somente-codigo ou etapa-desconhecida. Os dois saem ' +
+      'antes da primeira escrita: 422 nunca deixa peca orfa.',
+  })
+  registrar(@Body() registrarPassagemDto: RegistrarPassagemDto) {
+    return this.passagemRegistroService.registrar(registrarPassagemDto);
   }
 
   @Get()

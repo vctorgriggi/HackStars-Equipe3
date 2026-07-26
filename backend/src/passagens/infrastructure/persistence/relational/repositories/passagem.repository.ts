@@ -36,6 +36,23 @@ export class PassagemRelationalRepository implements PassagemRepository {
     return entities.map((entity) => PassagemMapper.toDomain(entity));
   }
 
+  async findAllByTransformador({
+    transformadorId,
+    paginationOptions,
+  }: {
+    transformadorId: string;
+    paginationOptions: IPaginationOptions;
+  }): Promise<Passagem[]> {
+    const entities = await this.passagemRepository.find({
+      where: { transformador: { id: transformadorId } },
+      skip: (paginationOptions.page - 1) * paginationOptions.limit,
+      take: paginationOptions.limit,
+      order: { createdAt: 'ASC', id: 'ASC' },
+    });
+
+    return entities.map((entity) => PassagemMapper.toDomain(entity));
+  }
+
   async findById(id: Passagem['id']): Promise<NullableType<Passagem>> {
     const entity = await this.passagemRepository.findOne({
       where: { id },

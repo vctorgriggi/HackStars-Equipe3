@@ -126,11 +126,21 @@ function montarBancada(
   const atualizarTransformador = jest.fn(() =>
     Promise.resolve(transformador(PROJETO_DEMO)),
   );
+  // `lerPayloadDoQr` e `buscarOuCriarPorPayload` sao os metodos REAIS do dono
+  // da entidade (a execucao delega, nao reimplementa — a copia privada que
+  // vivia aqui foi apagada). O duble usa as implementacoes verdadeiras com os
+  // colaboradores dublados: e o parser e o find-or-create de producao que
+  // rodam nestes testes, incluindo os 422 de payload.
   const transformadorService = {
     findByNumeroSerie: jest.fn(() => Promise.resolve(pecaExistente)),
     create: criarTransformador,
     update: atualizarTransformador,
   } as unknown as TransformadoresService;
+  const serviceReal = TransformadoresService.prototype;
+  transformadorService.lerPayloadDoQr =
+    serviceReal.lerPayloadDoQr.bind(transformadorService);
+  transformadorService.buscarOuCriarPorPayload =
+    serviceReal.buscarOuCriarPorPayload.bind(transformadorService);
 
   const findAllProjetos = jest.fn(() => Promise.resolve(projetos));
   const findByCodigoProjeto = jest.fn((codigo: string) =>

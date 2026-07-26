@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, FindOptionsWhere } from 'typeorm';
 import { TransformadorEntity } from '../entities/transformador.entity';
 import { NullableType } from '../../../../../utils/types/nullable.type';
 import { Transformador } from '../../../../domain/transformador';
-import { TransformadorRepository } from '../../transformador.repository';
+import {
+  FiltroTransformador,
+  TransformadorRepository,
+} from '../../transformador.repository';
 import { TransformadorMapper } from '../mappers/transformador.mapper';
 import { IPaginationOptions } from '../../../../../utils/types/pagination-options';
 
@@ -24,13 +27,26 @@ export class TransformadorRelationalRepository implements TransformadorRepositor
   }
 
   async findAllWithPagination({
+    filterOptions,
     paginationOptions,
   }: {
+    filterOptions?: FiltroTransformador | null;
     paginationOptions: IPaginationOptions;
   }): Promise<Transformador[]> {
+    const where: FindOptionsWhere<TransformadorEntity> = {};
+    if (filterOptions?.numeroSerie) {
+      where.numeroSerie = filterOptions.numeroSerie;
+    }
+    if (filterOptions?.pedido) {
+      where.pedido = filterOptions.pedido;
+    }
+
     const entities = await this.transformadorRepository.find({
+      where,
       skip: (paginationOptions.page - 1) * paginationOptions.limit,
       take: paginationOptions.limit,
+      // Ordem estavel: sem ela o Postgres pode devolver paginas repetidas.
+      order: { createdAt: 'ASC', id: 'ASC' },
     });
 
     return entities.map((entity) => TransformadorMapper.toDomain(entity));

@@ -16,12 +16,7 @@ import { Checkpoint } from '../checkpoints/domain/checkpoint';
 import { ProjetoModelo } from '../projetos-modelo/domain/projeto-modelo';
 import { Transformador } from '../transformadores/domain/transformador';
 
-import {
-  PayloadEtiqueta,
-  PayloadInvalidoError,
-  ResultadoParse,
-} from '../transformadores/qr/payload-etiqueta';
-import { parsePayloadEtiqueta } from '../transformadores/qr/qr-payload.parser';
+import { PayloadEtiqueta } from '../transformadores/qr/payload-etiqueta';
 
 import { conferir, normalizar } from './engine/engine-conformidade';
 import { ItemChecklist, LeituraCampo, ResultadoCampo } from './engine/tipos';
@@ -33,9 +28,6 @@ import { ConferenciaRepository } from './infrastructure/persistence/conferencia.
  * nunca dentro da engine: politica e parametro, nao constante enterrada.
  */
 export const LIMIAR_CONFIANCA_PADRAO = 0.8;
-
-/** Postgres: unique_violation. */
-const CODIGO_VIOLACAO_UNIQUE = '23505';
 
 export interface CampoExecutado extends ResultadoCampo {
   campoConferidoId: string;
@@ -171,18 +163,6 @@ const ORIGENS_DO_ESPERADO: {
   { prefixo: 'cliente-', ler: (payload) => payload.cliente },
 ];
 
-function ehViolacaoDeUnique(erro: unknown): boolean {
-  const bruto = erro as
-    | { code?: string; driverError?: { code?: string } }
-    | null
-    | undefined;
-
-  return (
-    bruto?.driverError?.code === CODIGO_VIOLACAO_UNIQUE ||
-    bruto?.code === CODIGO_VIOLACAO_UNIQUE
-  );
-}
-
 // Exportado por ser a validação ÚNICA de item de checklist — a versão que
 // vivia duplicada em conferencia-extracao divergia (não validava `etapa`) e
 // deixava checklist ruim pagar visão antes de explodir aqui.
@@ -263,7 +243,7 @@ export class ConferenciaExecucaoService {
     payloadQr: string;
     etapaCodigo?: string;
   }): Promise<ContextoExecucao> {
-    const payload = this.lerPayload(dto.payloadQr);
+    const payload = this.transformadorService.lerPayloadDoQr(dto.payloadQr);
 
     // Etapa e resolvida antes de qualquer escrita: codigo desconhecido nao
     // pode deixar transformador orfao no banco.
@@ -316,10 +296,11 @@ export class ConferenciaExecucaoService {
     const { payload, checkpoint, projetoModelo, checklist } = preparado;
 
     // Primeira escrita do fluxo: daqui para baixo, nenhum 422.
-    const transformador = await this.buscarOuCriarTransformador(
-      payload,
-      preparado.transformadorExistente,
-    );
+    const transformador =
+      await this.transformadorService.buscarOuCriarPorPayload(
+        payload,
+        preparado.transformadorExistente,
+      );
 
     if (!transformador.projetoModelo) {
       await this.transformadorService.update(transformador.id, {
@@ -466,37 +447,6 @@ export class ConferenciaExecucaoService {
     return recorte.itens;
   }
 
-  private lerPayload(payloadQr: string): PayloadEtiqueta {
-    let resultado: ResultadoParse;
-
-    try {
-      resultado = parsePayloadEtiqueta(payloadQr);
-    } catch (erro) {
-      if (erro instanceof PayloadInvalidoError) {
-        throw new UnprocessableEntityException({
-          status: HttpStatus.UNPROCESSABLE_ENTITY,
-          errors: {
-            payloadQr: erro.motivo,
-          },
-        });
-      }
-      throw erro;
-    }
-
-    // QR so com codigo de lookup: o fallback de digitacao manual e do front.
-    if (resultado.tipo === 'codigo') {
-      throw new UnprocessableEntityException({
-        status: HttpStatus.UNPROCESSABLE_ENTITY,
-        errors: {
-          payloadQr:
-            'payload-somente-codigo: lookup nao suportado nesta rodada',
-        },
-      });
-    }
-
-    return resultado.dados;
-  }
-
   private async resolverCheckpoint(
     etapaCodigo?: string,
   ): Promise<Checkpoint | null> {
@@ -515,65 +465,6 @@ export class ConferenciaExecucaoService {
     }
 
     return checkpoint;
-  }
-
-  /**
-   * `existente` chega resolvido do `prepararExecucao` (find sem create) — a
-   * criação só acontece aqui, depois de todos os 422 (achado 8). Corrida no
-   * meio do caminho continua coberta pelo retry de unique violation abaixo.
-   */
-  private async buscarOuCriarTransformador(
-    payload: PayloadEtiqueta,
-    existente: Transformador | null,
-  ): Promise<Transformador> {
-    if (existente) {
-      // QR é a fonte da verdade (SPEC, constraint 5): se a etiqueta traz
-      // dado diferente do registro, o registro é atualizado — antes disso a
-      // resposta exibia o valor antigo enquanto a engine comparava contra o
-      // novo, sem nenhum sinal de conflito (revisão R1).
-      const atualizacao: Record<string, string> = {};
-      if (payload.patrimonio && payload.patrimonio !== existente.patrimonio) {
-        atualizacao.patrimonio = payload.patrimonio;
-      }
-      if (payload.cliente && payload.cliente !== existente.cliente) {
-        atualizacao.cliente = payload.cliente;
-      }
-      if (payload.pedido && payload.pedido !== existente.pedido) {
-        atualizacao.pedido = payload.pedido;
-      }
-      if (Object.keys(atualizacao).length > 0) {
-        const atualizado = await this.transformadorService.update(
-          existente.id,
-          atualizacao,
-        );
-        return atualizado ?? existente;
-      }
-      return existente;
-    }
-
-    try {
-      return await this.transformadorService.create({
-        numeroSerie: payload.numeroSerie,
-        patrimonio: payload.patrimonio,
-        // Coluna NOT NULL: etiqueta sem cliente entra vazia (o QR e a fonte).
-        cliente: payload.cliente ?? '',
-        pedido: payload.pedido,
-        seq: payload.seq,
-        descricao: payload.descricao,
-      });
-    } catch (erro) {
-      if (!ehViolacaoDeUnique(erro)) {
-        throw erro;
-      }
-      // Corrida: outro request criou a mesma peca entre o find e o insert.
-      const concorrente = await this.transformadorService.findByNumeroSerie(
-        payload.numeroSerie,
-      );
-      if (!concorrente) {
-        throw erro;
-      }
-      return concorrente;
-    }
   }
 
   /**

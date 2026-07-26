@@ -36,6 +36,22 @@ export class ConferenciaRelationalRepository implements ConferenciaRepository {
     return entities.map((entity) => ConferenciaMapper.toDomain(entity));
   }
 
+  async findAllByTransformador({
+    transformadorId,
+    limit,
+  }: {
+    transformadorId: string;
+    limit: number;
+  }): Promise<Conferencia[]> {
+    const entities = await this.conferenciaRepository.find({
+      where: { transformador: { id: transformadorId } },
+      take: limit,
+      order: { createdAt: 'DESC', id: 'DESC' },
+    });
+
+    return entities.map((entity) => ConferenciaMapper.toDomain(entity));
+  }
+
   async findById(id: Conferencia['id']): Promise<NullableType<Conferencia>> {
     const entity = await this.conferenciaRepository.findOne({
       where: { id },
