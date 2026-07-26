@@ -1,20 +1,16 @@
 import {
   Controller,
   Get,
-  Post,
   Body,
   Patch,
   Param,
-  Delete,
   UseGuards,
   Query,
 } from '@nestjs/common';
 import { CamposConferidosService } from './campos-conferidos.service';
-import { CreateCampoConferidoDto } from './dto/create-campo-conferido.dto';
 import { UpdateCampoConferidoDto } from './dto/update-campo-conferido.dto';
 import {
   ApiBearerAuth,
-  ApiCreatedResponse,
   ApiOkResponse,
   ApiParam,
   ApiTags,
@@ -40,13 +36,14 @@ export class CamposConferidosController {
     private readonly camposConferidosService: CamposConferidosService,
   ) {}
 
-  @Post()
-  @ApiCreatedResponse({
-    type: CampoConferido,
-  })
-  create(@Body() createCampoConferidoDto: CreateCampoConferidoDto) {
-    return this.camposConferidosService.create(createCampoConferidoDto);
-  }
+  // ESCRITA DESATIVADA (auditoria de superfície, 2026-07-25). Já existia UM
+  // caminho de escrita de veredito (`criarComVeredito`, server-side); este
+  // POST era uma porta paralela que gravava campo sem passar pela engine.
+  //
+  // @Post()
+  // create(@Body() createCampoConferidoDto: CreateCampoConferidoDto) {
+  //   return this.camposConferidosService.create(createCampoConferidoDto);
+  // }
 
   @Get()
   @ApiOkResponse({
@@ -101,13 +98,14 @@ export class CamposConferidosController {
     return this.camposConferidosService.update(id, updateCampoConferidoDto);
   }
 
-  @Delete(':id')
-  @ApiParam({
-    name: 'id',
-    type: String,
-    required: true,
-  })
-  remove(@Param('id') id: string) {
-    return this.camposConferidosService.remove(id);
-  }
+  // DELETE DESATIVADO (auditoria de superfície, 2026-07-25). O PATCH já
+  // devolvia 422 `campo-conferido-imutavel`, mas o DELETE continuava 200:
+  // apagar o único campo `divergente` deixava a conferência com
+  // `vereditoGeral: divergente` e nenhum campo divergente — lastro corrompido
+  // em silêncio. Imutabilidade que não cobre remoção não é imutabilidade.
+  //
+  // @Delete(':id')
+  // remove(@Param('id') id: string) {
+  //   return this.camposConferidosService.remove(id);
+  // }
 }

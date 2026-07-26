@@ -1,20 +1,7 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  UseGuards,
-  Query,
-} from '@nestjs/common';
+import { Controller, Get, Param, UseGuards, Query } from '@nestjs/common';
 import { ProjetosModeloService } from './projetos-modelo.service';
-import { CreateProjetoModeloDto } from './dto/create-projeto-modelo.dto';
-import { UpdateProjetoModeloDto } from './dto/update-projeto-modelo.dto';
 import {
   ApiBearerAuth,
-  ApiCreatedResponse,
   ApiOkResponse,
   ApiParam,
   ApiTags,
@@ -38,13 +25,20 @@ import { FindAllProjetosModeloDto } from './dto/find-all-projetos-modelo.dto';
 export class ProjetosModeloController {
   constructor(private readonly projetosModeloService: ProjetosModeloService) {}
 
-  @Post()
-  @ApiCreatedResponse({
-    type: ProjetoModelo,
-  })
-  create(@Body() createProjetoModeloDto: CreateProjetoModeloDto) {
-    return this.projetosModeloService.create(createProjetoModeloDto);
-  }
+  // ESCRITA DESATIVADA (auditoria de superfície, 2026-07-25). A checklist
+  // deste registro É a norma que a engine consome: com PATCH aberto, remover
+  // `serie-placa` fazia o cenário-âncora (peça defeituosa) responder
+  // `conforme` — o falso OK que a regra de ouro proíbe, emitido pela própria
+  // API; e `checklist: "[]"` derrubava toda conferência em 500. POST também
+  // saiu: um segundo projeto quebra a resolução "único do banco" e todo scan
+  // de peça nova vira 422 `projeto-modelo-indeterminado`.
+  // Nesta rodada a ÚNICA escrita legítima é o seed. A ingestão de projeto
+  // (Fase 6) reabre a criação pela tela de revisão, não por CRUD cru.
+  //
+  // @Post()
+  // create(@Body() createProjetoModeloDto: CreateProjetoModeloDto) {
+  //   return this.projetosModeloService.create(createProjetoModeloDto);
+  // }
 
   @Get()
   @ApiOkResponse({
@@ -83,29 +77,9 @@ export class ProjetosModeloController {
     return this.projetosModeloService.findById(id);
   }
 
-  @Patch(':id')
-  @ApiParam({
-    name: 'id',
-    type: String,
-    required: true,
-  })
-  @ApiOkResponse({
-    type: ProjetoModelo,
-  })
-  update(
-    @Param('id') id: string,
-    @Body() updateProjetoModeloDto: UpdateProjetoModeloDto,
-  ) {
-    return this.projetosModeloService.update(id, updateProjetoModeloDto);
-  }
-
-  @Delete(':id')
-  @ApiParam({
-    name: 'id',
-    type: String,
-    required: true,
-  })
-  remove(@Param('id') id: string) {
-    return this.projetosModeloService.remove(id);
-  }
+  // @Patch(':id') e @Delete(':id') desativados pelo mesmo motivo do @Post()
+  // acima: a checklist é a norma contra a qual as peças são julgadas, e
+  // editá-la por CRUD cru falsifica o veredito de todas as conferências do
+  // modelo. Leitura (GET) segue aberta — a página /demo a usa para saber
+  // quantas posições chumbadas o modelo exige.
 }
