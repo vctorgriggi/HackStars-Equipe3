@@ -91,7 +91,7 @@ imagem da API como export estático, servido pelo `ServeStaticModule` em
 serviço novo. O redeploy da API ganha um pré-passo:
 
 ```bash
-cd web && NEXT_PUBLIC_API_URL=https://qzat8cp2m8.us-east-1.awsapprunner.com/api/v1 npm run build
+cd web && NEXT_PUBLIC_BASE_PATH=/app NEXT_PUBLIC_API_URL=https://qzat8cp2m8.us-east-1.awsapprunner.com/api/v1 npm run build
 rm -rf ../backend/web-app && cp -r out ../backend/web-app   # artefato de build, fora do git
 # ...e segue o redeploy normal do backend (buildx + start-deployment acima)
 ```
