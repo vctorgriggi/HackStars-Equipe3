@@ -103,7 +103,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"payloadQr\": \"{{payloadQrDemo}}\",\n  \"etapaCodigo\": \"fixacao-placa\",\n  \"leituras\": [\n    { \"campo\": \"serie-chumbada-1\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-chumbada-2\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-chumbada-3\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-placa\", \"valorLido\": \"847833\", \"confianca\": 0.97 },\n    { \"campo\": \"patrimonio-placa\", \"valorLido\": \"251328\", \"confianca\": 0.9 },\n    { \"campo\": \"patrimonio-serigrafia\", \"valorLido\": \"251328\", \"confianca\": 0.92 },\n    { \"campo\": \"cliente-serigrafia\", \"valorLido\": \"143091 - Energisa Rondônia Distribuidora de Energia S.A\", \"confianca\": 0.88 }\n  ]\n}"
+          "raw": "{\n  \"payloadQr\": \"{{payloadQrDemo}}\",\n  \"etapaCodigo\": \"fixacao-placa\",\n  \"leituras\": [\n    { \"campo\": \"serie-chumbada-1\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-chumbada-2\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-chumbada-3\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-placa\", \"valorLido\": \"847833\", \"confianca\": 0.97 },\n    { \"campo\": \"patrimonio-placa\", \"valorLido\": \"251328\", \"confianca\": 0.95 },\n    { \"campo\": \"patrimonio-serigrafia\", \"valorLido\": \"251328\", \"confianca\": 0.96 },\n    { \"campo\": \"cliente-serigrafia\", \"valorLido\": \"143091 - Energisa Rondônia Distribuidora de Energia S.A\", \"confianca\": 0.96 }\n  ]\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/conferencias/executar",
@@ -117,7 +117,7 @@
             "executar"
           ]
         },
-        "description": "A PEÇA DE DEMO: etiqueta e chumbados dizem 847233, a placa foi gravada 847833.\n\nEsperado: 201 com vereditoGeral 'divergente' e o ÚNICO campo divergente sendo serie-placa. O campo opcional potencia-serigrafia é omitido (não tem valor esperado no QR).\n\nRodar duas vezes: a peça NÃO deve duplicar (mesmo transformador.id)."
+        "description": "A PEÇA DE DEMO: etiqueta e chumbados dizem 847233, a placa foi gravada 847833.\n\nEsperado: 201 com vereditoGeral 'divergente' e o ÚNICO campo divergente sendo serie-placa. O campo opcional potencia-serigrafia é omitido (não tem valor esperado no QR).\n\nTodas as confianças estão acima do limiar padrão 0.9 (medido — ver docs/visao-ocr.md): abaixo dele o campo sai 'nao_conferivel' mesmo com o valor certo.\n\nA resposta traz 'incoerencias': as 3 séries chumbadas e a da placa carregam o mesmo valor esperado e não leram a mesma coisa. Incoerência só rebaixa; aqui o veredito já é 'divergente'.\n\nRodar duas vezes: a peça NÃO deve duplicar (mesmo transformador.id)."
       }
     },
     {
@@ -136,7 +136,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"payloadQr\": \"{{payloadQrDemo}}\",\n  \"etapaCodigo\": \"serigrafia\",\n  \"leituras\": [\n    { \"campo\": \"serie-chumbada-1\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-chumbada-2\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-chumbada-3\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-placa\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"patrimonio-placa\", \"valorLido\": \"251328\", \"confianca\": 0.95 },\n    { \"campo\": \"patrimonio-serigrafia\", \"valorLido\": \"251328\", \"confianca\": 0.95 },\n    { \"campo\": \"cliente-serigrafia\", \"valorLido\": \"143091 - Energisa Rondônia Distribuidora de Energia S.A\", \"confianca\": 0.95 }\n  ]\n}"
+          "raw": "{\n  \"payloadQr\": \"{{payloadQrDemo}}\",\n  \"etapaCodigo\": \"fixacao-placa\",\n  \"leituras\": [\n    { \"campo\": \"serie-chumbada-1\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-chumbada-2\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-chumbada-3\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"serie-placa\", \"valorLido\": \"847233\", \"confianca\": 0.95 },\n    { \"campo\": \"patrimonio-placa\", \"valorLido\": \"251328\", \"confianca\": 0.95 },\n    { \"campo\": \"patrimonio-serigrafia\", \"valorLido\": \"251328\", \"confianca\": 0.95 },\n    { \"campo\": \"cliente-serigrafia\", \"valorLido\": \"143091 - Energisa Rondônia Distribuidora de Energia S.A\", \"confianca\": 0.95 }\n  ]\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/conferencias/executar",
@@ -150,7 +150,7 @@
             "executar"
           ]
         },
-        "description": "Peça correta: esperado 201 com vereditoGeral 'conforme' (critério de aceitação 3 do SPEC)."
+        "description": "Peça correta: esperado 201 com vereditoGeral 'conforme' (critério de aceitação 3 do SPEC).\n\nA etapa é 'fixacao-placa' (a última) de propósito: o recorte por etapa é CUMULATIVO, e só nela a checklist cobre também serie-placa e patrimonio-placa, que este request envia. Com 'serigrafia', os dois campos de placa ficariam fora do recorte e as leituras seriam descartadas em silêncio — 'conforme' de meia peça."
       }
     },
     {
@@ -236,7 +236,7 @@
               "key": "file",
               "type": "file",
               "src": [],
-              "description": "Escolha uma imagem jpg/png/webp (HEIC é rejeitado: os serviços de visão não leem)"
+              "description": "Escolha uma imagem jpg ou png. HEIC e WEBP são rejeitados com 422: o Textract só lê JPEG/PNG, e aceitar no upload só adiaria a falha para a extração"
             },
             {
               "key": "fonteFisica",
@@ -258,7 +258,7 @@
             "upload"
           ]
         },
-        "description": "Esperado 201 com id + url. Com FILE_DRIVER=s3 a url é assinada (1h) e abre direto no navegador.\n\nTeste de borda: fonteFisica 'Placa' (maiúscula) → 422, porque grafia divergente quebraria o pareamento campo ↔ evidência."
+        "description": "Esperado 201 com id + url. Com FILE_DRIVER=s3 a url é assinada (1h) e abre direto no navegador.\n\nGuarde o id da resposta: é ele que vai em fotoEvidenciaIds no request 12.\n\nTeste de borda: fonteFisica 'Placa' (maiúscula) → 422, porque grafia divergente quebraria o pareamento campo ↔ evidência."
       }
     },
     {
@@ -379,7 +379,143 @@
             }
           ]
         },
-        "description": "Confirma o find-or-create: rodar o request 3 duas vezes não deve criar duas peças com numeroSerie 847233."
+        "description": "Confirma o find-or-create: rodar o request 3 duas vezes não deve criar duas peças com numeroSerie 847233.\n\nFiltros disponíveis: ?numeroSerie=847233 (chave de negócio, devolve 0 ou 1) e ?pedido=68202 (recorta o lote). É como o front resolve 'li o QR, quero a peça'."
+      }
+    },
+    {
+      "name": "12. Conferência com fotos (visão real)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"payloadQr\": \"{{payloadQrDemo}}\",\n  \"etapaCodigo\": \"fixacao-placa\",\n  \"fotoEvidenciaIds\": [\n    \"cole-aqui-o-id-devolvido-pelo-request-7\"\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/conferencias/executar-com-fotos",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "conferencias",
+            "executar-com-fotos"
+          ]
+        },
+        "description": "O CAMINHO PRINCIPAL: aqui as leituras vêm da visão, não do corpo. Suba as fotos pelo request 7 (uma por fonte física) e cole os ids.\n\nA resposta é a do request 3 mais 'extracao' (driver, fotos, leiturasProduzidas, fotosForaDoRecorte, achadosLivres) e 'achadosInconsistentes' — texto com cara de identificador que a visão leu na peça e o QR não conhece. Esse último é alarme informativo: não entra no veredito e não é persistido.\n\nCusto: UMA chamada de visão por foto, máximo 10 fotos, e só as fotos cuja fonte física tem campo no recorte da etapa são enviadas. Todo 422 (QR ilegível, etapa desconhecida, foto inexistente, foto já usada em outra conferência) sai ANTES de gastar."
+      }
+    },
+    {
+      "name": "13. Passagem — scan do QR no checkpoint",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"payloadQr\": \"{{payloadQrDemo}}\",\n  \"etapaCodigo\": \"oleo-conferencia\",\n  \"observacao\": \"scan de teste\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/passagens/registrar",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "passagens",
+            "registrar"
+          ]
+        },
+        "description": "Critérios 5 e 6 do SPEC. Resolve a peça pelo QR (find-or-create por numeroSerie) e devolve { passagem, checkpoint, transformador, ultimaConferencia }.\n\n'ultimaConferencia' é o que sustenta o alerta no ato do scan: rode o request 3 antes e ela virá 'divergente'.\n\nScans repetidos na mesma etapa geram passagens distintas, de propósito — são passagens reais. Etapa inexistente → 422 'etapa-desconhecida', antes de qualquer escrita."
+      }
+    },
+    {
+      "name": "14. Histórico de passagens da peça",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/transformadores/:id/passagens",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "transformadores",
+            ":id",
+            "passagens"
+          ],
+          "variable": [
+            {
+              "key": "id",
+              "value": "cole-aqui-o-transformador.id-da-resposta-do-request-3"
+            }
+          ]
+        },
+        "description": "Critério 5: passagens em ordem cronológica (mais antiga primeiro), cada uma com checkpoint (codigo, nome, ordem) e timestamp.\n\nPeça inexistente devolve 404, não lista vazia: 'nunca passou por lugar nenhum' e 'não existe' são respostas diferentes."
+      }
+    },
+    {
+      "name": "15. Conferências da peça (fonte do alerta)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/transformadores/:id/conferencias?limit=5",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "transformadores",
+            ":id",
+            "conferencias"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "5"
+            }
+          ],
+          "variable": [
+            {
+              "key": "id",
+              "value": "cole-aqui-o-transformador.id-da-resposta-do-request-3"
+            }
+          ]
+        },
+        "description": "Critério 6: conferências da mais recente para a mais antiga — a primeira é o veredito vigente da peça (limit=1 devolve só ela).\n\nO veredito vem do banco como a engine gravou; o cliente não recalcula nada. O checkpoint viaja junto de propósito: 'conforme' de gate parcial não atesta a peça inteira."
       }
     }
   ]

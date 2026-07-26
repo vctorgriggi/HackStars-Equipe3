@@ -45,8 +45,11 @@ linha, dando rastreabilidade de trânsito.
   Patrimônio é numeração do cliente — único por cliente, não globalmente;
   nunca serve de chave.
 - **ProjetoModelo** — o projeto de serigrafia de um modelo como dado: código
-  (ex.: EPT-163-PI-676), descrição e checklist de campos a conferir (nome,
-  fonte física, obrigatoriedade). É de onde a engine tira a lista de campos —
+  (ex.: EPT-163-PI-676), descrição e checklist de campos a conferir. Cada item
+  da checklist tem quatro chaves: `campo`, `fonteFisica`, `obrigatorio` e
+  `etapa` (o `codigo` do Checkpoint em que a marcação passa a existir na peça —
+  é o que permite a conferência parcial por gate; item sem `etapa` é conferido
+  em qualquer etapa). É de onde a engine tira a lista de campos —
   nunca de constante no código. Seed do MVP: o modelo da peça de demo,
   transcrito manualmente do desenho; ingestão automática do PDF é evolução
   (Could).
@@ -92,7 +95,7 @@ erDiagram
         uuid id PK
         string codigo "ex: EPT-163-PI-676"
         string descricao "opcional"
-        string checklist "JSON: campo, fonteFisica, obrigatorio"
+        string checklist "JSON: campo, fonteFisica, obrigatorio, etapa"
     }
     TRANSFORMADOR {
         uuid id PK
@@ -164,7 +167,7 @@ erDiagram
 - Tela de veredito campo a campo com a foto-evidência de cada valor lido.
 - Fluxo de conferência abre fixado em uma etapa via URL
   (`?etapa=<codigo do checkpoint>`): cada celular simula a câmera daquela
-  etapa, e conferências/eventos criados por ele herdam a etapa
+  etapa, e conferências/passagens criadas por ele herdam a etapa
   automaticamente — em produção, cada câmera fixa é provisionada amarrada ao
   mesmo `codigo`.
 
@@ -173,7 +176,7 @@ erDiagram
 **Rastreabilidade de trânsito**
 
 - Registrar passagem da peça por checkpoint via scan do QR.
-- Tela de histórico da peça: eventos de passagem em ordem cronológica.
+- Tela de histórico da peça: passagens em ordem cronológica.
 
 **Alerta de divergência**
 
@@ -201,8 +204,12 @@ erDiagram
 - Indicadores de auditoria: contagem de divergências por etapa (checkpoint) e
   por campo, agregando os dados que o Must já persiste.
 - Check qualitativo de layout via Bedrock: marcações da face presentes e na
-  disposição esperada do projeto da demo — condicionado ao spike T2.1 mostrar
-  confiabilidade; nunca rebaixa um `divergente` textual.
+  disposição esperada do projeto da demo. É o ÚNICO papel que sobrou para o
+  Bedrock depois da medição de 2026-07-25 (reprovado para ler número —
+  docs/visao-ocr.md), e sobrou porque aqui alucinação pesa menos e não há
+  concorrente OCR: a pergunta é "as marcações estão presentes e dispostas como
+  o projeto manda?", não "qual é o número?". Nunca rebaixa um `divergente`
+  textual nem promove nada a `conforme`.
 - Ingestão do projeto: upload do PDF, extração da checklist via Bedrock e
   tela de revisão/aprovação que cria o ProjetoModelo (Fase 6 do PLAN).
 
@@ -224,7 +231,7 @@ API decide. Detalhe das fronteiras no CLAUDE.md.
 - **extracao** — porta `ExtractorPort` e adapters de visão AWS; único lugar que
   fala com serviço de visão.
 - **evidencias** — upload e storage das fotos (S3).
-- **transito** — checkpoints e eventos de passagem.
+- **transito** — checkpoints e passagens da peça pela linha.
 - **frontend** — Next.js: leitura de QR, captura de fotos, veredito, histórico.
 
 O que nunca atravessa fronteiras: comparação de campos fora de `conformidade`;
@@ -240,9 +247,11 @@ atrás dessas mesmas fronteiras; engine e portas não mudam.
 - **Next.js** — front web mobile-first (16, React 19, Tailwind 4); roda no
   navegador do celular do operador.
 - **PostgreSQL** — banco relacional (default do boilerplate).
-- **AWS** — S3 para fotos; Textract ou Bedrock (modelo com visão) para
-  extração — escolha por spike com fotos reais (constraint 2). USD 500 em
-  créditos disponíveis.
+- **AWS** — S3 para fotos; **Textract** para extração, escolhido no spike com
+  fotos reais (constraint 2) e mantido depois de medir a peça inteira. Bedrock
+  ficou FORA da leitura numérica por medição, não por bloqueio: os modelos
+  disponíveis na conta alucinaram número plausível onde o Textract admitiu não
+  ter lido (docs/visao-ocr.md). USD 500 em créditos disponíveis.
 
 ## Constraints técnicas
 

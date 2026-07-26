@@ -10,9 +10,12 @@ escrevemos código aqui**, não documentação. Quando uma convenção for decid
 durante a implementação, registre-a aqui. Contexto detalhado mora em @SPEC.md
 (o quê e por quê) e @PLAN.md (ordem de execução).
 
-**Fase atual = Fase 2 — Extração por visão.** ERP, câmeras fixas e perfis de
-usuário não pertencem a esta rodada; estão em SPEC.md, seção "Planejado /
-rodadas futuras".
+**Fase atual = Fase 3 — Fluxo de conferência ponta a ponta.** A Fase 2 fechou
+(extração real plugada em `POST /conferencias/executar-com-fotos`) e o
+**backend da Fase 4 já subiu na frente da UI** — scan de passagem, histórico e
+última conferência da peça existem e estão no ar; o que falta na Fase 4 é tela.
+ERP, câmeras fixas e perfis de usuário não pertencem a esta rodada; estão em
+SPEC.md, seção "Planejado / rodadas futuras".
 
 ## Regra de ouro
 
@@ -33,8 +36,8 @@ não conformidade que chega ao cliente hoje).
 | Camada  | Tecnologia                                                       |
 | ------- | ---------------------------------------------------------------- |
 | API     | NestJS (base brocoders/nestjs-boilerplate), TypeORM + PostgreSQL |
-| Front   | Next.js 16 (React 19, Tailwind 4), mobile-first                  |
-| Visão   | AWS Textract (spike T2.1); Bedrock como reforço opcional         |
+| Front   | Next.js 16 (React 19, Tailwind 4), mobile-first; `mobile/` (Expo) é experimento do time |
+| Visão   | AWS Textract (escolhido e medido no spike T2.1); Bedrock reprovado para leitura numérica — docs/visao-ocr.md |
 | Storage | AWS S3 (fallback: disco local, se S3 ameaçar o prazo)            |
 | Deploy  | ECR + App Runner (HTTPS), RDS PostgreSQL — receita em docs/deploy.md |
 
@@ -54,7 +57,13 @@ backend/                  # NestJS (base brocoders/nestjs-boilerplate)
                           #   driver por env EXTRACTOR_DRIVER (mock default)
     auth/, files/, i18n/  # herdados do boilerplate; não usados nesta rodada
 frontend/                 # Next.js 16: leitura QR, fotos, veredito, histórico
+mobile/                   # app Expo (React Native) subido pelo time; experimento
 ```
+
+`mobile/` é **experimento**, não decisão: nenhuma tarefa do PLAN aponta para
+ele e qual cliente vai à demo (`frontend/` Next × `mobile/` Expo) está em
+aberto — ver "Decisões em aberto". Vale para os dois o mesmo contrato: cliente
+não compara campo, não conhece limiar e não fala com AWS.
 
 Pasta e rota vão no plural correto do português (`transformadores/`,
 `campos-conferidos/`, `projetos-modelo/`) — o gerador aprendeu os plurais do
@@ -90,8 +99,7 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
   vereditos por campo + veredito geral. Zero imports de I/O, SDK ou repositório.
 - Precedência do veredito geral: `divergente` > `nao_conferivel` > `conforme`.
   `conforme` só com todos os campos conformes.
-- Limiar de confiança é parâmetro da engine, não constante enterrada (a
-  política de campo parcialmente legível está em aberto e vai mudar isso).
+- Limiar de confiança é parâmetro da engine, não constante enterrada.
   Default do endpoint: `LIMIAR_CONFIANCA_PADRAO = 0.9` (medido com a peça
   real: leituras corretas em 98,4–99,9%, erro de dígito a 84,6%) em
   `conferencia-execucao.service.ts`, sobrescrevível por request.
@@ -223,9 +231,12 @@ do hackathon:
 3. Eager loading em cascata nas relações geradas — payloads grandes e joins
    duplicados; aceitável no volume da demo, e os endpoints das Fases 3–4
    selecionam o que expõem.
-4. Listagens sem filtro por relação (só paginação global) — os endpoints de
-   consulta reais (veredito por conferência, histórico por peça) entram nas
-   Fases 3–4.
+4. Listagens sem filtro por relação — PARCIALMENTE RESOLVIDO (2026-07-25):
+   `GET /transformadores?numeroSerie=&pedido=` e as duas consultas por relação
+   (`GET /transformadores/:id/passagens`, `GET /transformadores/:id/conferencias`)
+   existem e recortam o payload. O que segue global é a paginação das demais
+   listagens geradas (conferências, campos conferidos, fotos, passagens) — sem
+   dono na demo, porque as telas leem sempre pela peça.
 5. `checklist` como varchar validado só por `@IsString` — vira jsonb com
    validação estruturada quando a ingestão de projeto (Fase 6) existir; até
    lá, a única escrita é o seed.
@@ -319,3 +330,7 @@ do hackathon:
       qualitativo de layout.
 - [x] **Framework do front** — resolvido: Next.js 16; scaffold já subido pelo
       time venceu o Angular combinado na entrevista (2026-07-25).
+- [ ] **Cliente da demo: `frontend/` (Next) × `mobile/` (Expo)** — o time
+      subiu um app Expo em paralelo ao Next; os dois estão no repositório e
+      nenhum implementa o fluxo ainda. Decidir antes da T3.1, porque é ela que
+      escolhe onde a câmera e o `?etapa=` são implementados.

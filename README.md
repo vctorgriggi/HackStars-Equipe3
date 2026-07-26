@@ -22,9 +22,9 @@ vira retrabalho, não conformidade, atraso de expedição e risco de multa.
    etapa da linha via `?etapa=<codigo do checkpoint>`.
 2. **Fotos** — captura das fontes físicas (placa, serigrafia, série chumbada nas
    3 posições); cada foto é persistida como evidência no S3.
-3. **Extração** — o adapter de visão (Textract/Bedrock, atrás de
-   `ExtractorPort`) devolve cada valor lido com score de confiança e vínculo à
-   foto de origem. Leitura sem lastro não entra no banco.
+3. **Extração** — o adapter de visão (Textract, atrás de `ExtractorPort`)
+   devolve cada valor lido com score de confiança e vínculo à foto de origem.
+   Leitura sem lastro não entra no banco.
 4. **Engine** — a API compara campo a campo o lido contra o esperado do QR,
    usando a checklist do `ProjetoModelo` da peça. Veredito por campo:
    `conforme` | `divergente` | `nao_conferivel`; geral por precedência
@@ -60,8 +60,9 @@ caminho único de escrita de veredito) existe para tornar isso impossível.
 | Camada  | Tecnologia                                                       |
 | ------- | ---------------------------------------------------------------- |
 | API     | NestJS (base brocoders/nestjs-boilerplate), TypeORM + PostgreSQL |
-| Front   | Next.js 16 (React 19, Tailwind 4), mobile-first                  |
-| Visão   | AWS Textract (escolhido no spike T2.1); Bedrock como reforço opcional |
+| Front   | Next.js 16 (React 19, Tailwind 4), mobile-first (`frontend/`)    |
+| Cliente móvel | `mobile/`: app Expo (React Native) subido pelo time — **experimento**; qual dos dois vai à demo é decisão em aberto |
+| Visão   | AWS Textract (escolhido no spike T2.1 e mantido depois de medir a peça inteira); Bedrock reprovado para leitura numérica |
 | Storage | AWS S3 (fallback: disco local)                                   |
 
 ## Como rodar
@@ -72,7 +73,7 @@ cd backend && sed 's/^DATABASE_HOST=postgres/DATABASE_HOST=localhost/' env-examp
 cd backend && docker compose up -d postgres && npm run migration:run && npm run seed:run:relational
 cd backend && npm run start:dev   # API em :3001, swagger em /docs
 cd frontend && npm run dev        # app em :3000; API derivada do host da página
-cd backend && npm run test        # 129 testes unitários (engine, parser, extração)
+cd backend && npm run test        # 16 suítes / 278 testes (engine, parser, extração, consultas)
 # CRUD gerado exige JWT: login com o admin seed do boilerplate
 # (admin@example.com / secret) em POST /api/v1/auth/email/login
 ```
@@ -118,7 +119,8 @@ critério de aceitação 2 do SPEC.
 servida pela própria API: escolha a etapa, leia o QR pela câmera, fotografe
 as faces (vão para o S3) e dispare a conferência para ver o veredito campo a
 campo com a foto-evidência. É temporária, para inspecionar a API sem depender
-do app; o app real é o `frontend/`.
+do app, e some depois da apresentação; o app de verdade sai da Fase 3
+(`frontend/` ou `mobile/` — decisão em aberto).
 
 API no ar: `https://qzat8cp2m8.us-east-1.awsapprunner.com` (Swagger em `/docs`).
 Coleção de testes pronta em `docs/trael-api.postman_collection.json`.
@@ -126,16 +128,23 @@ Coleção de testes pronta em `docs/trael-api.postman_collection.json`.
 ## Endpoints principais
 
 A lista completa e sempre atual está no Swagger: `http://localhost:3001/docs`.
-Todos exigem JWT (login abaixo), exceto `GET /` e os arquivos de evidência.
+Todos exigem JWT (login abaixo), exceto `GET /`, a página `/demo` e os arquivos
+de evidência.
 
 | Método | Rota | Papel |
 | --- | --- | --- |
 | POST | `/api/v1/auth/email/login` | Token JWT (admin seed: `admin@example.com` / `secret`) |
-| POST | `/api/v1/conferencias/executar` | O coração: QR + leituras → veredito campo a campo persistido |
+| POST | `/api/v1/conferencias/executar-com-fotos` | O caminho principal: QR + ids de fotos → visão → veredito campo a campo persistido |
+| POST | `/api/v1/conferencias/executar` | Mesma engine com as leituras já prontas no corpo (teste e modo avançado da `/demo`); não chama visão |
 | POST | `/api/v1/fotos-evidencia/upload` | Multipart: foto + `fonteFisica` (whitelist canônica) → URL assinada |
+| POST | `/api/v1/passagens/registrar` | Scan no checkpoint: QR + `etapaCodigo` → passagem + `ultimaConferencia` (o dado do alerta) |
+| GET | `/api/v1/transformadores/:id/passagens` | Histórico de trânsito da peça, cronológico (critério 5) |
+| GET | `/api/v1/transformadores/:id/conferencias` | Conferências da peça, da mais recente para a mais antiga (critério 6) |
+| GET | `/api/v1/transformadores?numeroSerie=&pedido=` | Resolve "li o QR, quero a peça" e recorta por lote |
 | GET | `/api/v1/checkpoints` | Etapas ordenadas da linha (seed: 4 etapas com slug) |
-| GET | `/api/v1/projetos-modelo` | Projetos com checklist (seed: modelo da peça de demo) |
-| CRUD | `/api/v1/{transformadores, conferencias, campos-conferidos, fotos-evidencia, passagens}` | Gerados pelo boilerplate; `PATCH /campos-conferidos/:id` responde 422 (imutável — trilha de auditoria) |
+| GET | `/api/v1/projetos-modelo` | Projetos com checklist (seed: modelo da peça de demo); escrita fechada — a única é o seed |
+| CRUD | `/api/v1/{transformadores, conferencias, fotos-evidencia, passagens}` | Gerados pelo boilerplate |
+| GET/PATCH | `/api/v1/campos-conferidos` | Só leitura na prática: POST e DELETE desativados (404) e `PATCH /:id` responde 422 `campo-conferido-imutavel` — o lastro de um veredito emitido não se reescreve |
 
 ## Status
 
@@ -145,19 +154,23 @@ Prazo: demo em 2026-07-27.
 | -------------------------------------- | --------------------------------------------------------- | ----------------------- |
 | 0 — Fundação                           | scaffolds, 7 entidades, migrations, seeds da linha e do modelo | ✅ completa         |
 | 1 — Núcleo de conformidade (TDD)       | parser do QR, engine pura, `POST /conferencias/executar`   | ✅ completa             |
-| 2 — Extração por visão                 | `ExtractorPort` + adapters textract/bedrock/mock, upload S3 | ✅ concluída            |
+| 2 — Extração por visão                 | `ExtractorPort` + adapters textract/bedrock/mock, upload S3, extração plugada ao fluxo | ✅ concluída |
 | 3 — Fluxo ponta a ponta                | QR no celular, captura de fotos, tela de veredito          | a fazer                 |
-| 4 — Trânsito e alerta                  | Passagem, histórico da peça, alerta de divergência         | a fazer                 |
+| 4 — Trânsito e alerta                  | Passagem, histórico da peça, alerta de divergência         | backend pronto e no ar; UI a fazer |
 | 5 (opcional) — Dashboard e indicadores | linha e auditoria por etapa/campo                          | a fazer                 |
 | 6 (opcional) — Ingestão do projeto     | PDF do desenho → checklist via Bedrock → revisão           | a fazer                 |
 
 O spike T2.1 foi concluído com as fotos reais da peça: **Textract** leu todas
 as fontes físicas — inclusive o relevo chumbado, que era o risco — e é o
 driver do ambiente no ar (`EXTRACTOR_DRIVER=textract`); medições em
-[docs/visao-ocr.md](docs/visao-ocr.md). Bedrock fica como reforço opcional e
-segue bloqueado pela conta AWS ([docs/aws.md](docs/aws.md)). O sistema roda
-sem AWS com o driver `mock`. O frontend hoje tem apenas a rota placeholder de
-conferência (Fase 3).
+[docs/visao-ocr.md](docs/visao-ocr.md). **Bedrock foi reprovado para leitura
+numérica por medição**, não por bloqueio de conta: alucinou um número plausível
+(o patrimônio saiu como o número de série real da peça) onde o Textract
+devolveu null, e LLM não dá confiança calibrada — segue candidato apenas ao
+check qualitativo de layout. O sistema roda sem AWS com o driver `mock`. A
+Fase 4 já tem os endpoints no ar (scan de passagem, histórico e última
+conferência); o cliente — `frontend/`, hoje só com a rota placeholder de
+conferência, ou `mobile/` — é a decisão que a Fase 3 precisa fechar.
 
 ## Documentação
 
@@ -167,7 +180,9 @@ conferência (Fase 3).
 | [PLAN.md](PLAN.md)                                   | execução: fases, tasks, desvios registrados e status real       |
 | [CLAUDE.md](CLAUDE.md)                               | contrato de código: regra de ouro, fronteiras, convenções, gaps conhecidos |
 | [docs/aws.md](docs/aws.md)                           | AWS: serviços, modelos, custos, setup e estado da conta         |
-| [docs/regras-de-negocio.md](docs/regras-de-negocio.md) | regras de negócio consolidadas (em redação)                   |
+| [docs/visao-ocr.md](docs/visao-ocr.md)               | o que a visão mediu na peça real: acerto por fonte física, o limiar 0.9 e por que o Bedrock ficou de fora |
+| [docs/deploy.md](docs/deploy.md)                     | deploy na AWS (ECR + App Runner + RDS): receita e as armadilhas que já custaram tentativas |
+| [docs/regras-de-negocio.md](docs/regras-de-negocio.md) | regras de negócio consolidadas, com o ponto do código onde cada uma vive |
 
 ## Time
 

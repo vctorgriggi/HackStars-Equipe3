@@ -8,8 +8,13 @@
 ## Decisão
 
 **Textract resolve o MVP inteiro, inclusive a série chumbada.** Bedrock deixa
-de ser pré-requisito e vira reforço opcional para foto ruim (o adapter
-continua no código, atrás da mesma porta — trocar é mudar `EXTRACTOR_DRIVER`).
+de ser pré-requisito e, depois de medido (seção "Bedrock reavaliado", no fim
+deste arquivo), fica **FORA do caminho de leitura numérica**: alucinou número
+plausível onde o Textract admitiu não ter lido, e LLM não devolve confiança
+calibrada. Sobra para ele o check qualitativo de layout (Could do SPEC). O
+adapter continua no código, atrás da mesma porta — trocar é mudar
+`EXTRACTOR_DRIVER` —, mas trocar para `bedrock` numa conferência de verdade é
+abrir a porta do falso OK.
 
 Isso desfaz a premissa da constraint 2 do SPEC (relevo de baixo contraste
 derrubaria OCR clássico): com luz de topo e enquadramento decente, o Textract
@@ -91,7 +96,8 @@ quantidades certas? Sim — inventário medido:
    engine cobra exatamente essas.
 2. **O limiar de confiança prova seu valor no caso real**: numa das fotos o
    mesmo chumbado foi lido como `347233` com **35,4%** de confiança (o 8 virou
-   3 na sombra). Com o limiar em 0,8 isso vira `nao_conferivel` — nunca um
+   3 na sombra). Com o limiar (0,8 na época, 0,9 hoje) isso vira
+   `nao_conferivel` — nunca um
    `divergente` falso que mandaria peça boa para retrabalho.
 3. **Redundância entre fotos resolve leitura ruim**: a mesma marcação lida mal
    numa foto sai bem em outra (chumbado: 35% numa, 99,3% na de cima). O dedup
