@@ -20,6 +20,9 @@ import {
   ehCaminhoDeDisco,
   FotosEvidenciaService,
 } from '../fotos-evidencia/fotos-evidencia.service';
+import { PassagemRegistroService } from '../passagens/passagem-registro.service';
+import { RegistrarPassagemDto } from '../passagens/dto/registrar-passagem.dto';
+import { ResultadoRegistroPassagem } from '../passagens/dto/resultado-registro-passagem.dto';
 import { ProjetoModelo } from '../projetos-modelo/domain/projeto-modelo';
 
 import {
@@ -174,6 +177,10 @@ interface Bancada {
   findById: jest.Mock<Promise<FotoEvidencia | null>, [string]>;
   lerConteudoDe: jest.Mock<Promise<ConteudoEvidencia>, [FotoEvidencia]>;
   vincularAConferencia: jest.Mock<Promise<number>, [string[], Conferencia]>;
+  registrarPassagem: jest.Mock<
+    Promise<ResultadoRegistroPassagem>,
+    [RegistrarPassagemDto]
+  >;
   /** Ordem global das operacoes observaveis, para asserir "antes da visao". */
   trilha: string[];
 }
@@ -185,6 +192,9 @@ function montarBancada(
     checklist?: ItemChecklist[];
     checkpointCodigo?: string;
     erroNaPreparacao?: unknown;
+    /** Veredito que o `executar` dublado devolve (default: divergente). */
+    veredito?: string;
+    erroNoRegistroDePassagem?: unknown;
   } = {},
 ): Bancada {
   const evidencias = opcoes.evidencias ?? EVIDENCIAS_PADRAO;
@@ -244,7 +254,7 @@ function montarBancada(
   const resultadoExecucao: ResultadoExecucao = {
     conferencia: {
       id: CONFERENCIA_CRIADA.id,
-      vereditoGeral: 'divergente',
+      vereditoGeral: opcoes.veredito ?? 'divergente',
       createdAt: new Date(),
       checkpoint: null,
     },
@@ -269,6 +279,36 @@ function montarBancada(
     return Promise.resolve(resultadoExecucao);
   });
 
+  const registrarPassagem = jest.fn<
+    Promise<ResultadoRegistroPassagem>,
+    [RegistrarPassagemDto]
+  >((dto) => {
+    trilha.push('passagem');
+    if (opcoes.erroNoRegistroDePassagem) {
+      return Promise.reject(opcoes.erroNoRegistroDePassagem);
+    }
+    return Promise.resolve({
+      passagem: {
+        id: 'passagem-1',
+        createdAt: new Date(),
+        observacao: null,
+      },
+      checkpoint: { codigo: dto.etapaCodigo, nome: dto.etapaCodigo, ordem: 1 },
+      transformador: {
+        id: 'transformador-1',
+        numeroSerie: '847233',
+        patrimonio: '251328',
+        cliente: 'Energisa',
+      },
+      ultimaConferencia: {
+        id: dto.conferenciaId ?? CONFERENCIA_CRIADA.id,
+        vereditoGeral: 'conforme',
+        createdAt: new Date(),
+        checkpoint: null,
+      },
+    });
+  });
+
   const service = new ConferenciaExtracaoService(
     {
       findById,
@@ -280,6 +320,7 @@ function montarBancada(
     } as unknown as ConferenciasService,
     new ExtracaoService(extractor),
     { prepararExecucao, executar } as unknown as ConferenciaExecucaoService,
+    { registrar: registrarPassagem } as unknown as PassagemRegistroService,
   );
 
   const espiao = extractor as ExtractorEspiao;
@@ -297,6 +338,7 @@ function montarBancada(
     findById,
     lerConteudoDe,
     vincularAConferencia,
+    registrarPassagem,
     trilha,
   };
 }
@@ -911,5 +953,113 @@ describe('ehCaminhoDeDisco — origem dos bytes da evidencia', () => {
     expect(ehCaminhoDeDisco('evidencias/2026/abc.jpg', FileDriver.S3)).toBe(
       false,
     );
+  });
+});
+
+describe('ConferenciaExtracaoService — gate de passagem da estacao', () => {
+  it('should registrar a passagem vinculada quando flag ligada e veredito conforme', async () => {
+    const { service, registrarPassagem } = montarBancada({
+      veredito: 'conforme',
+      checkpointCodigo: 'serigrafia',
+    });
+
+    const resultado = await service.executarComFotos({
+      payloadQr: PAYLOAD_QR,
+      etapaCodigo: 'serigrafia',
+      fotoEvidenciaIds: [ID_PLACA],
+      registrarPassagemSeConforme: true,
+    });
+
+    expect(registrarPassagem).toHaveBeenCalledTimes(1);
+    expect(registrarPassagem).toHaveBeenCalledWith({
+      payloadQr: PAYLOAD_QR,
+      etapaCodigo: 'serigrafia',
+      conferenciaId: CONFERENCIA_CRIADA.id,
+    });
+    expect(resultado.passagemRegistrada).toMatchObject({
+      passagem: { id: 'passagem-1' },
+      checkpoint: { codigo: 'serigrafia' },
+    });
+  });
+
+  it('should nao registrar passagem quando o veredito nao e conforme', async () => {
+    // Bancada default: o executar dublado devolve `divergente`. A peca NAO
+    // passa — a liberacao e decisao humana, fora deste endpoint.
+    const { service, registrarPassagem } = montarBancada({
+      checkpointCodigo: 'serigrafia',
+    });
+
+    const resultado = await service.executarComFotos({
+      payloadQr: PAYLOAD_QR,
+      etapaCodigo: 'serigrafia',
+      fotoEvidenciaIds: [ID_PLACA],
+      registrarPassagemSeConforme: true,
+    });
+
+    expect(registrarPassagem).not.toHaveBeenCalled();
+    expect(resultado.passagemRegistrada).toBeNull();
+  });
+
+  it('should nao registrar passagem sem a flag, mesmo conforme', async () => {
+    const { service, registrarPassagem } = montarBancada({
+      veredito: 'conforme',
+      checkpointCodigo: 'serigrafia',
+    });
+
+    const resultado = await service.executarComFotos({
+      payloadQr: PAYLOAD_QR,
+      etapaCodigo: 'serigrafia',
+      fotoEvidenciaIds: [ID_PLACA],
+    });
+
+    expect(registrarPassagem).not.toHaveBeenCalled();
+    expect(resultado.passagemRegistrada).toBeNull();
+  });
+
+  it('should recusar flag sem etapaCodigo com 422 ANTES de qualquer visao', async () => {
+    const { service, espiao, prepararExecucao, executar } = montarBancada({
+      veredito: 'conforme',
+    });
+
+    await expect(
+      service.executarComFotos({
+        payloadQr: PAYLOAD_QR,
+        fotoEvidenciaIds: [ID_PLACA],
+        registrarPassagemSeConforme: true,
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        errors: {
+          registrarPassagemSeConforme: 'registro-de-passagem-exige-etapa',
+        },
+      },
+    });
+
+    // Nem preparacao, nem visao, nem engine: e o 422 mais barato do metodo.
+    expect(prepararExecucao).not.toHaveBeenCalled();
+    expect(espiao.chamadas).toHaveLength(0);
+    expect(executar).not.toHaveBeenCalled();
+  });
+
+  it('should devolver o veredito com passagemRegistrada null quando o registro falha', async () => {
+    // Best-effort ANUNCIADO: o veredito ja foi pago e gravado — a falha do
+    // registro nao pode derrubar a resposta (mesma politica do vinculo de
+    // evidencia).
+    const { service, registrarPassagem } = montarBancada({
+      veredito: 'conforme',
+      checkpointCodigo: 'serigrafia',
+      erroNoRegistroDePassagem: new Error('banco caiu'),
+    });
+
+    const resultado = await service.executarComFotos({
+      payloadQr: PAYLOAD_QR,
+      etapaCodigo: 'serigrafia',
+      fotoEvidenciaIds: [ID_PLACA],
+      registrarPassagemSeConforme: true,
+    });
+
+    expect(registrarPassagem).toHaveBeenCalledTimes(1);
+    expect(resultado.conferencia.vereditoGeral).toBe('conforme');
+    expect(resultado.passagemRegistrada).toBeNull();
   });
 });

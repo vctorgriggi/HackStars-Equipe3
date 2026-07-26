@@ -14,6 +14,8 @@ import {
 } from '../extracao/ports/extractor.port';
 import { FotoEvidencia } from '../fotos-evidencia/domain/foto-evidencia';
 import { FotosEvidenciaService } from '../fotos-evidencia/fotos-evidencia.service';
+import { PassagemRegistroService } from '../passagens/passagem-registro.service';
+import { ResultadoRegistroPassagem } from '../passagens/dto/resultado-registro-passagem.dto';
 import { PayloadEtiqueta } from '../transformadores/qr/payload-etiqueta';
 
 import {
@@ -69,11 +71,25 @@ export class ConferenciaExtracaoService {
     private readonly extracaoService: ExtracaoService,
 
     private readonly conferenciaExecucaoService: ConferenciaExecucaoService,
+
+    private readonly passagemRegistroService: PassagemRegistroService,
   ) {}
 
   async executarComFotos(
     dto: ExecutarComFotosDto,
   ): Promise<ResultadoExecucaoComExtracao> {
+    // Gate sem etapa nao existe: passagem e de um checkpoint, nunca da
+    // checklist inteira. Sai ANTES de prepararExecucao — e o 422 mais barato
+    // do metodo.
+    if (dto.registrarPassagemSeConforme && !dto.etapaCodigo) {
+      throw new UnprocessableEntityException({
+        status: HttpStatus.UNPROCESSABLE_ENTITY,
+        errors: {
+          registrarPassagemSeConforme: 'registro-de-passagem-exige-etapa',
+        },
+      });
+    }
+
     // Barato primeiro, e sem escrever nada: payload ilegivel, etapa
     // inexistente ('Serigrafia' com S maiusculo vindo de ?etapa=), projeto
     // indeterminado e recorte vazio saem como 422 ANTES de qualquer chamada
@@ -119,6 +135,16 @@ export class ConferenciaExtracaoService {
 
     await this.vincularEvidencias(usadas, resultado.conferencia.id);
 
+    // GATE: so o veredito `conforme` avanca a peca — e quem decidiu foi a
+    // engine, nunca este servico. Divergente/nao_conferivel NAO passa: a
+    // liberacao e decisao humana (POST /passagens/registrar com conferenciaId
+    // + observacao). A passagem nasce VINCULADA a esta conferencia.
+    const passagemRegistrada = await this.registrarPassagemDoGate(
+      dto,
+      resultado.conferencia.id,
+      resultado.conferencia.vereditoGeral,
+    );
+
     // Cruzamento DEPOIS do veredito, e sem tocar nele: o alarme le o mesmo
     // payload do QR que a engine leu, mas o resultado ja esta fechado — nao ha
     // caminho de codigo daqui para `vereditoGeral` ou para CampoConferido.
@@ -158,7 +184,44 @@ export class ConferenciaExtracaoService {
         achadosLivres: achadosLivres.length,
       },
       achadosInconsistentes,
+      passagemRegistrada,
     };
+  }
+
+  /**
+   * Registro automatico da passagem quando o gate aprova. Best-effort
+   * ANUNCIADO, mesma politica de `vincularEvidencias`: o veredito ja foi pago
+   * e gravado — derrubar a resposta aqui perderia o produto do endpoint. A
+   * falha vira log de erro e `passagemRegistrada: null`, e a UI da estacao
+   * avisa o operador para registrar manualmente.
+   */
+  private async registrarPassagemDoGate(
+    dto: ExecutarComFotosDto,
+    conferenciaId: string,
+    vereditoGeral: string | null | undefined,
+  ): Promise<ResultadoRegistroPassagem | null> {
+    if (
+      !dto.registrarPassagemSeConforme ||
+      !dto.etapaCodigo ||
+      vereditoGeral !== 'conforme'
+    ) {
+      return null;
+    }
+
+    try {
+      return await this.passagemRegistroService.registrar({
+        payloadQr: dto.payloadQr,
+        etapaCodigo: dto.etapaCodigo,
+        conferenciaId,
+      });
+    } catch (erro) {
+      this.logger.error(
+        `falha-ao-registrar-passagem: conferencia ${conferenciaId} saiu ` +
+          `conforme mas a passagem pela etapa "${dto.etapaCodigo}" nao foi ` +
+          `registrada — ${erro instanceof Error ? erro.message : String(erro)}`,
+      );
+      return null;
+    }
   }
 
   /**

@@ -88,6 +88,7 @@ interface Bancada {
   buscarOuCriar: jest.SpyInstance;
   criarPassagem: jest.Mock;
   ultimasConferencias: jest.Mock;
+  buscarConferencia: jest.Mock;
   anunciar: jest.Mock;
 }
 
@@ -96,6 +97,8 @@ function montarBancada(
     conferencias?: Conferencia[];
     /** Onde a peca estava ANTES do scan (ultima passagem existente). */
     ultimaPassagemEm?: Checkpoint;
+    /** O que `conferenciaRepository.findById` devolve para o vinculo. */
+    conferenciaVinculavel?: Conferencia | null;
   } = {},
 ): Bancada {
   const checkpointService = {
@@ -151,8 +154,12 @@ function montarBancada(
   const ultimasConferencias = jest.fn(() =>
     Promise.resolve(opcoes.conferencias ?? []),
   );
+  const buscarConferencia = jest.fn(() =>
+    Promise.resolve(opcoes.conferenciaVinculavel ?? null),
+  );
   const conferenciaRepository = {
     findAllByTransformador: ultimasConferencias,
+    findById: buscarConferencia,
   } as unknown as ConferenciaRepository;
 
   const anunciar = jest.fn(() => Promise.resolve());
@@ -171,6 +178,7 @@ function montarBancada(
     buscarOuCriar,
     criarPassagem,
     ultimasConferencias,
+    buscarConferencia,
     anunciar,
   };
 }
@@ -385,5 +393,209 @@ describe('registrar — ultimaConferencia sustenta o alerta no ato (criterio 6)'
 
     expect(resultado.ultimaConferencia?.vereditoGeral).toBe('conforme');
     expect(resultado.ultimaConferencia?.checkpoint).toBeNull();
+  });
+});
+
+describe('registrar — vinculo de comprovacao (gate da estacao)', () => {
+  const ID_CONFERENCIA = 'conferencia-1';
+
+  it('should recusar conferenciaId inexistente sem criar passagem', async () => {
+    const { service, criarPassagem, anunciar } = montarBancada({
+      conferenciaVinculavel: null,
+    });
+
+    await expect(
+      service.registrar({
+        payloadQr: payloadQr(),
+        etapaCodigo: 'serigrafia',
+        conferenciaId: ID_CONFERENCIA,
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        errors: {
+          conferenciaId: `conferencia-inexistente: ${ID_CONFERENCIA}`,
+        },
+      },
+    });
+
+    expect(criarPassagem).not.toHaveBeenCalled();
+    expect(anunciar).not.toHaveBeenCalled();
+  });
+
+  it('should recusar conferencia de outra peca', async () => {
+    const deOutraPeca = conferencia('conforme', CHECKPOINTS[1]);
+    deOutraPeca.transformador = {
+      ...peca(),
+      numeroSerie: '999999',
+    } as Transformador;
+
+    const { service, criarPassagem } = montarBancada({
+      conferenciaVinculavel: deOutraPeca,
+    });
+
+    await expect(
+      service.registrar({
+        payloadQr: payloadQr(),
+        etapaCodigo: 'serigrafia',
+        conferenciaId: ID_CONFERENCIA,
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        errors: {
+          conferenciaId: `conferencia-de-outra-peca: ${ID_CONFERENCIA}`,
+        },
+      },
+    });
+
+    expect(criarPassagem).not.toHaveBeenCalled();
+  });
+
+  it('should recusar conferencia de outra etapa', async () => {
+    const { service, criarPassagem } = montarBancada({
+      conferenciaVinculavel: conferencia('conforme', CHECKPOINTS[3]),
+    });
+
+    await expect(
+      service.registrar({
+        payloadQr: payloadQr(),
+        etapaCodigo: 'serigrafia',
+        conferenciaId: ID_CONFERENCIA,
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        errors: {
+          conferenciaId: `conferencia-de-outra-etapa: ${ID_CONFERENCIA}`,
+        },
+      },
+    });
+
+    expect(criarPassagem).not.toHaveBeenCalled();
+  });
+
+  it('should recusar conferencia sem checkpoint (checklist inteira)', async () => {
+    // Passagem e de um GATE: conferencia da peca inteira nao comprova etapa.
+    const { service } = montarBancada({
+      conferenciaVinculavel: conferencia('conforme'),
+    });
+
+    await expect(
+      service.registrar({
+        payloadQr: payloadQr(),
+        etapaCodigo: 'serigrafia',
+        conferenciaId: ID_CONFERENCIA,
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        errors: {
+          conferenciaId: `conferencia-de-outra-etapa: ${ID_CONFERENCIA}`,
+        },
+      },
+    });
+  });
+
+  it('should recusar reprova de conferencia nao-conforme sem observacao', async () => {
+    // A liberacao com excecao e AUDITAVEL por construcao: sem justificativa,
+    // nao passa.
+    const { service, criarPassagem, anunciar } = montarBancada({
+      conferenciaVinculavel: conferencia('divergente', CHECKPOINTS[1]),
+    });
+
+    await expect(
+      service.registrar({
+        payloadQr: payloadQr(),
+        etapaCodigo: 'serigrafia',
+        conferenciaId: ID_CONFERENCIA,
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        errors: { conferenciaId: 'excecao-sem-observacao' },
+      },
+    });
+
+    expect(criarPassagem).not.toHaveBeenCalled();
+    expect(anunciar).not.toHaveBeenCalled();
+  });
+
+  it('should recusar observacao so de espacos como justificativa', async () => {
+    const { service } = montarBancada({
+      conferenciaVinculavel: conferencia('nao_conferivel', CHECKPOINTS[1]),
+    });
+
+    await expect(
+      service.registrar({
+        payloadQr: payloadQr(),
+        etapaCodigo: 'serigrafia',
+        conferenciaId: ID_CONFERENCIA,
+        observacao: '   ',
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        errors: { conferenciaId: 'excecao-sem-observacao' },
+      },
+    });
+  });
+
+  it('should registrar a reprova humana com a excecao anotada e a conferencia vinculada', async () => {
+    const divergente = conferencia('divergente', CHECKPOINTS[1]);
+    const { service, criarPassagem, ultimasConferencias, anunciar } =
+      montarBancada({
+        conferenciaVinculavel: divergente,
+        // Se o fallback rodasse, devolveria OUTRA conferencia — o teste pega
+        // resposta montada da fonte errada.
+        conferencias: [conferencia('conforme', CHECKPOINTS[0])],
+      });
+
+    const resultado = await service.registrar({
+      payloadQr: payloadQr(),
+      etapaCodigo: 'serigrafia',
+      conferenciaId: ID_CONFERENCIA,
+      observacao: 'leitura errada da IA, peca conferida no olho',
+    });
+
+    expect(criarPassagem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conferencia: divergente,
+        observacao: 'leitura errada da IA, peca conferida no olho',
+      }),
+    );
+    // `ultimaConferencia` e a VINCULADA, nao a mais recente da peca.
+    expect(ultimasConferencias).not.toHaveBeenCalled();
+    expect(resultado.ultimaConferencia).toMatchObject({
+      id: ID_CONFERENCIA,
+      vereditoGeral: 'divergente',
+    });
+    expect(anunciar).toHaveBeenCalledTimes(1);
+  });
+
+  it('should aceitar conferencia conforme vinculada sem exigir observacao', async () => {
+    // Caminho do gate automatico: conforme passa limpo, sem excecao.
+    const { service, criarPassagem } = montarBancada({
+      conferenciaVinculavel: conferencia('conforme', CHECKPOINTS[1]),
+    });
+
+    const resultado = await service.registrar({
+      payloadQr: payloadQr(),
+      etapaCodigo: 'serigrafia',
+      conferenciaId: ID_CONFERENCIA,
+    });
+
+    expect(criarPassagem).toHaveBeenCalledTimes(1);
+    expect(resultado.ultimaConferencia?.vereditoGeral).toBe('conforme');
+    expect(resultado.passagem.observacao).toBeNull();
+  });
+
+  it('should manter o fallback da ultima conferencia quando nao ha vinculo', async () => {
+    const { service, buscarConferencia, ultimasConferencias } = montarBancada({
+      conferencias: [conferencia('divergente', CHECKPOINTS[3])],
+    });
+
+    const resultado = await service.registrar({
+      payloadQr: payloadQr(),
+      etapaCodigo: 'serigrafia',
+    });
+
+    expect(buscarConferencia).not.toHaveBeenCalled();
+    expect(ultimasConferencias).toHaveBeenCalledTimes(1);
+    expect(resultado.ultimaConferencia?.vereditoGeral).toBe('divergente');
   });
 });

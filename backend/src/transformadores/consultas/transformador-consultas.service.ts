@@ -57,6 +57,19 @@ export class PassagemResumo {
     description: 'Etapa da linha em que o scan aconteceu.',
   })
   checkpoint: EtapaResumo;
+
+  @ApiProperty({
+    type: ConferenciaResumo,
+    nullable: true,
+    description:
+      'A conferencia que COMPROVOU esta passagem (fluxo do gate da estacao: ' +
+      'registro automatico no `conforme`, ou liberacao com excecao pela ' +
+      'decisao humana — nesse caso `observacao` traz a justificativa). ' +
+      '`null` em scan avulso, sem vinculo — a linha do tempo pode entao ' +
+      'correlacionar apenas por etapa. Campo a campo com evidencias: ' +
+      '`GET /conferencias/{id}/campos`.',
+  })
+  conferencia: ConferenciaResumo | null;
 }
 
 /**
@@ -162,6 +175,11 @@ export class TransformadorConsultasService {
         nome: passagem.checkpoint.nome,
         ordem: passagem.checkpoint.ordem,
       },
+      // Relacao eager da FK nova — zero query extra; resumo pelo MESMO
+      // `resumirConferencia` de todo o resto (nunca projecao propria).
+      conferencia: passagem.conferencia
+        ? resumirConferencia(passagem.conferencia)
+        : null,
     }));
   }
 

@@ -75,14 +75,19 @@ export class PassagensController {
       'resposta traz `ultimaConferencia` — o ultimo veredito conhecido da ' +
       'peca, ou null se ela nunca foi conferida — para o alerta de ' +
       'divergencia aparecer no ato do scan. Scans repetidos na mesma etapa ' +
-      'geram eventos distintos, de proposito: sao passagens reais.',
+      'geram eventos distintos, de proposito: sao passagens reais. Com ' +
+      '`conferenciaId` (fluxo do gate da estacao), a passagem nasce VINCULADA ' +
+      'a conferencia que a comprovou; conferencia nao-conforme vinculada e a ' +
+      'reprova humana da leitura e exige `observacao` (excecao auditavel).',
   })
   @ApiCreatedResponse({
     type: ResultadoRegistroPassagem,
     description:
       'Passagem criada: { passagem, checkpoint, transformador, ' +
       'ultimaConferencia }. `ultimaConferencia` e o dado do ALERTA (criterio ' +
-      '6 do SPEC) — `null` quando a peca nunca foi conferida.',
+      '6 do SPEC) — `null` quando a peca nunca foi conferida. Quando ' +
+      '`conferenciaId` veio na request, `ultimaConferencia` e a conferencia ' +
+      'VINCULADA (a que comprovou o scan), nao a mais recente da peca.',
   })
   @ApiUnprocessableEntityResponse({
     description:
@@ -90,11 +95,17 @@ export class PassagensController {
       '`payload-somente-codigo` (QR ilegivel ou so com codigo de lookup — o ' +
       'caso do QR da ETIQUETA, medido: 13 digitos sem campo nenhum; a ' +
       'mensagem manda digitar os campos manualmente, porque o lookup ' +
-      'automatico exige ERP e e rodada futura) e ' +
+      'automatico exige ERP e e rodada futura); ' +
       '`etapa-desconhecida: <codigo>` (nao existe Checkpoint com esse ' +
       '`codigo` — mesmo codigo de erro do `/conferencias/executar`, um ' +
-      'contrato so). Os dois saem antes da primeira escrita: 422 nunca deixa ' +
-      'peca orfa.',
+      'contrato so); e, quando `conferenciaId` veio: ' +
+      '`conferencia-inexistente: <id>`, `conferencia-de-outra-peca: <id>` ' +
+      '(numero de serie do QR nao bate com o da conferencia), ' +
+      '`conferencia-de-outra-etapa: <id>` (checkpoint da conferencia nao e o ' +
+      'de `etapaCodigo`; conferencia de checklist inteira, sem checkpoint, ' +
+      'tambem cai aqui) e `excecao-sem-observacao` (conferencia nao-conforme ' +
+      'vinculada sem `observacao` — a reprova humana precisa ser auditavel). ' +
+      'Todos saem antes da primeira escrita: 422 nunca deixa peca orfa.',
   })
   registrar(@Body() registrarPassagemDto: RegistrarPassagemDto) {
     return this.passagemRegistroService.registrar(registrarPassagemDto);

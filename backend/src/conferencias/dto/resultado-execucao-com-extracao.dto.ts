@@ -1,5 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 
+// Sentido UNICO de import: o dto de registro de passagem so depende de
+// resumos-compartilhados e conferencia-resumo — nenhum dos dois volta aqui.
+import { ResultadoRegistroPassagem } from '../../passagens/dto/resultado-registro-passagem.dto';
 import { ResultadoExecucao } from './resultado-execucao.dto';
 import { FotoDaEvidenciaResposta } from './resumos-compartilhados.dto';
 
@@ -159,4 +162,20 @@ export class ResultadoExecucaoComExtracao extends ResultadoExecucao {
       'persistido nesta rodada — some na releitura.',
   })
   achadosInconsistentes: AchadoInconsistente[];
+
+  @ApiProperty({
+    type: ResultadoRegistroPassagem,
+    nullable: true,
+    description:
+      'A Passagem que o GATE registrou automaticamente, quando ' +
+      '`registrarPassagemSeConforme: true` e o veredito saiu `conforme` — o ' +
+      'mesmo shape do `POST /passagens/registrar`, com `ultimaConferencia` = ' +
+      'esta conferência. `null` em três casos, deliberadamente distintos só ' +
+      'pelo contexto: flag ausente/false (gate não pedido), veredito não ' +
+      '`conforme` (a peça NÃO passa — decisão humana via ' +
+      '`POST /passagens/registrar`), ou falha no registro após o veredito ' +
+      '(best-effort anunciado no log `falha-ao-registrar-passagem`; o ' +
+      'veredito desta resposta continua válido e gravado).',
+  })
+  passagemRegistrada: ResultadoRegistroPassagem | null;
 }

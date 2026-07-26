@@ -1,3 +1,5 @@
+import { Conferencia } from '../../conferencias/domain/conferencia';
+import { Exclude } from 'class-transformer';
 import { Checkpoint } from '../../checkpoints/domain/checkpoint';
 
 import { Transformador } from '../../transformadores/domain/transformador';
@@ -5,6 +7,9 @@ import { Transformador } from '../../transformadores/domain/transformador';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class Passagem {
+  @Exclude({ toPlainOnly: true })
+  conferencia?: Conferencia | null;
+
   @ApiProperty({
     type: () => String,
     nullable: true,

@@ -132,7 +132,11 @@ export class ConferenciasController {
       'mande os ids aqui junto do payload do QR e da etapa da URL do ' +
       'dispositivo. A visao le as fotos, a engine compara e o veredito volta ' +
       'pronto — o front nao compara nada. Chamada de visao acontece SO neste ' +
-      'disparo (creditos AWS sao finitos).',
+      'disparo (creditos AWS sao finitos). Com ' +
+      '`registrarPassagemSeConforme: true` (gate da estacao), veredito ' +
+      '`conforme` tambem registra a Passagem pela etapa, vinculada a esta ' +
+      'conferencia — veredito ruim nunca passa sozinho: a liberacao e ' +
+      'decisao humana via `POST /passagens/registrar`.',
   })
   @ApiCreatedResponse({
     type: ResultadoExecucaoComExtracao,
@@ -147,7 +151,10 @@ export class ConferenciasController {
       'leu na peca e o QR nao conhece. Esse ultimo e ALARME informativo — ' +
       'nao entra no vereditoGeral nem em campo nenhum, e nao e persistido ' +
       'nesta rodada. As fotos usadas ficam vinculadas a conferencia criada, ' +
-      'e o veredito continua nascendo na engine.',
+      'e o veredito continua nascendo na engine. `passagemRegistrada` traz a ' +
+      'Passagem que o gate registrou (so com a flag + veredito conforme); ' +
+      '`null` = gate nao pedido, veredito nao-conforme ou falha no registro ' +
+      '(anunciada em log, veredito intacto).',
   })
   @ApiUnprocessableEntityResponse({
     description:
@@ -157,7 +164,9 @@ export class ConferenciasController {
       '`checklist-sem-campo-avaliavel`) mais dois de evidencia: ' +
       '`foto-evidencia-inexistente` (id que nao existe) e ' +
       '`foto-evidencia-de-outra-conferencia` (foto ja presa a outra ' +
-      'conferencia — evidencia emprestada falsificaria a trilha). ' +
+      'conferencia — evidencia emprestada falsificaria a trilha) e ' +
+      '`registro-de-passagem-exige-etapa` (flag do gate sem `etapaCodigo` — ' +
+      'passagem e de um checkpoint, nunca da checklist inteira). ' +
       'Todos sao avaliados ANTES de qualquer chamada paga de visao.',
   })
   executarComFotos(@Body() executarComFotosDto: ExecutarComFotosDto) {
