@@ -11,10 +11,12 @@
  * (leituras digitadas à mão) fica recolhido no "modo avançado" para não
  * parecer um passo do fluxo.
  *
- * O recorte "quais fontes esta etapa confere" NÃO é constante desta página:
- * sai da checklist do ProjetoModelo (campo 'etapa' por item) cruzada com a
- * 'ordem' dos Checkpoints, ambas buscadas na API depois do login. Sem esses
- * dados a página mostra todas as fontes sem destaque — nunca bloqueia.
+ * O recorte "quais fotos esta etapa pede" NÃO é calculado aqui: vem pronto de
+ * GET /conferencias/plano-de-fotos, que devolve as vistas de cada etapa (com o
+ * recorte cumulativo JÁ aplicado pela API), o tipo de marcação de cada campo e
+ * a checklist inteira. A página só CONSULTA pertencimento a esse plano — a
+ * regra mora num lugar só, o servidor. Sem o plano ela mostra todas as vistas
+ * sem destaque e ANUNCIA que não sabe — nunca bloqueia.
  *
  * Três decisões de tela que valem mais que o CSS:
  *
@@ -305,6 +307,43 @@ export const PAGINA_DEMO = `<!doctype html>
     display: block; font-size: 12px; font-family: inherit; margin-top: 2px;
     color: var(--tinta); font-weight: 600;
   }
+  /* Dica de enquadramento (relevo de cima, close encostado): medição do
+     projeto, não opinião — discreta, porque não é o pedido, é o COMO. */
+  .item-foto .dica-captura {
+    display: block; font-size: 12px; font-family: inherit; margin-top: 2px;
+    color: var(--acento); font-style: italic;
+  }
+  /* O que o sistema vai procurar NESTA foto, item a item. Fica abaixo do nome
+     da vista porque é a resposta de "o que eles querem daqui". */
+  .item-foto .alvos { display: block; margin-top: 3px; }
+  /* A pilha de fontes vai repetida aqui de propósito: o cartão inteiro herda a
+     monoespaçada de .item-foto .nome, e o nome LEGÍVEL do campo só se separa do
+     nome canônico (que fica logo abaixo, monoespaçado) se as duas famílias
+     forem diferentes. */
+  .item-foto .alvo {
+    display: block; font-size: 13px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    padding: 3px 0 3px 8px; margin-top: 3px;
+    border-left: 2px solid var(--borda); color: var(--tinta);
+  }
+  .item-foto.desta-etapa .alvo { border-left-color: var(--acento); }
+  .item-foto .alvo-nome { font-weight: 600; }
+  .item-foto .alvo-obrig { color: var(--tinta-fraca); margin-left: 4px; }
+  .item-foto .alvo-cru {
+    display: block; font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 11px; color: var(--tinta-fraca); word-break: break-all;
+  }
+  /* Como a marcação foi GRAVADA: relevo (metal) × tinta (serigrafia). Duas
+     cores neutras próprias — nenhuma das do veredito, porque isto não julga
+     nada, só ajuda a achar o número na peça. */
+  .chip {
+    display: inline-block; margin-left: 6px; padding: 1px 6px;
+    border: 1px solid; border-radius: 3px;
+    font-family: inherit; font-size: 11px; font-weight: 700;
+    letter-spacing: .04em; text-transform: uppercase; white-space: nowrap;
+  }
+  .chip-relevo { color: var(--aco); border-color: var(--aco); background: #e7ebef; }
+  .chip-tinta { color: var(--violeta); border-color: var(--violeta); background: var(--violeta-fundo); }
   .item-leitura { padding: 10px 0; border-bottom: 1px solid var(--borda); }
   .item-leitura:last-child { border-bottom: 0; }
   .item-leitura .cabeca { display: flex; align-items: center; gap: 10px; min-height: 44px; }
@@ -321,6 +360,7 @@ export const PAGINA_DEMO = `<!doctype html>
   }
   .veredito-geral .titulo { font-size: 22px; font-weight: 700; letter-spacing: .04em; line-height: 1.25; }
   .veredito-geral .sub { font-size: 14px; margin-top: 6px; }
+  .veredito-geral .sub.forte { font-size: 17px; font-weight: 700; letter-spacing: .02em; }
   .v-divergente { background: var(--vermelho-fundo); border-color: var(--vermelho); color: var(--vermelho); }
   .v-nao_conferivel { background: var(--ambar-fundo); border-color: var(--ambar); color: var(--ambar); }
   .v-conforme { background: var(--verde-fundo); border-color: var(--verde); color: var(--verde); }
@@ -431,6 +471,27 @@ export const PAGINA_DEMO = `<!doctype html>
   .cartao-campo dd { margin: 0; word-break: break-word; color: var(--tinta); }
   .cartao-campo dd.mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
   .cartao-campo a { color: var(--acento); font-size: 14px; display: inline-block; margin-top: 8px; min-height: 24px; }
+  /* EVIDÊNCIA VISUAL: a foto que lastreou a leitura com a região marcada por
+     cima. As coordenadas chegam normalizadas (0..1) sobre a foto JÁ orientada
+     pelo EXIF — que é como o navegador também a desenha —, então o
+     posicionamento é porcentagem pura: a moldura tem exatamente o tamanho da
+     imagem (sem altura fixa, senão as % cairiam noutro lugar). */
+  a.evidencia { display: block; margin-top: 8px; text-decoration: none; color: var(--acento); }
+  a.evidencia .moldura {
+    display: block; position: relative; overflow: hidden;
+    width: 100%; max-width: 340px;
+    border: 1px solid var(--borda); border-radius: 4px; background: #e6e9ec;
+  }
+  a.evidencia img { display: block; width: 100%; height: auto; }
+  a.evidencia .realce {
+    position: absolute;
+    border: 3px solid var(--vermelho);
+    border-radius: 2px;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, .85);
+  }
+  a.evidencia .legenda-evidencia {
+    display: block; margin-top: 4px; font-size: 12px; color: var(--tinta-fraca);
+  }
   details { border: 1px solid var(--borda); border-radius: 4px; background: #fff; }
   summary { padding: 12px; font-size: 14px; color: var(--tinta-fraca); cursor: pointer; min-height: 44px; }
   #sec-avancado { background: #eceef1; border-style: dashed; }
@@ -720,7 +781,9 @@ export const PAGINA_DEMO = `<!doctype html>
     ['checklist-sem-campo-avaliavel',
       'A checklist até esta etapa só tem itens opcionais sem valor esperado na etiqueta. Nada a comparar.'],
     ['projeto-modelo-indeterminado',
-      'Há mais de um ProjetoModelo cadastrado e a etiqueta não diz qual é o desta peça — a API se recusa a escolher no chute. Deixe só o projeto da demo cadastrado, ou inclua o código do projeto no QR.'],
+      'A API não conseguiu decidir QUAL projeto/modelo vale para esta peça — e se recusa a escolher no chute. É preciso haver exatamente um ProjetoModelo cadastrado, ou o QR trazer o código do projeto. Sem isso a página não sabe quais fotos pedir.'],
+    ['checklist-invalido',
+      'A checklist do modelo está ilegível no banco (texto que não é uma lista válida de campos). Ninguém consegue conferir nada assim: avise o time — rodar o seed recria a checklist do modelo da demo.'],
     ['payload-somente-codigo',
       'O QR trouxe apenas um código de lookup, sem os campos da peça. Nesta rodada a etiqueta é a única fonte da verdade: use o atalho da peça de demonstração no passo 2 ou digite os campos.'],
     ['formato-desconhecido',
@@ -789,11 +852,16 @@ export const PAGINA_DEMO = `<!doctype html>
     // Último preset aplicado no modo avançado: quando a checklist chega da API
     // o formulário é remontado com os campos reais, e ele volta preenchido.
     preset: null,
-    // Vindos da API depois do login (null = ainda não carregados/falharam):
-    checklist: null,      // itens do ProjetoModelo único
+    // Vindos da API depois do login (null = ainda não carregados/falharam).
+    // TUDO abaixo sai de UMA chamada: GET /conferencias/plano-de-fotos. Os
+    // índices são só atalhos de consulta — nenhuma regra de recorte mora
+    // neles, porque o recorte já veio aplicado pela API.
+    plano: null,          // resposta crua do plano (projeto, checklist, etapas, pecaInteira)
+    checklist: null,      // plano.checklist: TODOS os itens do ProjetoModelo
     ordemPorCodigo: null, // codigo do Checkpoint -> ordem
     nomePorCodigo: null,  // codigo do Checkpoint -> nome exibido
-    mapaFontes: null      // fonteFisica -> { ordem, etapaCodigo, sempre, campos }
+    vistasDaPeca: null,   // fonteFisica -> [item] (recorte da peça inteira)
+    vistasPorEtapa: null  // codigo do Checkpoint -> { fonteFisica: [item] }
   };
 
   function el(id) { return document.getElementById(id); }
@@ -1065,13 +1133,15 @@ export const PAGINA_DEMO = `<!doctype html>
     });
   });
 
-  // --- B. Recorte por etapa, derivado dos dados da API ---------------------
+  // --- B. Recorte por etapa: PRONTO da API ---------------------------------
 
-  // O que cada etapa confere NÃO é constante desta página: sai da checklist do
-  // ProjetoModelo (cada item traz 'etapa' = codigo do Checkpoint em que a
-  // marcação passa a existir na peça) cruzada com a ordem dos Checkpoints.
-  // A regra é a MESMA da API (cumulativa): a etapa N confere o que ela e as
-  // anteriores gravaram.
+  // O que cada etapa confere não é calculado aqui e nem é constante desta
+  // página: vem de GET /conferencias/plano-de-fotos já recortado por etapa
+  // (semântica cumulativa aplicada no servidor — a etapa N confere o que ela e
+  // as anteriores gravaram). A página faz CONSULTA DE PERTENCIMENTO: "esta
+  // vista está nas vistas desta etapa?". Antes existiam três cópias da regra
+  // aqui dentro; duas telas discordando sobre o recorte é exatamente o tipo de
+  // divergência que o CLAUDE.md manda matar na origem.
   //
   // ESTADOS, e por que eles existem separados: enquanto a checklist não chega,
   // a página NÃO SABE quais vistas a etapa exige — e "não sei" nunca pode ser
@@ -1097,66 +1167,50 @@ export const PAGINA_DEMO = `<!doctype html>
     });
   }
 
+  // vistas[] do plano -> { fonteFisica: [item] }. Índice de consulta, não
+  // transformação: o conteúdo de cada vista é o que a API mandou, intacto.
+  function indexarVistas(vistas) {
+    var mapa = {};
+    (vistas || []).forEach(function (vista) {
+      if (!vista || typeof vista.fonteFisica !== 'string') { return; }
+      mapa[vista.fonteFisica] = (vista.campos || []).slice();
+    });
+    return mapa;
+  }
+
   function carregarRecorte() {
     estado.checklistEstado = 'carregando';
     bloquearPelaChecklist(true);
     montarFotos();
     atualizarPassos();
-    return Promise.all([
-      pedir(API + '/checkpoints?page=1&limit=50'),
-      pedir(API + '/projetos-modelo?page=1&limit=50')
-    ]).then(function (respostas) {
-      var pontos = respostas[0];
-      var projetos = respostas[1];
+    return pedir(API + '/conferencias/plano-de-fotos').then(function (resposta) {
+      if (!resposta.ok || !resposta.corpo) {
+        // A tradução de chão de fábrica (projeto-modelo-indeterminado,
+        // checklist-invalido) já sai daqui pronta para a tela.
+        throw new Error(mensagemDeErro(resposta.corpo, resposta.status));
+      }
 
-      if (!pontos.ok || !pontos.corpo || !pontos.corpo.data ||
-          !projetos.ok || !projetos.corpo || !projetos.corpo.data) {
-        throw new Error('resposta inesperada da API');
+      var plano = resposta.corpo;
+      if (!plano.pecaInteira || !plano.checklist || !plano.checklist.length) {
+        throw new Error('a API respondeu um plano de fotos sem checklist');
       }
 
       var ordens = {};
       var nomes = {};
-      pontos.corpo.data.forEach(function (ponto) {
-        if (ponto && typeof ponto.codigo === 'string' && typeof ponto.ordem === 'number') {
-          ordens[ponto.codigo] = ponto.ordem;
-          nomes[ponto.codigo] = ponto.nome || ponto.codigo;
-        }
+      var porEtapa = {};
+      (plano.etapas || []).forEach(function (gate) {
+        if (!gate || !gate.etapa || typeof gate.etapa.codigo !== 'string') { return; }
+        ordens[gate.etapa.codigo] = gate.etapa.ordem;
+        nomes[gate.etapa.codigo] = gate.etapa.nome || gate.etapa.codigo;
+        porEtapa[gate.etapa.codigo] = indexarVistas(gate.vistas);
       });
 
-      // Mais de um projeto cadastrado: a página NÃO escolhe por conta própria
-      // (a API responde projeto-modelo-indeterminado nesse caso). Sem recorte,
-      // com todas as fontes visíveis.
-      var lista = projetos.corpo.data;
-      if (lista.length !== 1) {
-        throw new Error(lista.length + ' projeto(s) cadastrado(s) — recorte indeterminado');
-      }
-      var itens = JSON.parse(lista[0].checklist);
-      if (!itens || !itens.length) {
-        throw new Error('checklist vazia');
-      }
-
-      var mapa = {};
-      itens.forEach(function (item) {
-        if (!item || typeof item.fonteFisica !== 'string') { return; }
-        var registro = mapa[item.fonteFisica] ||
-          { ordem: null, etapaCodigo: null, sempre: false, campos: [] };
-        registro.campos.push(item.campo);
-        var etapa = typeof item.etapa === 'string' ? item.etapa.trim() : '';
-        // Item sem etapa (ou com etapa que não existe como Checkpoint) entra
-        // em qualquer gate — igual à regra do backend.
-        if (!etapa || ordens[etapa] === undefined) {
-          registro.sempre = true;
-        } else if (registro.ordem === null || ordens[etapa] < registro.ordem) {
-          registro.ordem = ordens[etapa];
-          registro.etapaCodigo = etapa;
-        }
-        mapa[item.fonteFisica] = registro;
-      });
-
-      estado.checklist = itens;
+      estado.plano = plano;
+      estado.checklist = plano.checklist;
       estado.ordemPorCodigo = ordens;
       estado.nomePorCodigo = nomes;
-      estado.mapaFontes = mapa;
+      estado.vistasPorEtapa = porEtapa;
+      estado.vistasDaPeca = indexarVistas(plano.pecaInteira.vistas);
       estado.checklistEstado = 'pronta';
       estado.motivoDaFalha = '';
       bloquearPelaChecklist(false);
@@ -1167,7 +1221,9 @@ export const PAGINA_DEMO = `<!doctype html>
       montarLeituras();
       aplicarPreset(estado.preset || PRESET_DEMO);
     }).catch(function (erro) {
-      estado.mapaFontes = null;
+      estado.plano = null;
+      estado.vistasDaPeca = null;
+      estado.vistasPorEtapa = null;
       estado.checklistEstado = 'falhou';
       estado.motivoDaFalha = erro.message;
       // Falha NÃO bloqueia: o fallback permissivo continua liberado, só que
@@ -1183,28 +1239,80 @@ export const PAGINA_DEMO = `<!doctype html>
     return estado.ordemPorCodigo[estado.etapa];
   }
 
+  // As vistas que a etapa ATUAL pede, como a API as recortou. null = não há
+  // etapa escolhida, ou o código escolhido não é um gate que a API conhece.
+  function vistasDoGateAtual() {
+    if (!estado.etapa || !estado.vistasPorEtapa) { return null; }
+    return estado.vistasPorEtapa[estado.etapa] || null;
+  }
+
+  // Este aparelho está apontado para uma etapa que NÃO EXISTE na linha
+  // (?etapa= com erro de digitação, ou gate que ninguém seedou). Caso distinto
+  // de "sem etapa": lá o operador escolheu conferir a peça inteira e a página
+  // sabe o que pedir; aqui ela não sabe nada, e "não sei" nunca pode ser
+  // renderizado como "preciso de todas" (o invariante do topo desta seção).
+  // Sem esta pergunta os dois caíam no mesmo null de vistasDoGateAtual().
+  function etapaDesconhecida() {
+    if (!estado.etapa || estado.checklistEstado !== 'pronta') { return false; }
+    return !estado.vistasPorEtapa || !estado.vistasPorEtapa[estado.etapa];
+  }
+
+  function nomesDosCampos(itens) {
+    return (itens || []).map(function (item) { return item.campo; });
+  }
+
+  // Em que etapa a marcação desta vista passa a existir na peça — para o cartão
+  // dizer "só é marcada na etapa 4". EXIBIÇÃO, não regra: quem decidiu que a
+  // vista está fora deste gate foi a API; aqui só se lê o menor 'entraNaEtapa'
+  // dos campos dela para nomear a espera.
+  function entradaNaLinha(itens) {
+    var achada = null;
+    (itens || []).forEach(function (item) {
+      var entra = item ? item.entraNaEtapa : null;
+      if (!entra || typeof entra.ordem !== 'number') { return; }
+      if (!achada || entra.ordem < achada.ordem) {
+        achada = { ordem: entra.ordem, nome: entra.nome || entra.codigo };
+      }
+    });
+    return achada;
+  }
+
   // Situação de uma fonte física: 'desta-etapa' | 'fora-etapa' | 'sem-etapa'
   // (etapa não escolhida ou desconhecida) | 'fora-da-checklist' | 'indefinido'
-  // (dados da API ausentes).
+  // (o plano da API ainda não chegou).
+  //
+  // É CONSULTA ao plano, nunca recálculo: "esta vista está na lista de vistas
+  // que a API mandou para esta etapa?". Os campos exibidos também são os do
+  // gate — no gate da adesivação o topo tem só a série chumbada, porque o
+  // patrimônio ainda não foi serigrafado.
   function situacaoDaFonte(fonte) {
-    if (!estado.mapaFontes) { return { situacao: 'indefinido', campos: [] }; }
-    var registro = estado.mapaFontes[fonte];
-    if (!registro) { return { situacao: 'fora-da-checklist', campos: [] }; }
-    var ordem = ordemDaEtapaAtual();
-    if (ordem === undefined) { return { situacao: 'sem-etapa', campos: registro.campos }; }
-    if (registro.sempre || (registro.ordem !== null && registro.ordem <= ordem)) {
-      return { situacao: 'desta-etapa', campos: registro.campos };
+    if (!estado.vistasDaPeca) { return { situacao: 'indefinido', campos: [], itens: [] }; }
+    var daPeca = estado.vistasDaPeca[fonte];
+    if (!daPeca) { return { situacao: 'fora-da-checklist', campos: [], itens: [] }; }
+
+    var doGate = vistasDoGateAtual();
+    if (!doGate) {
+      // Etapa que a linha não conhece: a página não tem recorte nenhum para
+      // consultar, e listar os campos da PEÇA aqui viraria "fotografe tudo" —
+      // instrução infundada que termina em 422 etapa-desconhecida. 'indefinido'
+      // já é o estado de "não sei": fica fora de fontesAlvo(), não pede foto e
+      // deixa o upload como escape discreto, igual ao fallback de falha.
+      if (etapaDesconhecida()) { return { situacao: 'indefinido', campos: [], itens: [] }; }
+      return { situacao: 'sem-etapa', campos: nomesDosCampos(daPeca), itens: daPeca };
     }
-    var nome = registro.etapaCodigo && estado.nomePorCodigo
-      ? (estado.nomePorCodigo[registro.etapaCodigo] || registro.etapaCodigo)
-      : null;
+    if (doGate[fonte]) {
+      return { situacao: 'desta-etapa', campos: nomesDosCampos(doGate[fonte]), itens: doGate[fonte] };
+    }
+
     // O NÚMERO da etapa em que a marcação nasce entra junto: "é gravada na
     // etapa 4" localiza o operador na linha melhor que só o nome dela.
+    var entrada = entradaNaLinha(daPeca);
     return {
       situacao: 'fora-etapa',
-      campos: registro.campos,
-      entraEm: nome,
-      ordemQueGrava: registro.ordem
+      campos: nomesDosCampos(daPeca),
+      itens: daPeca,
+      entraEm: entrada ? entrada.nome : null,
+      ordemQueGrava: entrada ? entrada.ordem : null
     };
   }
 
@@ -1290,8 +1398,8 @@ export const PAGINA_DEMO = `<!doctype html>
   // Ordem de exibição: primeiro as vistas que a etapa confere.
   function fontesOrdenadas() {
     var lista = FONTES.slice();
-    if (estado.mapaFontes) {
-      Object.keys(estado.mapaFontes).forEach(function (fonte) {
+    if (estado.vistasDaPeca) {
+      Object.keys(estado.vistasDaPeca).forEach(function (fonte) {
         if (lista.indexOf(fonte) === -1) { lista.push(fonte); }
       });
     }
@@ -1300,6 +1408,13 @@ export const PAGINA_DEMO = `<!doctype html>
     }).sort(function (a, b) {
       return a.peso === b.peso ? a.indice - b.indice : a.peso - b.peso;
     }).map(function (item) { return item.fonte; });
+  }
+
+  // Qual modelo mandou este plano de fotos. Aparece porque a lista de fotos só
+  // faz sentido presa a um projeto: modelo diferente, fotos diferentes.
+  function prefixoDoProjeto() {
+    var projeto = estado.plano ? estado.plano.projeto : null;
+    return projeto && projeto.codigo ? 'Projeto ' + projeto.codigo + ' · ' : '';
   }
 
   function atualizarTextoRecorte() {
@@ -1315,17 +1430,20 @@ export const PAGINA_DEMO = `<!doctype html>
       return;
     }
     if (!estado.etapa) {
-      alvo.textContent = 'Sem etapa escolhida: a conferência cobra a peça inteira, então a página pede as ' +
+      alvo.textContent = prefixoDoProjeto() +
+        'Sem etapa escolhida: a conferência cobra a peça inteira, então a página pede as ' +
         fontesAlvo().length + ' fotos da checklist do modelo.';
       return;
     }
     if (ordemDaEtapaAtual() === undefined) {
       alvo.textContent = 'A etapa "' + estado.etapa + '" não está cadastrada na linha, então a página não sabe ' +
-        'quais fotos ela pede. Confira o código da etapa com o time.';
+        'quais fotos ela pede e não pede nenhuma. Confira o ?etapa= da URL com o time ou escolha uma ' +
+        'etapa acima.';
       return;
     }
     var doGate = fontesDesta('desta-etapa');
-    alvo.textContent = 'Esta etapa fecha com ' + doGate.length + ' foto(s): ' + resumoDeFontes(doGate) +
+    alvo.textContent = prefixoDoProjeto() +
+      'Esta etapa fecha com ' + doGate.length + ' foto(s): ' + resumoDeFontes(doGate) +
       '. Ela confere as marcações desta etapa e das anteriores — as marcações das etapas seguintes ' +
       'ainda não existem na peça, e por isso não são pedidas aqui.';
   }
@@ -1359,17 +1477,12 @@ export const PAGINA_DEMO = `<!doctype html>
     }).sort(function (a, b) { return a.ordem - b.ordem; });
   }
 
-  // Quantas vistas a etapa X cobra — mesma regra cumulativa de
-  // situacaoDaFonte, mas para uma etapa que ainda não é a atual: é o que faz o
-  // botão dizer "confere 3 vistas" ANTES de ser tocado.
+  // Quantas vistas a etapa X cobra — lido direto do plano da API, para uma
+  // etapa que ainda não é a atual: é o que faz o botão dizer "pede 3 fotos"
+  // ANTES de ser tocado.
   function vistasDaEtapa(codigo) {
-    if (!estado.mapaFontes || !estado.ordemPorCodigo) { return []; }
-    var ordem = estado.ordemPorCodigo[codigo];
-    if (ordem === undefined) { return []; }
-    return Object.keys(estado.mapaFontes).filter(function (fonte) {
-      var registro = estado.mapaFontes[fonte];
-      return registro.sempre || (registro.ordem !== null && registro.ordem <= ordem);
-    });
+    var doGate = estado.vistasPorEtapa ? estado.vistasPorEtapa[codigo] : null;
+    return doGate ? Object.keys(doGate) : [];
   }
 
   // A grade nasce dos dados, não do HTML: etapa nova no seed aparece aqui sem
@@ -1399,14 +1512,19 @@ export const PAGINA_DEMO = `<!doctype html>
   function atualizarTextoEtapa() {
     var dica = el('etapa-dica');
     if (estado.checklistEstado === 'falhou') {
-      dica.textContent = 'Não consegui carregar a checklist do modelo (' + estado.motivoDaFalha +
-        '), então não sei quantas fotos cada etapa pede. Escolha a etapa e confira as fotos com o time.';
+      dica.textContent = 'Não consegui carregar o plano de fotos do modelo, então não sei quantas ' +
+        'fotos cada etapa pede — os botões abaixo são as etapas conhecidas da linha, sem essa conta. ' +
+        'Motivo: ' + estado.motivoDaFalha;
     } else if (estado.checklistEstado === 'carregando') {
-      dica.textContent = 'Buscando as etapas da linha e a checklist do modelo...';
+      dica.textContent = 'Buscando na API as etapas da linha e o plano de fotos deste modelo...';
     } else if (!estado.etapaDefinida) {
       dica.textContent = 'Escolha em que ponto da linha este celular está. Cada botão diz quantas fotos aquele ponto pede.';
     } else if (!estado.etapa) {
       dica.textContent = 'Conferindo a peça inteira: a página vai pedir todas as fotos do modelo, não só as de um ponto da linha.';
+    } else if (etapaDesconhecida()) {
+      dica.textContent = 'A etapa "' + estado.etapa + '" não existe na linha — confira o ?etapa= da URL ou ' +
+        'escolha abaixo em que ponto este celular está. Até lá a página não pede foto nenhuma, e a ' +
+        'conferência seria recusada pela API (etapa-desconhecida).';
     } else {
       dica.textContent = 'Este celular está fazendo o papel da câmera de ' + nomeDaEtapa(estado.etapa) +
         '. A conferência fica registrada nesse ponto da linha e confere as marcações que já existem na peça aqui — ' +
@@ -1457,10 +1575,17 @@ export const PAGINA_DEMO = `<!doctype html>
 
   // Delegação: a grade é remontada quando os checkpoints chegam da API, e
   // religar listener a cada remontagem é como se perde clique no celular.
+  //
+  // Quem identifica o botão é o ATRIBUTO data-codigo, nunca a classe: os
+  // <span class="nome-etapa"> / <span class="sub-etapa"> DENTRO do botão casam
+  // a substring 'etapa' e não têm data-codigo, então clicar no texto (que é
+  // onde o dedo cai) lia null e gravava "peça inteira" calado — a etapa errada,
+  // sem nenhum sinal na tela. Distinção que importa: o botão "Nenhuma etapa"
+  // tem data-codigo="" (string VAZIA, não null) e continua valendo.
   el('grade-etapas').addEventListener('click', function (evento) {
     var alvo = evento.target;
     for (var salto = 0; alvo && salto < 4; salto += 1) {
-      if (alvo.getAttribute && String(alvo.className || '').indexOf('etapa') !== -1) {
+      if (alvo.getAttribute && alvo.getAttribute('data-codigo') !== null) {
         escolherEtapa(alvo.getAttribute('data-codigo'));
         return;
       }
@@ -1632,10 +1757,18 @@ export const PAGINA_DEMO = `<!doctype html>
         : 'etapa ' + info.entraEm;
       return 'ainda não existe na peça — só é marcada na ' + onde;
     }
+    if (info.situacao === 'indefinido') {
+      // Nem "pedida" nem "ainda não existe": a página não tem o recorte desta
+      // etapa (não chegou, falhou, ou a etapa não existe na linha). O cartão
+      // fica como escape e manda ler o aviso, que é quem explica o motivo.
+      return 'a página não sabe se esta vista é pedida agora — veja o aviso acima';
+    }
     if (info.situacao === 'fora-da-checklist') {
-      // Diferente do caso acima: aqui não é questão de esperar. Este MODELO
-      // não tem marcação nenhuma nessa face, em etapa nenhuma.
-      return 'este modelo não tem marcação neste lado da peça';
+      // Diferente do caso acima: aqui não é questão de esperar. O projeto deste
+      // modelo não manda gravar nada nessa face, em etapa nenhuma — e isso não
+      // é falta na peça, é o desenho dela. Sem essa frase o cartão soava como
+      // "está faltando marcação aqui".
+      return 'o projeto deste modelo não manda marcar este lado — nenhuma foto é pedida aqui, em etapa nenhuma';
     }
     return '';
   }
@@ -1654,10 +1787,50 @@ export const PAGINA_DEMO = `<!doctype html>
     return info.situacao === 'desta-etapa' || info.situacao === 'sem-etapa';
   }
 
+  // COMO a marcação foi gravada na peça, dito pela API (tipoMarcacao do plano),
+  // nunca deduzido aqui. 'indefinido' não vira chip: a página não afirma o que
+  // não sabe — e o operador enquadra igual, o chip só ajuda a achar o número.
+  function chipDaMarcacao(tipo) {
+    if (tipo === 'relevo') { return '<span class="chip chip-relevo">RELEVO no metal</span>'; }
+    if (tipo === 'tinta') { return '<span class="chip chip-tinta">TINTA (serigrafia)</span>'; }
+    return '';
+  }
+
+  // O "o que eles querem desta foto", item a item: nome legível, como está
+  // gravado e se é obrigatório. O nome canônico continua ali (linha discreta e
+  // title) porque é ele que aparece no veredito e no chat do time.
   function trechoDosCampos(info) {
-    if (!info.campos || !info.campos.length) { return ''; }
-    var verbo = ePedida(info) ? 'o sistema lê nesta foto: ' : 'quando chegar a hora, lê: ';
-    return '<span class="estado">' + verbo + esc(info.campos.join(', ')) + '</span>';
+    var itens = info.itens || [];
+    if (!itens.length) { return ''; }
+    var verbo = ePedida(info)
+      ? 'o sistema lê nesta foto:'
+      : 'quando chegar a hora desta vista, lê:';
+    var alvos = itens.map(function (item) {
+      return '<span class="alvo" title="' + esc(item.campo) + '">' +
+        '<span class="alvo-nome">' + esc(nomeLegivel(item.campo)) + '</span>' +
+        chipDaMarcacao(item.tipoMarcacao) +
+        '<span class="alvo-obrig">' + (item.obrigatorio ? '(obrigatório)' : '(opcional)') + '</span>' +
+        '<span class="alvo-cru">' + esc(item.campo) + '</span>' +
+        '</span>';
+    }).join('');
+    return '<span class="estado">' + verbo + '</span>' +
+      '<span class="alvos">' + alvos + '</span>';
+  }
+
+  // Dica de CAPTURA, por vista: as duas vêm de medição do projeto — o relevo
+  // lido de cima ganha dezenas de pontos de confiança (docs/visao-ocr.md), e
+  // close mal enquadrado é a causa n.º 1 de "não conferível". É instrução de
+  // enquadramento, jamais regra de conferência.
+  function trechoDaDica(fonte, info) {
+    if (!ePedida(info)) { return ''; }
+    var dicas = [];
+    var temRelevo = (info.itens || []).filter(function (item) {
+      return item.tipoMarcacao === 'relevo';
+    }).length > 0;
+    if (temRelevo) { dicas.push('relevo lê melhor de cima — a luz do teto define o dígito'); }
+    if (fonte === 'placa' || fonte === 'etiqueta') { dicas.push('close: aproxime até o texto encher o quadro'); }
+    if (!dicas.length) { return ''; }
+    return '<span class="dica-captura">' + esc(dicas.join(' · ')) + '</span>';
   }
 
   // Vista que carrega DUAS marcações ou mais (topo: série chumbada +
@@ -1706,7 +1879,8 @@ export const PAGINA_DEMO = `<!doctype html>
       '" data-fonte="' + esc(fonte) + '">' +
       '<img class="miniatura" alt="" ' + (foto && foto.url ? 'src="' + esc(foto.url) + '"' : 'hidden') + '>' +
       '<span class="nome">' + esc(fonte) +
-      trechoDaMarca(info) + trechoDasMarcacoes(info) + trechoDosCampos(info) +
+      trechoDaMarca(info) + trechoDasMarcacoes(info) + trechoDaDica(fonte, info) +
+      trechoDosCampos(info) +
       '<span class="estado envio' + (estado.falhas[fonte] ? ' falhou' : '') + '">' +
       esc(textoDoEnvio(fonte)) + '</span></span>' +
       '<span class="acoes-vista">' +
@@ -1774,17 +1948,29 @@ export const PAGINA_DEMO = `<!doctype html>
   // O passo 3 em três situações, e cada uma diz a verdade sobre o que a página
   // sabe. A do meio é a que faltava e virou bug no celular.
   function estadoDoPasso3() {
-    if (estado.checklistEstado === 'pronta') { return ''; }
+    if (estado.checklistEstado === 'pronta') {
+      // Plano na mão, mas apontado para um gate que não existe: a página SABE
+      // o que a peça tem e não sabe o que ESTA etapa pede. Sem esta frase o
+      // caso se fundia com "peça inteira" e a tela mandava fotografar tudo.
+      if (etapaDesconhecida()) {
+        return ['erro',
+          'A etapa "' + estado.etapa + '" deste aparelho não existe na linha, então NÃO SEI quais ' +
+          'fotos ela pede — confira o ?etapa= da URL ou escolha uma etapa no passo 1. Nenhuma foto ' +
+          'é pedida até isso ser corrigido; enviar continua liberado como escape.'];
+      }
+      return '';
+    }
     if (estado.checklistEstado === 'falhou') {
       return ['erro',
-        'Não consegui carregar a checklist deste modelo (' + estado.motivoDaFalha +
-        '), então NÃO SEI quais fotos esta etapa exige. As vistas abaixo são todas as ' +
-        'possíveis — confira com o time quais a etapa pede antes de fotografar. O envio ' +
-        'continua liberado.'];
+        'Não consegui carregar da API o plano de fotos deste modelo, então NÃO SEI quais fotos ' +
+        'esta etapa pede. Motivo: ' + estado.motivoDaFalha + ' — Consequência: a lista abaixo é ' +
+        'a de TODAS as vistas possíveis da peça, não a desta etapa; confirme com o time o que ' +
+        'fotografar. Fotografar e conferir continuam liberados.'];
     }
     return ['neutro',
-      'Carregando a checklist deste modelo... até ela chegar a página não sabe quais fotos ' +
-      'esta etapa exige, e por isso não pede nenhuma.'];
+      'Buscando na API o plano de fotos deste modelo (quais vistas esta etapa pede). Enquanto ' +
+      'ele não chega, a página não tem como saber o que pedir — por isso ainda não pede foto ' +
+      'nenhuma. É uma requisição só, leva um instante.'];
   }
 
   function montarFotos() {
@@ -1811,7 +1997,8 @@ export const PAGINA_DEMO = `<!doctype html>
     } else {
       el('outras-vistas').hidden = false;
       el('outras-vistas-titulo').textContent =
-        'Ver as outras ' + recolhidas.length + ' vistas da peça (nenhuma precisa de foto agora)';
+        'Ver as outras ' + recolhidas.length + ' vistas da peça — nenhuma delas é pedida nesta ' +
+        'etapa (o cartão de cada uma diz por quê)';
       el('lista-outras').innerHTML = recolhidas.map(function (fonte) {
         return cartaoDaVista(fonte, situacaoDaFonte(fonte));
       }).join('');
@@ -2006,18 +2193,18 @@ export const PAGINA_DEMO = `<!doctype html>
   el('preset-correta').addEventListener('click', function () { aplicarPreset(PRESET_CORRETA); });
   el('preset-ruim').addEventListener('click', function () { aplicarPreset(PRESET_RUIM); });
 
-  // Recorte da etapa vindo da checklist da API (mesma regra cumulativa do
-  // backend); a tabela local só entra se a checklist não tiver carregado.
+  // Recorte da etapa: LIDO do plano da API (união dos campos das vistas
+  // daquele gate — a API já aplicou a semântica cumulativa). Esta era a
+  // terceira cópia da regra na página; agora é consulta. A tabela local só
+  // entra como último recurso, quando o plano não carregou.
   function camposDaEtapa(codigo) {
-    var ordemEtapa = estado.ordemPorCodigo ? estado.ordemPorCodigo[codigo] : undefined;
-    if (estado.checklist && ordemEtapa !== undefined) {
+    var doGate = estado.vistasPorEtapa ? estado.vistasPorEtapa[codigo] : null;
+    if (doGate) {
       var permitidos = [];
-      estado.checklist.forEach(function (item) {
-        var etapa = typeof item.etapa === 'string' ? item.etapa.trim() : '';
-        var ordemItem = etapa && estado.ordemPorCodigo ? estado.ordemPorCodigo[etapa] : undefined;
-        if (!etapa || ordemItem === undefined || ordemItem <= ordemEtapa) {
-          permitidos.push(item.campo);
-        }
+      Object.keys(doGate).forEach(function (fonte) {
+        nomesDosCampos(doGate[fonte]).forEach(function (campo) {
+          if (permitidos.indexOf(campo) === -1) { permitidos.push(campo); }
+        });
       });
       return permitidos;
     }
@@ -2067,6 +2254,52 @@ export const PAGINA_DEMO = `<!doctype html>
     return foto && foto.url ? foto.url : null;
   }
 
+  // Bounding box da leitura, como a API mandou: JSON com Left/Top/Width/Height
+  // NORMALIZADOS (0..1) no referencial da foto JÁ ORIENTADA pelo EXIF — e o
+  // navegador também orienta a imagem pelo EXIF sozinho, então posicionar por
+  // porcentagem cai no lugar certo. Parse DEFENSIVO: a região é texto livre no
+  // banco, e caixa desenhada torta é pior que caixa nenhuma.
+  function regiaoNormalizada(bruto) {
+    if (!bruto) { return null; }
+    var caixa = bruto;
+    if (typeof bruto === 'string') {
+      try { caixa = JSON.parse(bruto); } catch (erro) { return null; }
+    }
+    if (!caixa || typeof caixa !== 'object') { return null; }
+    var lados = [caixa.Left, caixa.Top, caixa.Width, caixa.Height];
+    for (var i = 0; i < lados.length; i += 1) {
+      if (typeof lados[i] !== 'number' || !isFinite(lados[i])) { return null; }
+    }
+    if (caixa.Width <= 0 || caixa.Height <= 0) { return null; }
+    return { left: caixa.Left, top: caixa.Top, largura: caixa.Width, altura: caixa.Height };
+  }
+
+  function porcento(valor) {
+    return (Math.max(0, Math.min(1, valor)) * 100).toFixed(2) + '%';
+  }
+
+  // Miniatura da foto-evidência com a marca de ONDE o número foi lido. É
+  // exibição pura do que a API mandou (url assinada + regiaoLeitura): a página
+  // não recorta, não mede e não conclui nada da imagem. Toque abre a foto
+  // inteira em outra aba.
+  function miniaturaDaEvidencia(url, fonte, regiaoBruta) {
+    if (!url) { return ''; }
+    var regiao = regiaoNormalizada(regiaoBruta);
+    var realce = regiao
+      ? '<span class="realce" style="left:' + porcento(regiao.left) +
+        ';top:' + porcento(regiao.top) +
+        ';width:' + porcento(regiao.largura) +
+        ';height:' + porcento(regiao.altura) + '"></span>'
+      : '';
+    var legenda = (regiao ? 'onde a leitura saiu' : 'foto-evidência') +
+      ' · vista ' + fonte + ' · toque para abrir';
+    return '<a class="evidencia" href="' + esc(url) + '" target="_blank" rel="noopener">' +
+      '<span class="moldura">' +
+      '<img src="' + esc(url) + '" alt="Foto-evidência da vista ' + esc(fonte) + '" loading="lazy">' +
+      realce + '</span>' +
+      '<span class="legenda-evidencia">' + esc(legenda) + '</span></a>';
+  }
+
   function formatarConfianca(valor) {
     if (valor === null || valor === undefined) { return 'sem confiança'; }
     return Number(valor).toFixed(3);
@@ -2074,10 +2307,27 @@ export const PAGINA_DEMO = `<!doctype html>
 
   function linhaDaEtapa(resposta) {
     var quantos = typeof resposta.camposAvaliados === 'number' ? resposta.camposAvaliados : (resposta.campos || []).length;
-    if (resposta.etapaAvaliada) {
-      return 'Etapa: ' + resposta.etapaAvaliada.nome + ' · ' + quantos + ' campos conferíveis nesta etapa';
+    var etapa = resposta.etapaAvaliada;
+    if (etapa) {
+      // A ORDEM entra junto do nome: "etapa 2 — Serigrafia" diz onde na linha
+      // este veredito foi emitido, e é isso que impede ler um conforme de gate
+      // parcial como atestado da peça inteira.
+      var onde = typeof etapa.ordem === 'number'
+        ? 'etapa ' + etapa.ordem + ' — ' + etapa.nome
+        : etapa.nome;
+      return 'Conferência parcial na ' + onde + ' · ' + quantos + ' campos conferíveis nesta etapa';
     }
     return 'Conferência completa · ' + quantos + ' campos';
+  }
+
+  // Identidade da peça como a API a resolveu a partir do QR. São dados que já
+  // vinham na resposta e a tela ignorava — e é por eles que o time confere, no
+  // olho, que está vendo a peça certa e o projeto certo.
+  function linhaDaPeca(peca) {
+    var partes = [];
+    if (peca.patrimonio) { partes.push('patrimônio ' + peca.patrimonio); }
+    if (peca.cliente) { partes.push('cliente ' + peca.cliente); }
+    return partes.join(' · ');
   }
 
   function formatarPercentual(valor) {
@@ -2161,12 +2411,16 @@ export const PAGINA_DEMO = `<!doctype html>
     var itens = achados.map(function (achado) {
       var ocorrencias = achado.ocorrencias || [];
       var linhas = ocorrencias.map(function (ocorrencia) {
-        var foto = ocorrencia.fotoEvidenciaId ? fotoPorId(ocorrencia.fotoEvidenciaId) : null;
+        // A foto vem da API (nova) ou, para resposta antiga, do que ESTA sessão
+        // enviou. Nenhuma rota é inventada: sem url, sem link e sem miniatura.
+        var daApi = ocorrencia.foto && ocorrencia.foto.url ? ocorrencia.foto : null;
+        var local = !daApi && ocorrencia.fotoEvidenciaId ? fotoPorId(ocorrencia.fotoEvidenciaId) : null;
+        var url = daApi ? daApi.url : (local ? local.url : null);
+        var fonte = daApi ? (daApi.fonteFisica || '?') : (local ? local.fonte : '');
         var confianca = 'confiança ' + esc(formatarConfianca(ocorrencia.confianca));
-        if (foto && foto.url) {
-          return '<li>' + esc(foto.fonte) + ' · ' + confianca +
-            ' · <a href="' + esc(foto.url) + '" target="_blank" rel="noopener">ver foto (' +
-            esc(foto.fonte) + ')</a></li>';
+        if (url) {
+          return '<li>' + esc(fonte) + ' · ' + confianca +
+            miniaturaDaEvidencia(url, fonte, ocorrencia.regiaoLeitura) + '</li>';
         }
         return '<li>' + confianca + ' · foto não identificada nesta sessão</li>';
       }).join('');
@@ -2323,7 +2577,16 @@ export const PAGINA_DEMO = `<!doctype html>
       bloco += '<dt>casou com</dt><dd class="mono">' + esc(campo.campoDaLeitura) + '</dd>';
     }
     bloco += '</dl>';
-    if (url) {
+
+    // Evidência VISUAL primeiro: a API agora manda a foto do campo (url
+    // assinada) e a região da leitura, então o operador vê o número marcado em
+    // vez de ter que caçá-lo na foto inteira. Sem fotoEvidencia na resposta
+    // (rota de leituras digitadas, resposta antiga), cai no link da foto que
+    // ESTA sessão enviou para a vista — o comportamento de antes.
+    var daApi = campo.fotoEvidencia && campo.fotoEvidencia.url ? campo.fotoEvidencia : null;
+    if (daApi) {
+      bloco += miniaturaDaEvidencia(daApi.url, daApi.fonteFisica || campo.fonteFisica, campo.regiaoLeitura);
+    } else if (url) {
       bloco += '<a href="' + esc(url) + '" target="_blank" rel="noopener">ver foto (' + esc(campo.fonteFisica) + ')</a>';
     }
     return bloco + '</div>';
@@ -2375,10 +2638,15 @@ export const PAGINA_DEMO = `<!doctype html>
 
     var html = faixaDaExtracao(resposta.extracao);
 
+    var identidade = linhaDaPeca(peca);
     html += '<div class="veredito-geral v-' + esc(geral) + '">' +
       '<div class="titulo">' + esc(textos[0]) + '</div>' +
       '<div class="sub">' + esc(textos[1]) + '</div>' +
-      '<div class="sub">Peça ' + esc(peca.numeroSerie || '?') + '</div>' +
+      '<div class="sub forte">Peça ' + esc(peca.numeroSerie || '?') + '</div>' +
+      (identidade ? '<div class="sub">' + esc(identidade) + '</div>' : '') +
+      (peca.projetoModeloCodigo
+        ? '<div class="sub">Conferida contra o projeto ' + esc(peca.projetoModeloCodigo) + '</div>'
+        : '') +
       '<div class="sub">' + esc(linhaDaEtapa(resposta)) + '</div>' +
       '</div>';
 
