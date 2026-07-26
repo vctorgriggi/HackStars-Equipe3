@@ -232,6 +232,7 @@ function montarBancada(
     etapaAvaliada: null,
     camposAvaliados: contexto.checklist.length,
     campos: [],
+    incoerencias: [],
   };
 
   const executar = jest.fn<
@@ -392,8 +393,10 @@ describe('ConferenciaExtracaoService — visao plugada no fluxo', () => {
       fotos: 2,
       leiturasProduzidas: 4,
       fotosForaDoRecorte: 0,
-      // Total BRUTO: o mock ecoa como achado livre cada valor que leu.
-      achadosLivres: 4,
+      // Zero: achado livre e o texto que NAO virou leitura de campo, e neste
+      // cenario todo texto do mock virou leitura (achado A4 — o mock ecoava os
+      // proprios valores lidos, o oposto do que o Textract faz).
+      achadosLivres: 0,
     });
   });
 
@@ -692,18 +695,25 @@ describe('ConferenciaExtracaoService — evidencia amarrada a conferencia (achad
 // devolve TODO o texto que leu, o servico cruza contra o QR e alarma o que nao
 // bate. A regra de ferro tem teste proprio aqui — alarme nunca vira veredito.
 describe('ConferenciaExtracaoService — achados livres so alarmam', () => {
-  /** Mock que, alem das leituras da demo, "viu" um numero estranho na foto. */
-  function espiaoComTextoEstranho(texto: string): ExtractorEspiao {
+  /**
+   * Mock que, alem das leituras da demo, "viu" na foto um texto que NENHUM
+   * campo alvo consumiu — a definicao de achado livre nos dois adapters (no
+   * Textract, `achadosDasLinhas` devolve exatamente as linhas nao consumidas).
+   * Todo cenario de alarme precisa monta-lo explicitamente: valor que virou
+   * leitura de campo nunca chega ao cruzamento (achado A4).
+   */
+  function espiaoComTextoExtra(texto: string): ExtractorEspiao {
     return new ExtractorEspiao(
       new MockExtractor(LEITURAS_DEMO, CONFIANCA_MOCK, [texto]),
     );
   }
 
   it('should devolver achadosInconsistentes vazio quando tudo bate com o QR', async () => {
-    // Serigrafia da peca de demo: patrimonio 251328 (esta no QR) e o texto do
-    // cliente (nao numerico, fora do cruzamento). Nada a alarmar.
+    // A foto viu um numero a mais, mas ele e o patrimonio que a etiqueta
+    // afirma: consistente com a fonte da verdade, nada a alarmar.
     const { service } = montarBancada({
       evidencias: { [ID_SERIGRAFIA]: foto(ID_SERIGRAFIA, 'serigrafia') },
+      extractor: espiaoComTextoExtra('251328'),
     });
 
     const resultado = await service.executarComFotos({
@@ -713,13 +723,13 @@ describe('ConferenciaExtracaoService — achados livres so alarmam', () => {
 
     expect(resultado.achadosInconsistentes).toEqual([]);
     // Vazio NAO e sinal de peca boa: o resumo mostra que houve texto lido.
-    expect(resultado.extracao.achadosLivres).toBe(2);
+    expect(resultado.extracao.achadosLivres).toBe(1);
   });
 
   it('should alarmar o numero que a visao viu e o QR nao conhece', async () => {
     const { service } = montarBancada({
       evidencias: { [ID_SERIGRAFIA]: foto(ID_SERIGRAFIA, 'serigrafia') },
-      extractor: espiaoComTextoEstranho('999999'),
+      extractor: espiaoComTextoExtra('999999'),
     });
 
     const resultado = await service.executarComFotos({
@@ -742,10 +752,17 @@ describe('ConferenciaExtracaoService — achados livres so alarmam', () => {
   });
 
   it('should alarmar a serie da placa da peca de demo, que diverge da etiqueta', async () => {
-    // A peca fisica da demo tem placa 847833 contra etiqueta 847233: o alarme
-    // pega o mesmo defeito que a checklist pega, por outro caminho.
+    // A peca fisica da demo tem placa 847833 contra etiqueta 847233. O alarme
+    // pega o mesmo defeito que a checklist pega, mas por OUTRO caminho: o
+    // 847833 aqui e um texto que a heuristica NAO consumiu como campo alvo
+    // (ex.: a placa aparece de novo numa etiqueta interna da foto). Quando ele
+    // vira a leitura de `serie-placa`, quem acusa e a engine — e o cenario e
+    // montado explicitamente porque, no Textract, linha consumida por um alvo
+    // nunca reaparece como achado livre (achado A4: antes o mock ecoava a
+    // leitura e o teste passava so em modo mock).
     const { service } = montarBancada({
       evidencias: { [ID_PLACA]: foto(ID_PLACA, 'placa') },
+      extractor: espiaoComTextoExtra('847833'),
     });
 
     const resultado = await service.executarComFotos({
@@ -766,7 +783,7 @@ describe('ConferenciaExtracaoService — achados livres so alarmam', () => {
     });
     const comAchado = montarBancada({
       evidencias: { [ID_SERIGRAFIA]: foto(ID_SERIGRAFIA, 'serigrafia') },
-      extractor: espiaoComTextoEstranho('999999'),
+      extractor: espiaoComTextoExtra('999999'),
     });
 
     const antes = await semAchado.service.executarComFotos({
@@ -799,7 +816,7 @@ describe('ConferenciaExtracaoService — achados livres so alarmam', () => {
         [ID_SERIGRAFIA]: foto(ID_SERIGRAFIA, 'serigrafia'),
         [ID_CHUMBADO]: foto(ID_CHUMBADO, 'chumbado-1'),
       },
-      extractor: espiaoComTextoEstranho('999999'),
+      extractor: espiaoComTextoExtra('999999'),
     });
 
     const resultado = await service.executarComFotos({

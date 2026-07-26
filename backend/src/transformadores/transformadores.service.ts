@@ -163,10 +163,10 @@ export class TransformadoresService {
    * diferente do registro ATUALIZA o registro, senao a resposta exibiria o
    * valor antigo enquanto a comparacao usa o novo (revisao R1).
    *
-   * NOTA DE MANUTENCAO: `ConferenciaExecucaoService.buscarOuCriarTransformador`
-   * e a copia privada desta mesma regra — nao pode ser colapsada nesta rodada
-   * (o arquivo esta sob edicao concorrente). Ao mexer aqui, mexer la tambem, e
-   * na primeira oportunidade apagar a copia de la em favor deste metodo.
+   * REGRA UNICA: a copia privada que vivia em `ConferenciaExecucaoService`
+   * (`buscarOuCriarTransformador`) foi apagada — a execucao delega para este
+   * metodo, inclusive nos testes, que usam a implementacao real com os
+   * colaboradores dublados. Nao recriar a copia.
    */
   async buscarOuCriarPorPayload(
     payload: PayloadEtiqueta,

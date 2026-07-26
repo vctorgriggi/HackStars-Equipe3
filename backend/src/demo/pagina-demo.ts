@@ -37,6 +37,10 @@ export const PAGINA_DEMO = `<!doctype html>
     --ambar-fundo: #fff5e0;
     --verde: #1e6b41;
     --verde-fundo: #e8f5ed;
+    /* Coerência entre posições: cor PRÓPRIA, para não ser lida como veredito
+       (vermelho = divergente) nem como achado livre (âmbar). */
+    --violeta: #553091;
+    --violeta-fundo: #f1ecfb;
   }
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
@@ -247,6 +251,44 @@ export const PAGINA_DEMO = `<!doctype html>
   .v-divergente { background: var(--vermelho-fundo); border-color: var(--vermelho); color: var(--vermelho); }
   .v-nao_conferivel { background: var(--ambar-fundo); border-color: var(--ambar); color: var(--ambar); }
   .v-conforme { background: var(--verde-fundo); border-color: var(--verde); color: var(--verde); }
+  .bloco-coerencia {
+    border: 2px solid var(--violeta); background: var(--violeta-fundo);
+    border-radius: 6px; padding: 14px; margin-bottom: 14px;
+  }
+  .bloco-coerencia .titulo-coerencia {
+    font-size: 17px; font-weight: 700; line-height: 1.3; color: var(--violeta);
+  }
+  .bloco-coerencia .explica { font-size: 13px; margin: 6px 0 0; color: var(--tinta-fraca); }
+  .bloco-coerencia .explica b { color: var(--violeta); }
+  .bloco-coerencia .grupo-coerencia {
+    background: #fff; border: 1px solid var(--violeta); border-radius: 4px;
+    padding: 10px 12px; margin-top: 10px;
+  }
+  .bloco-coerencia .esperado { font-size: 14px; color: var(--tinta-fraca); }
+  .bloco-coerencia .valores { font-size: 13px; color: var(--tinta-fraca); margin-top: 2px; }
+  .bloco-coerencia .mono {
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    color: var(--tinta); font-weight: 700;
+  }
+  .bloco-coerencia ul { list-style: none; margin: 10px 0 0; padding: 0; }
+  .bloco-coerencia li {
+    border-top: 1px solid var(--borda); padding: 10px 0 4px;
+  }
+  .bloco-coerencia li:first-child { border-top: 0; }
+  .bloco-coerencia .topo-leitura {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+  }
+  .bloco-coerencia .campo-legivel { font-size: 15px; color: var(--tinta); }
+  .bloco-coerencia .campo-cru {
+    display: block; font-size: 12px; color: var(--tinta-fraca);
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+  }
+  .bloco-coerencia .selo {
+    flex: none; font-size: 12px; font-weight: 700; letter-spacing: .05em;
+    text-transform: uppercase; padding: 3px 8px; border-radius: 3px; border: 1px solid;
+  }
+  .bloco-coerencia .detalhe { font-size: 14px; color: var(--tinta); margin-top: 4px; }
+  .bloco-coerencia a { color: var(--acento); font-size: 14px; display: inline-block; min-height: 24px; margin-top: 4px; }
   .alarme-consistencia {
     border: 2px solid var(--ambar); background: var(--ambar-fundo);
     border-radius: 6px; padding: 14px; margin-bottom: 14px;
@@ -1217,6 +1259,65 @@ export const PAGINA_DEMO = `<!doctype html>
     return 'Conferência completa · ' + quantos + ' campos';
   }
 
+  function formatarPercentual(valor) {
+    if (valor === null || valor === undefined) { return 'sem confiança'; }
+    return (Number(valor) * 100).toFixed(1) + '%';
+  }
+
+  // Cosmética pura: hífens viram espaços e a primeira letra sobe. Nenhum mapa
+  // de nomes bonitos — ele envelheceria a cada campo novo da checklist; o nome
+  // canônico continua visível logo abaixo.
+  function nomeLegivel(campo) {
+    var texto = String(campo || '').replace(/-/g, ' ');
+    return texto.charAt(0).toUpperCase() + texto.slice(1);
+  }
+
+  // Incoerência entre posições irmãs: a série é gravada várias vezes DE
+  // PROPÓSITO, e discordância entre elas é o sinal que a comparação campo a
+  // campo perde. Aqui só se EXIBE o que a API mandou: nenhuma leitura é eleita
+  // vencedora, nada é reordenado por confiança (ranking sugeriria voto) e
+  // nenhum veredito é recalculado.
+  function blocoDasIncoerencias(incoerencias) {
+    if (!incoerencias || !incoerencias.length) { return ''; }
+
+    var grupos = incoerencias.map(function (incoerencia) {
+      var leituras = incoerencia.leituras || [];
+      var linhas = leituras.map(function (leitura) {
+        var url = urlDaFonte(leitura.fonteFisica);
+        var linha = '<li>' +
+          '<div class="topo-leitura">' +
+          '<span><span class="campo-legivel">' + esc(nomeLegivel(leitura.campo)) + '</span>' +
+          '<span class="campo-cru">' + esc(leitura.campo) + '</span></span>' +
+          '<span class="selo v-' + esc(leitura.veredito) + '">' + esc(leitura.veredito) + '</span>' +
+          '</div>' +
+          '<div class="detalhe">fonte ' + esc(leitura.fonteFisica) + ' · leu <span class="mono">' +
+          esc(leitura.valorLido === null ? '(sem leitura)' : leitura.valorLido) +
+          '</span> · confiança ' + esc(formatarPercentual(leitura.confianca)) + '</div>';
+        if (url) {
+          linha += '<a href="' + esc(url) + '" target="_blank" rel="noopener">ver foto (' +
+            esc(leitura.fonteFisica) + ')</a>';
+        }
+        return linha + '</li>';
+      }).join('');
+
+      return '<div class="grupo-coerencia">' +
+        '<div class="esperado">A etiqueta manda: <span class="mono">' +
+        esc(incoerencia.valorEsperado) + '</span></div>' +
+        '<div class="valores">Valores lidos neste grupo: ' +
+        esc((incoerencia.valoresLidos || []).join(' · ')) + '</div>' +
+        '<ul>' + linhas + '</ul></div>';
+    }).join('');
+
+    return '<div class="bloco-coerencia">' +
+      '<div class="titulo-coerencia">Posições que deveriam ter o mesmo número não concordam</div>' +
+      '<p class="explica">O número de série é gravado em várias posições da peça de propósito — ' +
+      'as posições chumbadas e a placa têm de carregar o mesmo número. Elas discordarem indica ' +
+      'gravação errada na peça OU leitura ruim da foto: <b>vá às fotos e confira posição por ' +
+      'posição</b>. Nenhuma leitura é eleita correta aqui — não existe voto de maioria; a ' +
+      'incoerência só impede o veredito conforme, nunca aprova nada.</p>' +
+      grupos + '</div>';
+  }
+
   // fotoEvidenciaId -> fonte/url das fotos que ESTA sessão enviou. Id que não
   // veio daqui simplesmente não vira link (nenhuma rota nova é inventada).
   function fotoPorId(id) {
@@ -1302,6 +1403,9 @@ export const PAGINA_DEMO = `<!doctype html>
     // Logo abaixo do veredito para não passar despercebido no celular, e com
     // forma/cor próprias (âmbar, caixa de alarme) — nunca a faixa vermelha do
     // divergente: confundir alarme com veredito é o erro caro aqui.
+    // Ordem: incoerência primeiro (pode ter travado o conforme), achado livre
+    // depois (é informativo puro).
+    html += blocoDasIncoerencias(resposta.incoerencias);
     html += blocoDosAchados(resposta.achadosInconsistentes);
 
     html += (resposta.campos || []).map(function (campo) {

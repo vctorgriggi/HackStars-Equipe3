@@ -1,4 +1,4 @@
-import { conferir } from './engine-conformidade';
+import { conferir, temLastro } from './engine-conformidade';
 import { ItemChecklist, LeituraCampo, OpcoesEngine } from './tipos';
 
 // Nota de lint: a regra `no-restricted-syntax` do projeto exige que todo `it`
@@ -398,10 +398,143 @@ describe('conferir — regra 4: veredito geral', () => {
     expect(resultado.vereditoGeral).toBe('divergente');
   });
 
-  it('should ser conforme para checklist vazia', () => {
+  // INVERSAO DELIBERADA (achado A1 da revisao adversarial). Este teste dizia
+  // "should ser conforme para checklist vazia" e CONSAGRAVA o falso OK: zero
+  // campo verificado devolvia `conforme`, o veredito mais forte do sistema,
+  // sobre uma peca que ninguem olhou. `conforme` agora exige pelo menos um
+  // campo conforme.
+  it('should ser nao_conferivel para checklist vazia, nunca conforme', () => {
     const resultado = conferir([], {}, [], OPCOES);
 
-    expect(resultado).toEqual({ vereditoGeral: 'conforme', campos: [] });
+    expect(resultado).toEqual({
+      vereditoGeral: 'nao_conferivel',
+      campos: [],
+      incoerencias: [],
+    });
+  });
+});
+
+// Regressao do achado A1: os dois caminhos provados pela revisao para chegar a
+// `conforme` sem verificar nada. Inalcancaveis pelo seed de hoje (toda etapa
+// tem campo obrigatorio), mas a checklist e DADO — a Fase 6 a escreve com LLM.
+describe('conferir — regra 4b: conforme exige campo verificado', () => {
+  it('should ser nao_conferivel quando o recorte so tem opcionais sem leitura', () => {
+    const resultado = conferir(
+      [
+        item('serie-placa', false),
+        item('potencia-serigrafia', false, 'serigrafia'),
+      ],
+      { 'serie-placa': '847233', 'potencia-serigrafia': '10 kVA' },
+      [],
+      OPCOES,
+    );
+
+    expect(resultado.campos.map((campo) => campo.veredito)).toEqual([
+      'nao_conferivel',
+      'nao_conferivel',
+    ]);
+    expect(resultado.vereditoGeral).toBe('nao_conferivel');
+  });
+
+  it('should ser nao_conferivel quando todo item opcional e omitido por falta de esperado', () => {
+    // O caso mais perigoso: a engine omite opcional sem valor esperado, entao
+    // o resultado sai com `campos: []` — e antes saia `conforme`.
+    const resultado = conferir(
+      [item('potencia-serigrafia', false, 'serigrafia')],
+      {},
+      [leitura('potencia-serigrafia', '10 kVA')],
+      OPCOES,
+    );
+
+    expect(resultado.campos).toEqual([]);
+    expect(resultado.vereditoGeral).toBe('nao_conferivel');
+  });
+
+  it('should seguir conforme quando ao menos um campo foi verificado', () => {
+    // Contraprova: a guarda nova nao pode rebaixar o caso legitimo do
+    // criterio 4 do SPEC (opcional ilegivel nao bloqueia o conforme).
+    const resultado = conferir(
+      [item('serie-placa'), item('potencia-serigrafia', false, 'serigrafia')],
+      { 'serie-placa': '847233', 'potencia-serigrafia': '10 kVA' },
+      [leitura('serie-placa', '847233')],
+      OPCOES,
+    );
+
+    expect(resultado.vereditoGeral).toBe('conforme');
+  });
+});
+
+// Ramo (b2) coberto aqui, e nao so na suite do dedupe (achado M9): o fato
+// `conflitante` e ENTRADA da engine, e a engine tem de honra-lo sozinha.
+describe('conferir — regra 2b2: leituras conflitantes', () => {
+  it('should marcar nao_conferivel com motivo leituras-conflitantes', () => {
+    const resultado = conferir(
+      [item('serie-placa')],
+      { 'serie-placa': '847233' },
+      [{ ...leitura('serie-placa', '847233', 0.99), conflitante: true }],
+      OPCOES,
+    );
+
+    expect(resultado.campos[0]).toMatchObject({
+      veredito: 'nao_conferivel',
+      motivo: 'leituras-conflitantes',
+    });
+    expect(resultado.vereditoGeral).toBe('nao_conferivel');
+  });
+
+  it('should ter precedencia sobre a marcacao de leitura trocada', () => {
+    // Decisao registrada: com os dois fatos na mesma leitura vence
+    // `leituras-conflitantes`. Os dois dao nao_conferivel — muda so o motivo
+    // que o humano le —, e o conflito e mais primario: com duas leituras
+    // validas se contradizendo, nem da para afirmar que a vencedora e a
+    // marcacao do vizinho.
+    const resultado = conferir(
+      [item('serie-chumbada-1', true, 'chumbado-1')],
+      { 'serie-chumbada-1': '847233', 'patrimonio-placa': '251328' },
+      [
+        {
+          ...leitura('serie-chumbada-1', '251328', 0.99),
+          conflitante: true,
+          trocado: true,
+          campoDaLeitura: 'patrimonio-placa',
+        },
+      ],
+      OPCOES,
+    );
+
+    expect(resultado.campos[0].motivo).toBe('leituras-conflitantes');
+    expect(resultado.campos[0].veredito).toBe('nao_conferivel');
+  });
+
+  it('should ter precedencia sobre a confianca abaixo do limiar', () => {
+    // (b2) roda antes de (c): duas leituras validas discordando e um fato mais
+    // informativo que "esta leitura ficou fraca".
+    const resultado = conferir(
+      [item('serie-placa')],
+      { 'serie-placa': '847233' },
+      [{ ...leitura('serie-placa', '847233', 0.5), conflitante: true }],
+      OPCOES,
+    );
+
+    expect(resultado.campos[0].motivo).toBe('leituras-conflitantes');
+  });
+});
+
+// M1: a politica de lastro virou uma funcao so, usada pelo ramo (c) da engine e
+// pelo dedupe da execucao. Testada direto para que a decisao em aberto do
+// "campo parcialmente legivel" tenha um lugar unico onde mudar.
+describe('temLastro — politica de confianca compartilhada', () => {
+  it('should exigir confianca presente, positiva e >= limiar', () => {
+    expect(temLastro(0.9, 0.8)).toBe(true);
+    expect(temLastro(0.8, 0.8)).toBe(true);
+    expect(temLastro(0.79, 0.8)).toBe(false);
+    expect(temLastro(null, 0.8)).toBe(false);
+    expect(temLastro(undefined, 0.8)).toBe(false);
+  });
+
+  it('should recusar confianca zero mesmo com limiar zero', () => {
+    expect(temLastro(0, 0)).toBe(false);
+    expect(temLastro(0.01, 0)).toBe(true);
   });
 });
 

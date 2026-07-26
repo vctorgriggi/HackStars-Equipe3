@@ -1,0 +1,110 @@
+import { PayloadEtiqueta } from '../transformadores/qr/payload-etiqueta';
+
+import { montarValoresEsperados } from './conferencia-execucao.service';
+import { conferir } from './engine/engine-conformidade';
+import { ItemChecklist } from './engine/tipos';
+
+// Nota de lint: a regra `no-restricted-syntax` do projeto exige que todo `it`
+// comece com "should"; o restante da frase segue o vocabulario de dominio.
+//
+// Achado M9 da revisao adversarial: `montarValoresEsperados` nao tinha teste
+// direto, e e ela que decide de onde vem o valor esperado de cada campo — logo,
+// e ela que decide que 'potencia-*' NAO tem esperado nesta rodada (a potencia
+// nao esta no QR). Regra de ouro em jogo: valor esperado que nao veio do
+// payload do QR nao existe (SPEC, constraint 5); inventar um seria fabricar a
+// fonte da verdade.
+
+function item(campo: string, obrigatorio = true): ItemChecklist {
+  return { campo, fonteFisica: 'placa', obrigatorio };
+}
+
+function payload(extra: Partial<PayloadEtiqueta> = {}): PayloadEtiqueta {
+  return {
+    numeroSerie: '847233',
+    patrimonio: '251328',
+    cliente: '143091 - Energisa Rondônia',
+    pedido: null,
+    seq: null,
+    descricao: null,
+    codigoProjeto: null,
+    ...extra,
+  };
+}
+
+describe('montarValoresEsperados — origem do esperado por PREFIXO do campo', () => {
+  it('should mandar o numeroSerie do QR para todo campo serie-*', () => {
+    const valores = montarValoresEsperados(
+      [item('serie-placa'), item('serie-chumbada-1'), item('serie-chumbada-2')],
+      payload(),
+    );
+
+    expect(valores).toEqual({
+      'serie-placa': '847233',
+      'serie-chumbada-1': '847233',
+      'serie-chumbada-2': '847233',
+    });
+  });
+
+  it('should mandar patrimonio e cliente para os prefixos correspondentes', () => {
+    const valores = montarValoresEsperados(
+      [item('patrimonio-placa'), item('cliente-serigrafia')],
+      payload(),
+    );
+
+    expect(valores).toEqual({
+      'patrimonio-placa': '251328',
+      'cliente-serigrafia': '143091 - Energisa Rondônia',
+    });
+  });
+
+  it('should NAO inventar esperado para potencia-*', () => {
+    // A potencia nao viaja no QR. Sem esperado, a engine omite o campo opcional
+    // e marca o obrigatorio como nao_conferivel — nunca conforme.
+    const valores = montarValoresEsperados(
+      [item('potencia-serigrafia', false)],
+      payload(),
+    );
+
+    expect(valores).toEqual({});
+  });
+
+  it('should ignorar campo de prefixo desconhecido', () => {
+    const valores = montarValoresEsperados([item('peso-total')], payload());
+
+    expect(valores).toEqual({});
+  });
+
+  it('should omitir o campo quando a etiqueta nao traz o dado', () => {
+    // Etiqueta sem cliente: o campo fica SEM esperado, e nao com esperado
+    // vazio. String vazia compararia "igual a nada" e viraria conforme.
+    const valores = montarValoresEsperados(
+      [item('cliente-serigrafia'), item('serie-placa')],
+      payload({ cliente: null }),
+    );
+
+    expect(valores).toEqual({ 'serie-placa': '847233' });
+  });
+
+  it('should tratar dado so com espacos como ausente', () => {
+    const valores = montarValoresEsperados(
+      [item('cliente-serigrafia')],
+      payload({ cliente: '   ' }),
+    );
+
+    expect(valores).toEqual({});
+  });
+
+  it('should nao afirmar conforme para campo obrigatorio sem esperado', () => {
+    // Ponta a ponta com a engine: a decisao desta funcao chega ao veredito.
+    const checklist = [item('potencia-serigrafia')];
+    const resultado = conferir(
+      checklist,
+      montarValoresEsperados(checklist, payload()),
+      [{ campo: 'potencia-serigrafia', valorLido: '10 kVA', confianca: 0.99 }],
+      { limiarConfianca: 0.9 },
+    );
+
+    expect(resultado.campos[0].motivo).toBe('sem-valor-esperado');
+    expect(resultado.vereditoGeral).toBe('nao_conferivel');
+  });
+});

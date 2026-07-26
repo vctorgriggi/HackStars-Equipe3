@@ -85,12 +85,49 @@ export class CamposConferidosService {
   }
 
   /**
+   * Recusa BARATA das evidências de um lote inteiro, para ser chamada ANTES da
+   * primeira escrita da execução (achado A2 da revisão adversarial).
+   *
+   * A mesma regra que `criarComVeredito` aplica no fim da linha: foto já presa
+   * a OUTRA conferência não lastreia campo nenhum. A diferença é o momento —
+   * lá dentro, o 422 estoura no meio do laço de campos, com a Conferencia já
+   * criada e N campos gravados; a conferência órfã com campos parciais fica no
+   * banco e ainda é a "última conferência" que o scan de passagem lê.
+   *
+   * Só recusa foto presa a outra conferência. Id INEXISTENTE segue tolerado
+   * (contrato publicado do DTO: "ignorado se nao existir") — a evidência é
+   * complementar ao veredito, e derrubar a conferência por um id velho perderia
+   * um veredito legítimo.
+   */
+  async validarEvidenciasDisponiveis(
+    fotoEvidenciaIds: string[],
+  ): Promise<void> {
+    for (const id of new Set(fotoEvidenciaIds)) {
+      const fotoEvidencia = await this.fotosEvidenciaService.findById(id);
+
+      if (fotoEvidencia?.conferencia) {
+        throw new UnprocessableEntityException({
+          status: HttpStatus.UNPROCESSABLE_ENTITY,
+          errors: {
+            fotoEvidenciaId: `foto-evidencia-de-outra-conferencia: ${id}`,
+          },
+        });
+      }
+    }
+  }
+
+  /**
    * Unico caminho que grava `veredito`: chamado server-side pela execucao de
    * conferencia, com o resultado ja calculado pela engine. Nao existe rota
    * nem DTO HTTP equivalente — veredito nunca entra pela borda (regra de ouro).
    *
    * `fotoEvidenciaId` inexistente no banco nao derruba a conferencia: o campo
    * e persistido sem foto (a evidencia e complementar ao veredito).
+   *
+   * A recusa de foto presa a OUTRA conferencia continua aqui como ULTIMA linha
+   * de defesa (nenhuma escrita de lastro emprestado passa por baixo dela); a
+   * recusa barata, antes de qualquer escrita, e
+   * `validarEvidenciasDisponiveis`.
    */
   async criarComVeredito(dados: {
     conferencia: Conferencia;

@@ -378,21 +378,23 @@ describe('MockExtractor — determinismo', () => {
 });
 
 describe('MockExtractor — achados livres', () => {
-  it('should ecoar como achado livre o proprio valor que leu', async () => {
+  // INVERSAO DELIBERADA (achado A4 da revisao adversarial). Este teste dizia
+  // "should ecoar como achado livre o proprio valor que leu" e consagrava um
+  // mock que fazia o CONTRARIO do Textract: la, `achadosDasLinhas` remove as
+  // linhas consumidas pelos alvos (ver
+  // 'should manter fora dos achados a linha consumida como leitura de campo',
+  // em textract.extractor.spec.ts). Mock divergente do adapter real sustenta
+  // teste verde que a producao nao reproduz.
+  it('should NAO ecoar como achado livre o valor que virou leitura de campo', async () => {
     const extractor = new MockExtractor({ 'serie-placa': '847833' });
 
-    const { achadosLivres } = await extractor.extrair(foto('placa', 'f1'), [
-      { campo: 'serie-placa' },
-    ]);
+    const { leituras, achadosLivres } = await extractor.extrair(
+      foto('placa', 'f1'),
+      [{ campo: 'serie-placa' }],
+    );
 
-    expect(achadosLivres).toEqual([
-      {
-        texto: '847833',
-        confianca: 0.99,
-        regiaoLeitura: null,
-        fotoEvidenciaId: 'f1',
-      },
-    ]);
+    expect(leituras.map((leitura) => leitura.valorLido)).toEqual(['847833']);
+    expect(achadosLivres).toEqual([]);
   });
 
   it('should nao inventar achado quando nao ha leitura nem texto extra', async () => {
@@ -416,11 +418,10 @@ describe('MockExtractor — achados livres', () => {
       [{ campo: 'serie-placa' }],
     );
 
+    // So o texto extra: o valor que virou leitura de campo fica fora, como no
+    // Textract. `textosExtras` e a UNICA fonte de achado livre do mock.
     expect(leituras.map((leitura) => leitura.valorLido)).toEqual(['847233']);
-    expect(achadosLivres.map((achado) => achado.texto)).toEqual([
-      '847233',
-      '999999',
-    ]);
+    expect(achadosLivres.map((achado) => achado.texto)).toEqual(['999999']);
   });
 });
 

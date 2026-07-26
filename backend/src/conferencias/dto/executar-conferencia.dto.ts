@@ -102,7 +102,7 @@ export class ExecutarConferenciaDto {
     type: () => Number,
     minimum: 0,
     maximum: 1,
-    description: 'Limiar de confianca da engine; ausente usa o padrao (0.8)',
+    description: 'Limiar de confianca da engine; ausente usa o padrao (0.9)',
   })
   @IsOptional()
   @IsNumber()

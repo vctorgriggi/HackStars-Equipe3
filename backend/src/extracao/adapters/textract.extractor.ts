@@ -18,8 +18,8 @@ import {
 /**
  * Adapter Textract (OCR classico) — `DetectDocumentTextCommand`.
  *
- * ESTRATEGIA (heuristica de primeira rodada; sera refinada pelo spike T2.1,
- * `scripts/spike-extracao.ts`):
+ * ESTRATEGIA (heuristica validada pelo spike T2.1 com as fotos reais da peca —
+ * medicao em docs/visao-ocr.md; `scripts/spike-extracao.ts` reexecuta):
  *
  * 1. o Textract devolve blocos; usamos so os `LINE`, que trazem `Confidence`
  *    (0..100) e `Geometry.BoundingBox` (coordenadas normalizadas 0..1);
@@ -184,8 +184,8 @@ function lerLinhas(blocos: Block[]): LinhaOcr[] {
 /**
  * Blocos do Textract -> leituras + achados livres. Funcao PURA (sem I/O, sem
  * SDK em runtime, so o tipo `Block`), no mesmo espirito da engine de
- * conformidade: e a heuristica que o spike T2.1 vai refinar, entao ela precisa
- * ser exercitavel sem AWS.
+ * conformidade: e a heuristica que decide o que a visao afirma, e todo
+ * refinamento dela precisa ser exercitavel sem AWS.
  */
 export function interpretarBlocos(
   blocos: Block[],

@@ -18,8 +18,13 @@ import { Transformador } from '../transformadores/domain/transformador';
 
 import { PayloadEtiqueta } from '../transformadores/qr/payload-etiqueta';
 
-import { conferir, normalizar } from './engine/engine-conformidade';
-import { ItemChecklist, LeituraCampo, ResultadoCampo } from './engine/tipos';
+import { conferir, normalizar, temLastro } from './engine/engine-conformidade';
+import {
+  IncoerenciaEntreCampos,
+  ItemChecklist,
+  LeituraCampo,
+  ResultadoCampo,
+} from './engine/tipos';
 import { ExecutarConferenciaDto } from './dto/executar-conferencia.dto';
 import { ConferenciaRepository } from './infrastructure/persistence/conferencia.repository';
 
@@ -66,6 +71,18 @@ export interface ResultadoExecucao {
    */
   camposAvaliados: number;
   campos: CampoExecutado[];
+  /**
+   * Campos irmãos (mesmo valor esperado do QR — as 3 séries chumbadas + a da
+   * placa, os patrimônios entre si) que NÃO leram a mesma coisa. Sai da engine
+   * junto do veredito; o front renderiza "as N posições da série não concordam
+   * entre si" sem comparar nada.
+   *
+   * Vazio na esmagadora maioria das execuções. NÃO é persistido nesta rodada
+   * (mesma decisão de `achadosInconsistentes`): gravar exigiria entidade nova e
+   * trilha própria. O EFEITO dele no veredito é persistido — incoerência
+   * impede o `conforme` geral.
+   */
+  incoerencias: IncoerenciaEntreCampos[];
 }
 
 /**
@@ -192,7 +209,11 @@ export function ehItemChecklist(valor: unknown): valor is ItemChecklist {
   );
 }
 
-function montarValoresEsperados(
+// Exportada para teste direto (mesmo padrao de `filtrarChecklistPorEtapa` e
+// `dedupeLeituras`): e ela que decide, entre outras coisas, que 'potencia-*'
+// nao tem valor esperado nesta rodada — regra que so aparecia indiretamente,
+// pelo veredito de um campo, ate a revisao adversarial (achado M9).
+export function montarValoresEsperados(
   checklist: ItemChecklist[],
   payload: PayloadEtiqueta,
 ): Record<string, string> {
@@ -302,20 +323,10 @@ export class ConferenciaExecucaoService {
     const preparado = contexto ?? (await this.prepararExecucao(dto));
     const { payload, checkpoint, projetoModelo, checklist } = preparado;
 
-    // Primeira escrita do fluxo: daqui para baixo, nenhum 422.
-    const transformador =
-      await this.transformadorService.buscarOuCriarPorPayload(
-        payload,
-        preparado.transformadorExistente,
-      );
-
-    if (!transformador.projetoModelo) {
-      await this.transformadorService.update(transformador.id, {
-        projetoModelo: { id: projetoModelo.id },
-      });
-      transformador.projetoModelo = projetoModelo;
-    }
-
+    // A ENGINE RODA ANTES DA PRIMEIRA ESCRITA. E lógica pura (checklist +
+    // payload + leituras), então nada obriga a pagá-la depois de criar a peça —
+    // e rodá-la antes é o que permite recusar um resultado vazio sem deixar
+    // Transformador órfão (mesma promessa do achado 8, agora para o AVALIADO).
     const limiarConfianca = dto.limiarConfianca ?? LIMIAR_CONFIANCA_PADRAO;
     const leituras = dedupeLeituras(
       dto.leituras.map((leitura) => ({
@@ -332,9 +343,52 @@ export class ConferenciaExecucaoService {
     const resultado = conferir(
       checklist,
       valoresEsperados,
-      marcarLeiturasTrocadas(leituras, valoresEsperados),
+      marcarLeiturasTrocadas(leituras, valoresEsperados, limiarConfianca),
       { limiarConfianca },
     );
+
+    // Recorte NAO VAZIO que mesmo assim nao avaliou campo nenhum: todos os
+    // itens eram opcionais SEM valor esperado no QR e a engine os omitiu. A
+    // guarda do recorte (`recorte.itens.length === 0`) media a lista de
+    // ENTRADA e nao pegava este caso (achado A1). Gravar seria pior que 422:
+    // ficaria uma conferencia sem campo nenhum, e conferencia sem campo e a
+    // pergunta "esta peca esta conforme?" respondida sem olhar a peca.
+    if (resultado.campos.length === 0) {
+      throw new UnprocessableEntityException({
+        status: HttpStatus.UNPROCESSABLE_ENTITY,
+        errors: {
+          checklist:
+            `checklist-sem-campo-avaliavel: nenhum item conferivel do ` +
+            `ProjetoModelo ${projetoModelo.codigo} produziu campo avaliavel ` +
+            `(itens opcionais sem valor esperado no QR)`,
+        },
+      });
+    }
+
+    // Ultimo 422 possivel, e por isso o ultimo passo antes da escrita: foto
+    // emprestada de OUTRA conferencia (achado A2). A mesma recusa acontecia no
+    // fim da linha, dentro de `criarComVeredito`, ja com a conferencia criada e
+    // N campos gravados — sobrava conferencia orfa com campos parciais, que o
+    // scan de passagem ainda leria como "ultima conferencia" da peca.
+    await this.campoConferidoService.validarEvidenciasDisponiveis(
+      leituras
+        .map((leitura) => leitura.fotoEvidenciaId)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0),
+    );
+
+    // Primeira escrita do fluxo: daqui para baixo, nenhum 422.
+    const transformador =
+      await this.transformadorService.buscarOuCriarPorPayload(
+        payload,
+        preparado.transformadorExistente,
+      );
+
+    if (!transformador.projetoModelo) {
+      await this.transformadorService.update(transformador.id, {
+        projetoModelo: { id: projetoModelo.id },
+      });
+      transformador.projetoModelo = projetoModelo;
+    }
 
     const conferencia = await this.conferenciaRepository.create({
       vereditoGeral: resultado.vereditoGeral,
@@ -343,6 +397,16 @@ export class ConferenciaExecucaoService {
 
       transformador,
     });
+
+    for (const incoerencia of resultado.incoerencias) {
+      this.logger.warn(
+        `incoerencia-entre-campos: conferencia ${conferencia.id} — ` +
+          `${incoerencia.campos.join(', ')} deveriam carregar ` +
+          `"${incoerencia.valorEsperado}" e leram valores diferentes entre si ` +
+          `(${incoerencia.valoresLidos.join(' x ')}); veredito geral ` +
+          `${resultado.vereditoGeral}`,
+      );
+    }
 
     const campos: CampoExecutado[] = [];
     for (const campo of resultado.campos) {
@@ -390,6 +454,7 @@ export class ConferenciaExecucaoService {
             },
       camposAvaliados: checklist.length,
       campos,
+      incoerencias: resultado.incoerencias,
     };
   }
 
@@ -567,14 +632,27 @@ export class ConferenciaExecucaoService {
  * `nao_conferivel`. Nenhuma leitura vira `conforme` por causa dela, e o campo
  * genuinamente divergente (placa 847833 × etiqueta 847233) continua
  * `divergente`, porque 847833 não é o esperado de campo nenhum.
+ *
+ * SÓ MARCA LEITURA COM LASTRO (achado A3 da revisão adversarial): a marcação
+ * roda no ramo (b3) da engine, ANTES do ramo (c) do limiar, então marcar sem
+ * lastro sequestrava o motivo. Medido: `251328 @ 0.35` num campo de série saía
+ * `leitura-de-outro-campo` — o operador era mandado reenquadrar a foto quando a
+ * causa real era foto ruim (35% de confiança). Sem lastro a leitura não afirma
+ * nada sobre campo nenhum, nem sobre o vizinho; deixá-la passar entrega o campo
+ * ao ramo (c), que dá o motivo honesto `confianca-abaixo-do-limiar`.
  */
 export function marcarLeiturasTrocadas(
   leituras: LeituraCampo[],
   valoresEsperados: Record<string, string>,
+  limiarConfianca: number,
 ): LeituraCampo[] {
   return leituras.map((leitura) => {
     const valorLido = leitura.valorLido;
     if (valorLido === null || valorLido.trim().length === 0) {
+      return leitura;
+    }
+
+    if (!temLastro(leitura.confianca, limiarConfianca)) {
       return leitura;
     }
 
@@ -584,12 +662,17 @@ export function marcarLeiturasTrocadas(
       return leitura;
     }
 
-    const pertenceAOutroCampo = Object.entries(valoresEsperados).some(
+    // Primeiro campo cuja expectativa casa. Com irmãos (as 3 chumbadas, os dois
+    // patrimônios) todos carregam o MESMO esperado, então qualquer um serve de
+    // representante do grupo — vale a ordem da checklist, como em `coerencia`.
+    const casado = Object.entries(valoresEsperados).find(
       ([campo, esperado]) =>
         campo !== leitura.campo && normalizar(esperado) === lido,
     );
 
-    return pertenceAOutroCampo ? { ...leitura, trocado: true } : leitura;
+    return casado === undefined
+      ? leitura
+      : { ...leitura, trocado: true, campoDaLeitura: casado[0] };
   });
 }
 
@@ -631,13 +714,14 @@ export function dedupeLeituras(
 
     // Só leitura com lastro entra na detecção de conflito: abaixo do limiar
     // (ou sem confiança) é ruído que a engine já barra sozinha — ruído não
-    // pode vetar uma leitura boa.
+    // pode vetar uma leitura boa. `temLastro` é A MESMA função que a engine usa
+    // no ramo (c): a condição vivia reescrita aqui, com os sinais invertidos, e
+    // a decisão em aberto do "campo parcialmente legível" mudaria só um dos dois
+    // lugares (achado M1).
     const valida =
       candidata.valorLido !== null &&
       candidata.valorLido.trim().length > 0 &&
-      candidata.confianca !== null &&
-      candidata.confianca > 0 &&
-      candidata.confianca >= limiarConfianca;
+      temLastro(candidata.confianca, limiarConfianca);
     if (valida) {
       const conjunto = valoresValidos.get(candidata.campo) ?? new Set<string>();
       conjunto.add(normalizar(candidata.valorLido as string));

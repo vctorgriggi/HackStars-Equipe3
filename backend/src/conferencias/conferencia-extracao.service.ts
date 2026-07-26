@@ -196,12 +196,11 @@ export class ConferenciaExtracaoService {
   }
 
   /**
-   * Ids -> registros de FotoEvidencia, com as duas recusas baratas: id
-   * deduplicado (id repetido no request pagaria a mesma foto duas vezes,
-   * constraint 4), foto inexistente e foto que JA pertence a outra
-   * conferencia.
+   * Ids -> registros de FotoEvidencia, com id deduplicado (id repetido no
+   * request pagaria a mesma foto duas vezes, constraint 4) e as duas recusas
+   * baratas: foto inexistente e foto que JA pertence a outra conferencia.
    *
-   * As tres derrubam o lote inteiro ANTES de qualquer chamada de visao:
+   * As duas derrubam o lote inteiro ANTES de qualquer chamada de visao:
    * conferencia parcial silenciosa e pior que erro explicito, e evidencia
    * emprestada de outra conferencia falsificaria a trilha de auditoria
    * (a mesma guarda que `criarComVeredito` faz no fim da linha — aqui ela

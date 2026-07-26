@@ -63,7 +63,11 @@ export class ConferenciasController {
     description:
       'Conferencia executada: peca (find-or-create pelo numero de serie), ' +
       'veredito geral calculado pela engine e um CampoConferido por campo ' +
-      'do checklist avaliado.',
+      'do checklist avaliado. A resposta traz tambem `incoerencias`: grupos ' +
+      'de campos irmaos (mesmo valor esperado do QR — as series chumbadas e a ' +
+      'da placa, os patrimonios entre si) que leram valores DIFERENTES entre ' +
+      'si, cada um com campo, valor lido, confianca e veredito. Incoerencia ' +
+      'so REBAIXA: impede o `conforme` geral e nunca suaviza um `divergente`.',
   })
   @ApiUnprocessableEntityResponse({
     description:
@@ -82,7 +86,8 @@ export class ConferenciasController {
       'Mesma conferencia do POST /executar, mas as leituras vem da VISAO: ' +
       'so as fotos cuja fonte fisica tem campo no recorte da etapa sao lidas ' +
       'do storage e enviadas uma unica vez ao extrator ativo ' +
-      '(EXTRACTOR_DRIVER). A resposta acrescenta `extracao` (driver, fotos, ' +
+      '(EXTRACTOR_DRIVER). Vale tambem aqui o `incoerencias` do /executar. ' +
+      'A resposta acrescenta `extracao` (driver, fotos, ' +
       'leiturasProduzidas, fotosForaDoRecorte, achadosLivres) e ' +
       '`achadosInconsistentes`: textos com cara de identificador que a visao ' +
       'leu na peca e o QR nao conhece. Esse ultimo e ALARME informativo — ' +

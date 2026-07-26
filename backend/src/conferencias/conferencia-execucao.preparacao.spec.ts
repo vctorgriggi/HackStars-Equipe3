@@ -109,6 +109,7 @@ interface Bancada {
   atualizarTransformador: jest.Mock;
   criarConferencia: jest.Mock;
   criarComVeredito: jest.Mock;
+  validarEvidenciasDisponiveis: jest.Mock<Promise<void>, [string[]]>;
   findAllProjetos: jest.Mock;
   findByCodigoProjeto: jest.Mock;
 }
@@ -117,6 +118,7 @@ function montarBancada(
   opcoes: {
     projetos?: ProjetoModelo[];
     pecaExistente?: Transformador | null;
+    validarEvidenciasDisponiveis?: jest.Mock<Promise<void>, [string[]]>;
   } = {},
 ): Bancada {
   const projetos = opcoes.projetos ?? [PROJETO_DEMO];
@@ -162,8 +164,14 @@ function montarBancada(
   const criarComVeredito = jest.fn(() =>
     Promise.resolve({ id: 'campo-conferido-1' }),
   );
+  // Recusa barata das evidencias (achado A2): por default nada a recusar; os
+  // testes de evidencia emprestada trocam a implementacao.
+  const validarEvidenciasDisponiveis =
+    opcoes.validarEvidenciasDisponiveis ??
+    jest.fn<Promise<void>, [string[]]>(() => Promise.resolve());
   const campoConferidoService = {
     criarComVeredito,
+    validarEvidenciasDisponiveis,
   } as unknown as CamposConferidosService;
 
   const criarConferencia = jest.fn(() =>
@@ -185,6 +193,7 @@ function montarBancada(
     atualizarTransformador,
     criarConferencia,
     criarComVeredito,
+    validarEvidenciasDisponiveis,
     findAllProjetos,
     findByCodigoProjeto,
   };
@@ -362,6 +371,144 @@ describe('prepararExecucao — resolucao UNICA de ProjetoModelo (achado 12)', ()
       'patrimonio-serigrafia',
     ]);
     expect(contexto.checkpoint?.codigo).toBe('serigrafia');
+  });
+});
+
+describe('executar — nada e gravado sem campo avaliado (achado A1)', () => {
+  // Checklist SO com opcional sem valor esperado no QR: o recorte nao e vazio
+  // (a guarda antiga media a lista de ENTRADA e deixava passar), mas a engine
+  // omite o item e devolve `campos: []`. Antes, isso virava conferencia
+  // gravada com veredito `conforme` e zero campo — o falso OK perfeito.
+  const SO_OPCIONAL = [
+    projeto('SO-OPCIONAL', [
+      {
+        campo: 'potencia-serigrafia',
+        fonteFisica: 'serigrafia',
+        obrigatorio: false,
+      },
+    ]),
+  ];
+
+  it('should recusar com 422 quando nenhum item da checklist e avaliavel', async () => {
+    const { service } = montarBancada({ projetos: SO_OPCIONAL });
+
+    await expect(
+      service.executar({
+        payloadQr: payloadQr(),
+        leituras: [
+          {
+            campo: 'potencia-serigrafia',
+            valorLido: '10 kVA',
+            confianca: 0.99,
+          },
+        ],
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        errors: {
+          checklist: expect.stringContaining('checklist-sem-campo-avaliavel'),
+        },
+      },
+    });
+  });
+
+  it('should nao deixar transformador nem conferencia para tras', async () => {
+    const { service, criarTransformador, criarConferencia, criarComVeredito } =
+      montarBancada({ projetos: SO_OPCIONAL });
+
+    await expect(
+      service.executar({
+        payloadQr: payloadQr(),
+        leituras: [
+          {
+            campo: 'potencia-serigrafia',
+            valorLido: '10 kVA',
+            confianca: 0.99,
+          },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+
+    expect(criarTransformador).not.toHaveBeenCalled();
+    expect(criarConferencia).not.toHaveBeenCalled();
+    expect(criarComVeredito).not.toHaveBeenCalled();
+  });
+});
+
+describe('executar — evidencia emprestada recusada antes da escrita (achado A2)', () => {
+  function leituraComFoto(fotoEvidenciaId: string) {
+    return {
+      campo: 'serie-chumbada-1',
+      valorLido: '847233',
+      confianca: 0.99,
+      fotoEvidenciaId,
+    };
+  }
+
+  it('should validar as fotos das leituras antes de qualquer escrita', async () => {
+    const { service, validarEvidenciasDisponiveis, criarTransformador } =
+      montarBancada();
+
+    await service.executar({
+      payloadQr: payloadQr(),
+      etapaCodigo: 'adesivacao',
+      leituras: [leituraComFoto('foto-1')],
+    });
+
+    expect(validarEvidenciasDisponiveis).toHaveBeenCalledWith(['foto-1']);
+    expect(
+      validarEvidenciasDisponiveis.mock.invocationCallOrder[0],
+    ).toBeLessThan(criarTransformador.mock.invocationCallOrder[0]);
+  });
+
+  it('should nao gravar nada quando a foto pertence a outra conferencia', async () => {
+    // Antes: o 422 vinha de `criarComVeredito`, no meio do laco de campos, com
+    // a conferencia ja criada — sobrava conferencia orfa com campos parciais,
+    // ainda lida como "ultima conferencia" da peca pelo scan de passagem.
+    const recusa = jest.fn<Promise<void>, [string[]]>(() =>
+      Promise.reject(
+        new UnprocessableEntityException({
+          status: 422,
+          errors: {
+            fotoEvidenciaId: 'foto-evidencia-de-outra-conferencia: foto-1',
+          },
+        }),
+      ),
+    );
+    const { service, criarTransformador, criarConferencia, criarComVeredito } =
+      montarBancada({ validarEvidenciasDisponiveis: recusa });
+
+    await expect(
+      service.executar({
+        payloadQr: payloadQr(),
+        etapaCodigo: 'adesivacao',
+        leituras: [leituraComFoto('foto-1')],
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        errors: {
+          fotoEvidenciaId: 'foto-evidencia-de-outra-conferencia: foto-1',
+        },
+      },
+    });
+
+    expect(criarTransformador).not.toHaveBeenCalled();
+    expect(criarConferencia).not.toHaveBeenCalled();
+    expect(criarComVeredito).not.toHaveBeenCalled();
+  });
+
+  it('should nao consultar evidencia nenhuma quando as leituras vem sem foto', async () => {
+    const { service, validarEvidenciasDisponiveis } = montarBancada();
+
+    await service.executar({
+      payloadQr: payloadQr(),
+      etapaCodigo: 'adesivacao',
+      leituras: [
+        { campo: 'serie-chumbada-1', valorLido: '847233', confianca: 0.99 },
+      ],
+    });
+
+    expect(validarEvidenciasDisponiveis).toHaveBeenCalledWith([]);
   });
 });
 
