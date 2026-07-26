@@ -8,6 +8,7 @@ import type {
   PaginaApi,
   PassagemResumoApi,
   TransformadorComSituacaoApi,
+  VereditoConferenciaApi,
 } from "@/lib/domain/transformador-api";
 import { fetchJson } from "./http";
 import { buscarTodasAsPaginas } from "./paginacao";
@@ -43,6 +44,15 @@ export function fetchConferencias(
 ): Promise<ConferenciaResumoApi[]> {
   return fetchJson<ConferenciaResumoApi[]>(
     `/api/transformadores/${encodeURIComponent(transformadorId)}/conferencias?limit=50`,
+  );
+}
+
+/** Campo a campo com foto-evidência (URL assinada, expira em 1h). */
+export function fetchCamposConferencia(
+  conferenciaId: string,
+): Promise<VereditoConferenciaApi> {
+  return fetchJson<VereditoConferenciaApi>(
+    `/api/conferencias/${encodeURIComponent(conferenciaId)}/campos`,
   );
 }
 

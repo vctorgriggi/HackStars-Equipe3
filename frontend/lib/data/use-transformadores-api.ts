@@ -8,6 +8,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { keys } from "./keys";
 import {
+  fetchCamposConferencia,
   fetchConferencias,
   fetchEtapasLinha,
   fetchPassagens,
@@ -43,6 +44,20 @@ export function useConferencias(transformadorId: string | undefined) {
     queryKey: keys.transformadoresApi.conferencias(transformadorId ?? ""),
     queryFn: () => fetchConferencias(transformadorId!),
     enabled: !!transformadorId,
+  });
+}
+
+/**
+ * Campo a campo com evidências de UMA conferência — aberto sob demanda na
+ * linha do tempo (`enabled`). `staleTime` curto de propósito: a URL da foto
+ * é assinada e expira em 1h; cache velho viraria miniatura quebrada.
+ */
+export function useCamposConferencia(conferenciaId: string | null) {
+  return useQuery({
+    queryKey: keys.conferenciasApi.campos(conferenciaId ?? ""),
+    queryFn: () => fetchCamposConferencia(conferenciaId!),
+    enabled: !!conferenciaId,
+    staleTime: 5 * 60_000,
   });
 }
 

@@ -10,6 +10,11 @@ export const keys = {
     conferencias: (id: string) =>
       ["transformadores-api", id, "conferencias"] as const,
   },
+  // Campo a campo com evidências (URL assinada, 1h) — key própria por
+  // conferência, aberta sob demanda na linha do tempo.
+  conferenciasApi: {
+    campos: (id: string) => ["conferencias-api", id, "campos"] as const,
+  },
   etapasLinha: { all: ["etapas-linha"] as const },
   // API real de clientes/projetos/câmeras — sufixo próprio para não colidir
   // com o cache mock abaixo (keys.cameras segue vivo no detalhe de

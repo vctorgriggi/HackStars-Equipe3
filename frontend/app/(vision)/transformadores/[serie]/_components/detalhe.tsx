@@ -10,13 +10,18 @@
 // campo com foto-evidência (URL assinada, expira em 1h — não guardar).
 
 import Link from "next/link";
+import { useState } from "react";
 import {
+  useCamposConferencia,
   useConferencias,
   useEtapasLinha,
   usePassagens,
   useTransformadorPorSerie,
 } from "@/lib/data/use-transformadores-api";
-import type { PassagemResumoApi } from "@/lib/domain/transformador-api";
+import type {
+  ConferenciaResumoApi,
+  PassagemResumoApi,
+} from "@/lib/domain/transformador-api";
 import { Icon } from "@/components/ui/icon";
 import { NeutralChip, StatusChip } from "@/components/ui/chip";
 import { VereditoChip } from "@/components/vision/veredito-chip";
@@ -25,6 +30,7 @@ import { SectionCard } from "@/components/ui/section-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TimelineItem } from "@/components/ui/timeline-item";
 import { EmptyState } from "@/components/ui/empty-state";
+import { CampoConferidoLinha } from "./campo-conferido-linha";
 
 function fmtDataHora(iso: string): string {
   const data = new Date(iso);
@@ -39,6 +45,81 @@ function fmtDataHora(iso: string): string {
   return `${dia} · ${hora}`;
 }
 
+function fmtHora(iso: string): string {
+  return new Date(iso).toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/**
+ * Campo a campo com as fotos-evidência, aberto sob demanda (a URL assinada
+ * expira em 1h — buscar na hora, nunca guardar). Só renderizado expandido,
+ * então o `enabled` do hook nunca dispara fechado.
+ */
+function EvidenciasDaConferencia({ conferenciaId }: { conferenciaId: string }) {
+  const { data, isPending, isError } = useCamposConferencia(conferenciaId);
+
+  if (isPending) {
+    return <Skeleton className="mt-2 h-24 w-full rounded-md" />;
+  }
+  if (isError || !data) {
+    return (
+      <p className="mt-2 text-sm text-text-3">
+        Não foi possível carregar as evidências desta conferência.
+      </p>
+    );
+  }
+
+  return (
+    <ul className="mt-2 grid gap-2">
+      {data.campos.map((campo) => (
+        <CampoConferidoLinha key={campo.id} campo={campo} />
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * Uma conferência dentro da etapa da linha do tempo: veredito + hora +
+ * comprovação campo a campo expansível. Nada aqui deriva veredito — o chip
+ * mostra o que a engine gravou.
+ */
+function ConferenciaDaEtapa({
+  conferencia,
+  aberta,
+  onToggle,
+}: {
+  conferencia: ConferenciaResumoApi;
+  aberta: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="mt-1.5 rounded-md border border-line bg-surface-2 px-3 py-2">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={aberta}
+        className="flex min-h-8 w-full flex-wrap items-center gap-2 text-left"
+      >
+        <VereditoChip veredito={conferencia.vereditoGeral} />
+        <span className="text-sm text-text-2">
+          Conferência das {fmtHora(conferencia.createdAt)}
+        </span>
+        <span className="ml-auto inline-flex items-center gap-1 text-xs text-text-3">
+          {aberta ? "ocultar evidências" : "ver evidências"}
+          <Icon
+            name="chevron-down"
+            size={14}
+            className={aberta ? "rotate-180" : undefined}
+          />
+        </span>
+      </button>
+      {aberta && <EvidenciasDaConferencia conferenciaId={conferencia.id} />}
+    </div>
+  );
+}
+
 export function DetalheTransformador({ serie }: { serie: string }) {
   const {
     data: transformador,
@@ -49,6 +130,11 @@ export function DetalheTransformador({ serie }: { serie: string }) {
   const { data: etapas = [] } = useEtapasLinha();
   const { data: passagens = [] } = usePassagens(transformador?.id);
   const { data: conferencias = [] } = useConferencias(transformador?.id);
+
+  // Uma conferência expandida por vez (a evidência é pesada: fotos assinadas).
+  const [conferenciaAberta, setConferenciaAberta] = useState<string | null>(
+    null,
+  );
 
   if (isPending) {
     return (
@@ -93,6 +179,20 @@ export function DetalheTransformador({ serie }: { serie: string }) {
     doGrupo.push(passagem);
     passagensPorEtapa.set(passagem.checkpoint.codigo, doGrupo);
   }
+
+  // Conferências por etapa (mesmo código estável): é o que põe a COMPROVAÇÃO
+  // na linha do tempo — veredito e evidência do gate junto do scan. As sem
+  // checkpoint (checklist inteira) seguem só no card "Conferências".
+  const conferenciasPorEtapa = new Map<string, ConferenciaResumoApi[]>();
+  for (const conferencia of conferencias) {
+    const codigo = conferencia.checkpoint?.codigo;
+    if (!codigo) continue;
+    const doGrupo = conferenciasPorEtapa.get(codigo) ?? [];
+    doGrupo.push(conferencia);
+    conferenciasPorEtapa.set(codigo, doGrupo);
+  }
+  // DESC da API → cronológica na timeline (mais antiga primeiro).
+  for (const grupo of conferenciasPorEtapa.values()) grupo.reverse();
 
   const infoLinhas: [string, string][] = [
     ["Cliente", t.cliente || "—"],
@@ -177,6 +277,15 @@ export function DetalheTransformador({ serie }: { serie: string }) {
                       : ("prevista" as const);
                 const daEtapa = passagensPorEtapa.get(etapa.codigo) ?? [];
                 const ultima = daEtapa[daEtapa.length - 1];
+                const conferenciasDaEtapa =
+                  conferenciasPorEtapa.get(etapa.codigo) ?? [];
+                // Liberação com exceção: a passagem carrega a conferência
+                // reprovada + a justificativa — trilha auditável visível.
+                const liberadaComExcecao = Boolean(
+                  ultima?.conferencia &&
+                    ultima.conferencia.vereditoGeral !== "conforme" &&
+                    ultima.observacao,
+                );
                 const chip =
                   estado === "concluida" ? (
                     <StatusChip status="success" label="Concluído" />
@@ -201,15 +310,39 @@ export function DetalheTransformador({ serie }: { serie: string }) {
                       {daEtapa.length > 1 && (
                         <NeutralChip>{daEtapa.length} scans</NeutralChip>
                       )}
+                      {liberadaComExcecao && (
+                        <StatusChip
+                          status="lowconf"
+                          label="Liberada com exceção"
+                        />
+                      )}
                       <span className="t-mono ml-auto text-xs text-text-3">
                         {ultima ? fmtDataHora(ultima.createdAt) : "—"}
                       </span>
                     </div>
+                    {ultima?.conferencia && (
+                      <p className="mt-1 text-xs text-text-3">
+                        Passagem comprovada pela conferência das{" "}
+                        {fmtHora(ultima.conferencia.createdAt)}.
+                      </p>
+                    )}
                     {ultima?.observacao && (
                       <p className="mt-1 text-sm text-text-3">
                         {ultima.observacao}
                       </p>
                     )}
+                    {conferenciasDaEtapa.map((conferencia) => (
+                      <ConferenciaDaEtapa
+                        key={conferencia.id}
+                        conferencia={conferencia}
+                        aberta={conferenciaAberta === conferencia.id}
+                        onToggle={() =>
+                          setConferenciaAberta((atual) =>
+                            atual === conferencia.id ? null : conferencia.id,
+                          )
+                        }
+                      />
+                    ))}
                   </TimelineItem>
                 );
               })}

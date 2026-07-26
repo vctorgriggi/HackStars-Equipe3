@@ -13,7 +13,131 @@ type Validacao = { sucesso: boolean; mensagem: string; divergencias: Divergencia
 type ResultadoChecagem = { checagem: Checagem; validacao: Validacao };
 type Dispositivo = { deviceId: string; label: string };
 
+/** Campo do veredito como o BFF repassa da API (evidencia com URL pronta). */
+type CampoRelatorio = {
+  campo: string;
+  fonteFisica: string;
+  valorEsperado: string | null;
+  valorLido: string | null;
+  veredito: "conforme" | "divergente" | "nao_conferivel";
+  motivo?: string;
+  confianca?: number | null;
+  fotoEvidencia?: { id: string; url: string; fonteFisica: string } | null;
+  regiaoLeitura?: string | null;
+};
+
+/** O que um lote conferido carrega alem do resumo por checagem. */
+type Veredito = {
+  vereditoGeral: string;
+  conferenciaId: string | null;
+  passagemRegistrada: boolean;
+  campos: CampoRelatorio[];
+};
+
 type Tela = "carregando" | "configuracao" | "operacao";
+
+/**
+ * Bounding box `{Left,Top,Width,Height}` (fracoes 0..1) -> porcentagens CSS.
+ * Formato inesperado devolve null e a foto aparece sem destaque — nunca
+ * derruba a tela (mesmo contrato do app irmao).
+ */
+function interpretarRegiaoLeitura(
+  regiao: string | null | undefined,
+): { left: number; top: number; width: number; height: number } | null {
+  if (!regiao) return null;
+  try {
+    const caixa = JSON.parse(regiao) as Record<string, unknown>;
+    const numeros = [caixa.Left, caixa.Top, caixa.Width, caixa.Height];
+    if (numeros.some((n) => typeof n !== "number" || !Number.isFinite(n))) return null;
+    return {
+      left: (caixa.Left as number) * 100,
+      top: (caixa.Top as number) * 100,
+      width: (caixa.Width as number) * 100,
+      height: (caixa.Height as number) * 100,
+    };
+  } catch {
+    return null;
+  }
+}
+
+const SELO_DO_VEREDITO: Record<CampoRelatorio["veredito"], { rotulo: string; classe: string }> = {
+  conforme: { rotulo: "CONFORME", classe: "bg-green-950 text-green-300" },
+  divergente: { rotulo: "DIVERGENTE", classe: "bg-red-950 text-red-300" },
+  nao_conferivel: { rotulo: "NAO CONFERIVEL", classe: "bg-amber-950 text-amber-300" },
+};
+
+/**
+ * Um campo do veredito com a foto-evidencia — a COMPROVACAO da checagem.
+ * Renderizado tanto no lote aprovado (prova do conforme) quanto no reprovado
+ * (base da decisao humana). A cor sai SEMPRE de `veredito`, nunca de
+ * comparacao feita aqui.
+ */
+function CartaoCampo({ campo }: { campo: CampoRelatorio }) {
+  const caixa = interpretarRegiaoLeitura(campo.regiaoLeitura);
+  const selo = SELO_DO_VEREDITO[campo.veredito] ?? SELO_DO_VEREDITO.nao_conferivel;
+  const corDoLido =
+    campo.veredito === "conforme"
+      ? "text-green-300"
+      : campo.veredito === "divergente"
+        ? "text-red-300"
+        : "text-amber-300";
+
+  return (
+    <div className="mb-3 flex gap-3 rounded-lg bg-neutral-950 p-3">
+      {campo.fotoEvidencia ? (
+        <div className="relative h-28 w-40 shrink-0 overflow-hidden rounded-md bg-black">
+          {/* eslint-disable-next-line @next/next/no-img-element -- URL S3 assinada, sem host fixo */}
+          <img
+            src={campo.fotoEvidencia.url}
+            alt={`Evidencia de ${campo.campo}`}
+            className="h-full w-full object-contain"
+          />
+          {caixa && (
+            <span
+              className={`pointer-events-none absolute border-2 ${
+                campo.veredito === "conforme" ? "border-green-400" : "border-red-400"
+              }`}
+              style={{
+                left: `${caixa.left}%`,
+                top: `${caixa.top}%`,
+                width: `${caixa.width}%`,
+                height: `${caixa.height}%`,
+              }}
+            />
+          )}
+        </div>
+      ) : (
+        <div className="flex h-28 w-40 shrink-0 items-center justify-center rounded-md bg-neutral-800 text-center text-xs text-neutral-500">
+          sem foto
+          <br />
+          (campo sem leitura)
+        </div>
+      )}
+      <div className="min-w-0 text-sm">
+        <div className="mb-1 flex flex-wrap items-center gap-2">
+          <span className="font-semibold">{campo.campo}</span>
+          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${selo.classe}`}>
+            {selo.rotulo}
+          </span>
+        </div>
+        <div className="text-neutral-400">
+          esperado{" "}
+          <span className="font-mono text-neutral-100">{campo.valorEsperado || "—"}</span>
+          {" · "}lido{" "}
+          <span className={`font-mono ${corDoLido}`}>
+            {campo.valorLido ?? "(sem leitura)"}
+          </span>
+          {typeof campo.confianca === "number" && (
+            <> · confianca {(campo.confianca * 100).toFixed(1)}%</>
+          )}
+        </div>
+        {campo.motivo && (
+          <div className="mt-0.5 text-xs text-neutral-500">motivo: {campo.motivo}</div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Página
@@ -36,6 +160,12 @@ export default function EstacaoPage() {
 
   // relatório
   const [relatorio, setRelatorio] = useState<ResultadoChecagem[] | null>(null);
+  const [veredito, setVeredito] = useState<Veredito | null>(null);
+
+  // decisão humana (lote nao-conforme): observação + envio da liberação
+  const [observacaoReprova, setObservacaoReprova] = useState("");
+  const [liberando, setLiberando] = useState(false);
+  const [avisoDecisao, setAvisoDecisao] = useState("");
 
   // etiqueta (QR) da peça atual — é o ground truth; em produção viria da
   // leitura automática do QR. Pré-preenchida com a peça de demonstração.
@@ -325,6 +455,10 @@ export default function EstacaoPage() {
       const json: {
         ok: boolean;
         erro?: string;
+        vereditoGeral?: string;
+        conferenciaId?: string | null;
+        passagemRegistrada?: boolean;
+        campos?: CampoRelatorio[];
         resultados?: { checagemId: string; validacao: Validacao }[];
       } = await resp.json();
       if (!json.ok || !json.resultados) {
@@ -341,10 +475,23 @@ export default function EstacaoPage() {
             divergencias: [],
           },
       }));
+      setVeredito({
+        vereditoGeral: json.vereditoGeral ?? "desconhecido",
+        conferenciaId: json.conferenciaId ?? null,
+        passagemRegistrada: Boolean(json.passagemRegistrada),
+        campos: json.campos ?? [],
+      });
+      setObservacaoReprova("");
+      setAvisoDecisao("");
       setRelatorio(resultados);
       const oks = resultados.filter((r) => r.validacao.sucesso).length;
-      setStatusOp(`Ultimo lote: ${oks}/${resultados.length} checagem(ns) OK.`);
+      setStatusOp(
+        json.vereditoGeral === "conforme" && json.passagemRegistrada
+          ? `Lote conforme — passagem registrada na etapa.`
+          : `Ultimo lote: ${oks}/${resultados.length} checagem(ns) OK.`,
+      );
     } catch (e) {
+      setVeredito(null);
       setRelatorio(
         camsAbertas.map((checagem) => ({
           checagem,
@@ -362,12 +509,49 @@ export default function EstacaoPage() {
   }, [prontoParaCapturar, camsAbertas, config, etiqueta]);
 
   // -------------------------------------------------------------------------
+  // Decisao humana: reprova da leitura -> libera com excecao auditavel.
+  // O kiosk NUNCA decide veredito: ele envia a justificativa e o backend
+  // valida (observacao obrigatoria, conferencia da mesma peca/etapa).
+  // -------------------------------------------------------------------------
+  const liberarComExcecao = useCallback(async () => {
+    if (!config || !veredito?.conferenciaId || !observacaoReprova.trim() || liberando) return;
+    setLiberando(true);
+    setAvisoDecisao("");
+    try {
+      const resp = await fetch("/api/estacao/liberar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          payloadQr: etiqueta.trim(),
+          etapaCodigo: config.etapaId,
+          conferenciaId: veredito.conferenciaId,
+          observacao: observacaoReprova.trim(),
+        }),
+      });
+      const json = (await resp.json().catch(() => null)) as
+        | { ok?: boolean; erro?: string; errors?: Record<string, string> }
+        | null;
+      if (!resp.ok || !json?.ok) {
+        const codigo = json?.errors ? Object.values(json.errors).join("; ") : json?.erro;
+        throw new Error(codigo ?? `liberacao respondeu ${resp.status}`);
+      }
+      setStatusOp("Peca liberada COM EXCECAO — passagem registrada com a justificativa.");
+      setRelatorio(null);
+      setVeredito(null);
+    } catch (e) {
+      setAvisoDecisao("Falha ao liberar: " + (e as Error).message);
+    } finally {
+      setLiberando(false);
+    }
+  }, [config, veredito, observacaoReprova, liberando, etiqueta]);
+
+  // -------------------------------------------------------------------------
   // Teclado: Enter captura / Enter fecha relatório aprovado / Esc fecha
   // -------------------------------------------------------------------------
   useEffect(() => {
     function aoTeclar(e: KeyboardEvent) {
       if (e.key === "Escape") {
-        setRelatorio(null);
+        if (!liberando) setRelatorio(null);
         return;
       }
       if (e.key !== "Enter") return;
@@ -379,7 +563,7 @@ export default function EstacaoPage() {
     }
     window.addEventListener("keydown", aoTeclar);
     return () => window.removeEventListener("keydown", aoTeclar);
-  }, [relatorio, loteAprovado, capturarLote]);
+  }, [relatorio, loteAprovado, liberando, capturarLote]);
 
   function reconfigurar() {
     pararOperacao();
@@ -552,74 +736,162 @@ export default function EstacaoPage() {
         <div
           className="fixed inset-0 z-20 flex items-center justify-center bg-black/65"
           onClick={(e) => {
-            if (e.target === e.currentTarget) setRelatorio(null);
+            if (e.target === e.currentTarget && !liberando) setRelatorio(null);
           }}
         >
-          <div className="flex max-h-[85vh] w-[min(680px,92vw)] flex-col overflow-hidden rounded-xl bg-neutral-900">
-            <div
-              className={`px-5 py-3.5 text-base font-semibold ${
-                loteAprovado ? "bg-green-950 text-green-300" : "bg-red-950 text-red-300"
-              }`}
-            >
-              {loteAprovado
-                ? `Lote aprovado — todas as ${relatorio.length} checagens conferem`
-                : `Lote com divergencias — ${relatorio.filter((r) => !r.validacao.sucesso).length} de ${relatorio.length} checagem(ns) reprovaram`}
-            </div>
-            <div className="overflow-auto px-5 py-4">
-              {loteAprovado ? (
-                <p className="text-sm text-neutral-400">
-                  Nenhuma divergencia encontrada. Transformador liberado para a proxima etapa.
-                  (Enter fecha)
-                </p>
-              ) : (
-                relatorio.map((r) => (
-                  <div key={r.checagem.id} className="mb-4">
-                    <div className="mb-1.5 flex items-center gap-2 text-sm font-semibold">
-                      {r.checagem.nome}
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                          r.validacao.sucesso
-                            ? "bg-green-950 text-green-300"
-                            : "bg-red-950 text-red-300"
-                        }`}
-                      >
-                        {r.validacao.sucesso ? "OK" : "DIVERGENCIA"}
-                      </span>
-                    </div>
-                    {!r.validacao.sucesso && r.validacao.divergencias.length > 0 ? (
-                      <table className="w-full border-collapse text-sm">
-                        <thead>
-                          <tr className="text-left text-neutral-500">
-                            <th className="border-b border-neutral-800 px-2 py-1.5 font-medium">Ponto</th>
-                            <th className="border-b border-neutral-800 px-2 py-1.5 font-medium">Esperado</th>
-                            <th className="border-b border-neutral-800 px-2 py-1.5 font-medium">Lido</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {r.validacao.divergencias.map((d, i) => (
-                            <tr key={i}>
-                              <td className="border-b border-neutral-800 px-2 py-1.5">{d.ponto}</td>
-                              <td className="border-b border-neutral-800 px-2 py-1.5">{d.esperado}</td>
-                              <td className="border-b border-neutral-800 px-2 py-1.5 text-red-300">{d.lido}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    ) : !r.validacao.sucesso ? (
-                      <p className="text-sm text-red-300">{r.validacao.mensagem}</p>
-                    ) : null}
+          <div className="flex max-h-[88vh] w-[min(760px,94vw)] flex-col overflow-hidden rounded-xl bg-neutral-900">
+            {(() => {
+              const conforme = veredito?.vereditoGeral === "conforme";
+              const camposReprovados = (veredito?.campos ?? []).filter(
+                (c) => c.veredito !== "conforme",
+              );
+              const camposConformes = (veredito?.campos ?? []).filter(
+                (c) => c.veredito === "conforme",
+              );
+
+              return (
+                <>
+                  <div
+                    className={`px-5 py-3.5 text-base font-semibold ${
+                      conforme ? "bg-green-950 text-green-300" : "bg-red-950 text-red-300"
+                    }`}
+                  >
+                    {conforme
+                      ? veredito?.passagemRegistrada
+                        ? "Peca liberada — conferencia conforme e passagem registrada"
+                        : "Conferencia conforme"
+                      : veredito
+                        ? `Peca RETIDA — veredito ${veredito.vereditoGeral.replace("_", " ")}: decisao do operador`
+                        : `Lote com falha — ${relatorio.filter((r) => !r.validacao.sucesso).length} de ${relatorio.length} checagem(ns) reprovaram`}
                   </div>
-                ))
-              )}
-            </div>
-            <div className="flex justify-end bg-neutral-950 px-5 py-3">
-              <button
-                onClick={() => setRelatorio(null)}
-                className="rounded-lg bg-neutral-700 px-5 py-2 text-sm hover:bg-neutral-600"
-              >
-                Fechar
-              </button>
-            </div>
+
+                  <div className="overflow-auto px-5 py-4">
+                    {conforme ? (
+                      <>
+                        <p className="text-sm text-neutral-400">
+                          Nenhuma divergencia encontrada.{" "}
+                          {veredito?.passagemRegistrada
+                            ? "A peca avancou na esteira — a passagem nasceu vinculada a esta conferencia. (Enter fecha)"
+                            : ""}
+                        </p>
+                        {!veredito?.passagemRegistrada && (
+                          <p className="mt-2 rounded-md bg-amber-950 px-3 py-2 text-sm text-amber-300">
+                            A passagem NAO foi registrada automaticamente (falha no
+                            registro). Escaneie a peca manualmente no checkpoint para
+                            registrar o avanco.
+                          </p>
+                        )}
+                        {(veredito?.campos.length ?? 0) > 0 && (
+                          <>
+                            {/* A comprovacao do CONFORME tambem fica a vista (e
+                                gravada): campo a campo com a foto que lastreou
+                                cada veredito — mesma evidencia que a linha do
+                                tempo da peca reabre depois. */}
+                            <p className="mb-2 mt-4 text-sm font-semibold text-neutral-300">
+                              Comprovacao da checagem (gravada com a conferencia)
+                            </p>
+                            {veredito?.campos.map((campo) => (
+                              <CartaoCampo key={campo.campo} campo={campo} />
+                            ))}
+                          </>
+                        )}
+                      </>
+                    ) : veredito && camposReprovados.length > 0 ? (
+                      <>
+                        <p className="mb-3 text-sm text-neutral-400">
+                          A peca NAO passa sozinha. Confira a evidencia de cada campo
+                          reprovado e decida: o defeito e real (corrija a peca e confira
+                          de novo) ou a leitura da IA errou (libere com justificativa).
+                        </p>
+                        {camposReprovados.map((campo) => (
+                          <CartaoCampo key={campo.campo} campo={campo} />
+                        ))}
+                        {camposConformes.length > 0 && (
+                          <details className="mb-1 mt-1">
+                            <summary className="cursor-pointer text-sm text-neutral-400">
+                              {camposConformes.length} campo(s) conforme(s) — ver
+                              comprovacao
+                            </summary>
+                            <div className="mt-2">
+                              {camposConformes.map((campo) => (
+                                <CartaoCampo key={campo.campo} campo={campo} />
+                              ))}
+                            </div>
+                          </details>
+                        )}
+
+                        <label className="mb-1 mt-4 block text-sm text-neutral-400">
+                          Justificativa da liberacao (obrigatoria para reprovar a leitura
+                          — fica gravada na passagem, auditavel)
+                        </label>
+                        <textarea
+                          value={observacaoReprova}
+                          onChange={(e) => setObservacaoReprova(e.target.value)}
+                          rows={2}
+                          placeholder="ex.: leitura errada da IA — serie conferida visualmente na peca"
+                          className="w-full rounded-md border border-neutral-700 bg-neutral-800 p-2 text-sm"
+                        />
+                        {avisoDecisao && (
+                          <p className="mt-2 text-sm text-red-300">{avisoDecisao}</p>
+                        )}
+                      </>
+                    ) : (
+                      relatorio.map((r) => (
+                        <div key={r.checagem.id} className="mb-4">
+                          <div className="mb-1.5 flex items-center gap-2 text-sm font-semibold">
+                            {r.checagem.nome}
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                                r.validacao.sucesso
+                                  ? "bg-green-950 text-green-300"
+                                  : "bg-red-950 text-red-300"
+                              }`}
+                            >
+                              {r.validacao.sucesso ? "OK" : "FALHA"}
+                            </span>
+                          </div>
+                          {!r.validacao.sucesso && (
+                            <p className="text-sm text-red-300">{r.validacao.mensagem}</p>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap justify-end gap-3 bg-neutral-950 px-5 py-3">
+                    {!conforme && veredito?.conferenciaId ? (
+                      <>
+                        <button
+                          onClick={() => setRelatorio(null)}
+                          disabled={liberando}
+                          className="rounded-lg bg-neutral-700 px-5 py-2 text-sm hover:bg-neutral-600 disabled:opacity-45"
+                          title="O defeito e real: a peca NAO avanca; corrija e confira de novo nesta etapa"
+                        >
+                          Aceitar defeito — corrigir a peca
+                        </button>
+                        <button
+                          onClick={liberarComExcecao}
+                          disabled={liberando || observacaoReprova.trim().length === 0}
+                          className="rounded-lg bg-amber-700 px-5 py-2 text-sm font-medium text-white hover:bg-amber-600 disabled:cursor-default disabled:opacity-45"
+                          title="A IA leu errado: registra a passagem com a justificativa (excecao auditavel)"
+                        >
+                          {liberando
+                            ? "Liberando..."
+                            : "Reprovar leitura — liberar mesmo assim"}
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => setRelatorio(null)}
+                        className="rounded-lg bg-neutral-700 px-5 py-2 text-sm hover:bg-neutral-600"
+                      >
+                        Fechar
+                      </button>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}

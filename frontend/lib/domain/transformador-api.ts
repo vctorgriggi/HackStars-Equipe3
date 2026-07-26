@@ -44,6 +44,81 @@ export interface PassagemResumoApi {
   createdAt: string;
   observacao: string | null;
   checkpoint: EtapaResumoApi;
+  /** Conferência que COMPROVOU esta passagem (gate da estação: registro
+   *  automático no `conforme`, ou liberação com exceção — aí `observacao`
+   *  traz a justificativa). `null` = scan avulso, sem vínculo. */
+  conferencia: ConferenciaResumoApi | null;
+}
+
+/** Foto-evidência com URL PRONTA (assinada, expira em 1h — nunca persistir). */
+export interface FotoDaEvidenciaApi {
+  id: string;
+  url: string;
+  fonteFisica: string;
+}
+
+/** Um campo como o banco gravou (GET /conferencias/{id}/campos). O front
+ *  nunca compara `valorEsperado` × `valorLido` — a cor sai de `veredito`. */
+export interface CampoVereditoApi {
+  id: string;
+  campo: string;
+  /** Re-resolvida da checklist do projeto; `null` = não resolvida. */
+  fonteFisica: string | null;
+  obrigatorio: boolean | null;
+  /** String VAZIA (não null) quando o QR não trazia o dado. */
+  valorEsperado: string;
+  valorLido: string | null;
+  confianca: number | null;
+  veredito: Veredito | null;
+  /** JSON `{Left,Top,Width,Height}` em frações 0..1, quando o extrator deu. */
+  regiaoLeitura: string | null;
+  fotoEvidencia: FotoDaEvidenciaApi | null;
+}
+
+export interface ConferenciaDoVereditoApi {
+  id: string;
+  vereditoGeral: Veredito | null;
+  createdAt: string;
+  observacao: string | null;
+  checkpoint: EtapaResumoApi | null;
+}
+
+/** Releitura completa: GET /conferencias/{id}/campos. */
+export interface VereditoConferenciaApi {
+  conferencia: ConferenciaDoVereditoApi;
+  transformador: {
+    id: string;
+    numeroSerie: string;
+    patrimonio: string;
+    cliente: string;
+  };
+  campos: CampoVereditoApi[];
+}
+
+/**
+ * Bounding box `{Left,Top,Width,Height}` (frações 0..1) → porcentagens CSS.
+ * Formato inesperado devolve `null` e a foto aparece sem destaque — nunca
+ * derruba a tela que mostra a não conformidade.
+ */
+export function interpretarRegiaoLeitura(
+  regiao: string | null | undefined,
+): { left: number; top: number; width: number; height: number } | null {
+  if (!regiao) return null;
+  try {
+    const caixa = JSON.parse(regiao) as Record<string, unknown>;
+    const numeros = [caixa.Left, caixa.Top, caixa.Width, caixa.Height];
+    if (numeros.some((n) => typeof n !== "number" || !Number.isFinite(n))) {
+      return null;
+    }
+    return {
+      left: (caixa.Left as number) * 100,
+      top: (caixa.Top as number) * 100,
+      width: (caixa.Width as number) * 100,
+      height: (caixa.Height as number) * 100,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export interface EtapaAtualApi {
