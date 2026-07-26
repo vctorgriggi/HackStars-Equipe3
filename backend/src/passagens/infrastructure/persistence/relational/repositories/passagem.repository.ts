@@ -81,6 +81,16 @@ export class PassagemRelationalRepository implements PassagemRepository {
     return ultimas;
   }
 
+  async removeAllByTransformador(transformadorId: string): Promise<void> {
+    // Query builder porque o criterio de `delete()` nao resolve relacao; a
+    // coluna FK gerada pelo ManyToOne e `transformadorId`.
+    await this.passagemRepository
+      .createQueryBuilder()
+      .delete()
+      .where('"transformadorId" = :transformadorId', { transformadorId })
+      .execute();
+  }
+
   async findById(id: Passagem['id']): Promise<NullableType<Passagem>> {
     const entity = await this.passagemRepository.findOne({
       where: { id },

@@ -2,6 +2,7 @@ import {
   // common
   HttpStatus,
   Injectable,
+  NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 
@@ -11,10 +12,12 @@ import { Conferencia } from '../conferencias/domain/conferencia';
 import { EtapaResumo } from '../conferencias/dto/resumos-compartilhados.dto';
 import { ConferenciaRepository } from '../conferencias/infrastructure/persistence/conferencia.repository';
 import { AnuncioPassagemService } from '../tempo-real/anuncio-passagem.service';
+import { Transformador } from '../transformadores/domain/transformador';
 import { TransformadoresService } from '../transformadores/transformadores.service';
 import { resumirConferencia } from '../transformadores/consultas/conferencia-resumo';
 
 import { RegistrarPassagemDto } from './dto/registrar-passagem.dto';
+import { ReiniciarApresentacaoDto } from './dto/reiniciar-apresentacao.dto';
 import { ResultadoRegistroPassagem } from './dto/resultado-registro-passagem.dto';
 import { PassagemRepository } from './infrastructure/persistence/passagem.repository';
 
@@ -88,7 +91,86 @@ export class PassagemRegistroService {
         })
       )[0];
 
-    const resultado: ResultadoRegistroPassagem = {
+    const resultado = this.montarResultado(passagem, checkpoint, transformador, ultima);
+
+    // Difusao no canal de tempo real (esteira). NUNCA falha o scan: a
+    // passagem ja esta gravada, e `anunciar()` engole o proprio erro.
+    await this.anuncioPassagem.anunciar(resultado, checkpointAnterior);
+
+    return resultado;
+  }
+
+  /**
+   * Reinicio de APRESENTACAO (ferramenta de demo): recoloca a peca no
+   * primeiro checkpoint da linha, apagando o historico de transito dela e
+   * registrando uma passagem nova ali — a posicao na esteira e DERIVADA da
+   * ultima passagem (SPEC), entao e assim que uma peca "volta ao inicio".
+   * O evento `passagem-registrada` sai pelo MESMO anuncio do scan: toda tela
+   * ao vivo conectada ve a peca voltar, com `checkpointAnterior` de onde ela
+   * estava. Conferencias NAO sao tocadas (trilha de auditoria): o veredito
+   * vigente da peca continua o que a engine gravou.
+   */
+  async reiniciarApresentacao(
+    dto: ReiniciarApresentacaoDto,
+  ): Promise<ResultadoRegistroPassagem> {
+    // Reset nao cria peca: serie desconhecida e 404, nunca find-or-create.
+    const transformador = await this.transformadorService.findByNumeroSerie(
+      dto.numeroSerie,
+    );
+    if (!transformador) {
+      throw new NotFoundException({
+        status: HttpStatus.NOT_FOUND,
+        errors: {
+          numeroSerie: `transformador-inexistente: ${dto.numeroSerie}`,
+        },
+      });
+    }
+
+    // "Primeiro vinculo da esteira" e posicional por natureza — menor
+    // `ordem` (findAll ja ordena; codigo continua sendo o identificador das
+    // REGRAS de gate, mas "o inicio da linha" nao e regra de gate).
+    const [primeiro] = await this.checkpointService.findAll();
+    if (!primeiro) {
+      throw new UnprocessableEntityException({
+        status: HttpStatus.UNPROCESSABLE_ENTITY,
+        errors: { checkpoint: 'linha-sem-checkpoints' },
+      });
+    }
+
+    // De onde a peca volta — lido ANTES do delete, senao o `from` some.
+    const checkpointAnterior = await this.lerCheckpointAnterior(
+      transformador.id,
+    );
+
+    await this.passagemRepository.removeAllByTransformador(transformador.id);
+
+    const passagem = await this.passagemRepository.create({
+      observacao: 'reinicio de apresentacao',
+      conferencia: null,
+      checkpoint: primeiro,
+      transformador,
+    });
+
+    const ultima = (
+      await this.conferenciaRepository.findAllByTransformador({
+        transformadorId: transformador.id,
+        limit: 1,
+      })
+    )[0];
+
+    const resultado = this.montarResultado(passagem, primeiro, transformador, ultima);
+    await this.anuncioPassagem.anunciar(resultado, checkpointAnterior);
+
+    return resultado;
+  }
+
+  private montarResultado(
+    passagem: { id: string; createdAt: Date; observacao?: string | null },
+    checkpoint: Checkpoint,
+    transformador: Transformador,
+    ultima: Conferencia | null | undefined,
+  ): ResultadoRegistroPassagem {
+    return {
       passagem: {
         id: passagem.id,
         createdAt: passagem.createdAt,
@@ -107,12 +189,6 @@ export class PassagemRegistroService {
       },
       ultimaConferencia: ultima ? resumirConferencia(ultima) : null,
     };
-
-    // Difusao no canal de tempo real (esteira). NUNCA falha o scan: a
-    // passagem ja esta gravada, e `anunciar()` engole o proprio erro.
-    await this.anuncioPassagem.anunciar(resultado, checkpointAnterior);
-
-    return resultado;
   }
 
   /**

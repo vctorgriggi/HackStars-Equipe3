@@ -16,6 +16,7 @@ import { PassagemRegistroService } from './passagem-registro.service';
 import { ResultadoRegistroPassagem } from './dto/resultado-registro-passagem.dto';
 import { CreatePassagemDto } from './dto/create-passagem.dto';
 import { RegistrarPassagemDto } from './dto/registrar-passagem.dto';
+import { ReiniciarApresentacaoDto } from './dto/reiniciar-apresentacao.dto';
 import { UpdatePassagemDto } from './dto/update-passagem.dto';
 import {
   ApiBearerAuth,
@@ -109,6 +110,37 @@ export class PassagensController {
   })
   registrar(@Body() registrarPassagemDto: RegistrarPassagemDto) {
     return this.passagemRegistroService.registrar(registrarPassagemDto);
+  }
+
+  @Post('reiniciar-apresentacao')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary:
+      'Ferramenta de demo: recoloca a peca no primeiro checkpoint da linha',
+    description:
+      'Reinicio de APRESENTACAO — nao e fluxo de operacao. Apaga o historico ' +
+      'de transito da peca (hard delete das passagens dela) e registra uma ' +
+      'passagem nova no PRIMEIRO checkpoint da linha (menor `ordem`), porque ' +
+      'a posicao na esteira e DERIVADA da ultima passagem (SPEC). O evento ' +
+      '`passagem-registrada` sai pelo mesmo canal de tempo real do scan: ' +
+      'toda tela ao vivo conectada ve a peca voltar ao inicio, com ' +
+      '`checkpointAnterior` de onde ela estava. Conferencias e evidencias ' +
+      'NAO sao tocadas (trilha de auditoria): `ultimaConferencia` continua ' +
+      'sendo o veredito que a engine gravou.',
+  })
+  @ApiCreatedResponse({
+    type: ResultadoRegistroPassagem,
+    description:
+      'Passagem inicial criada; mesmo contrato do `/passagens/registrar`.',
+  })
+  @ApiUnprocessableEntityResponse({
+    description:
+      'Codigos possiveis (em `errors`): `linha-sem-checkpoints` (banco sem ' +
+      'etapa seedada). Serie desconhecida responde 404 ' +
+      '`transformador-inexistente: <numeroSerie>` — reset nunca cria peca.',
+  })
+  reiniciarApresentacao(@Body() dto: ReiniciarApresentacaoDto) {
+    return this.passagemRegistroService.reiniciarApresentacao(dto);
   }
 
   @Get()
