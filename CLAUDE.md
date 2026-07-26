@@ -251,8 +251,13 @@ do hackathon:
     Textract/Bedrock; migrar o S3 para ela exige tornar as credenciais
     opcionais no boilerplate (4 arquivos).
 13. Página `/demo` (src/demo) é ferramenta temporária de inspeção servida pela
-    API, com credenciais do admin seed pré-preenchidas — remover antes de
-    qualquer uso fora do hackathon.
+    API, com credenciais do admin seed pré-preenchidas no HTML servido SEM
+    auth — na prática, um clique dá JWT de admin a qualquer visitante da URL
+    pública. Com o registro público fechado (rodada de análise), esta é a
+    ÚNICA porta de entrada que resta, então ela é a fechadura principal.
+    Decisão do time em 2026-07-25: manter até a demo (o fluxo de teste no
+    celular depende dela) e **remover o `DemoModule` do `app.module.ts` logo
+    após a apresentação** — prazo, não intenção vaga.
 14. Conferência parcial persiste `vereditoGeral` sem marca de cobertura: a
     resposta diz `etapaAvaliada`/`camposAvaliados`, mas a linha gravada em
     `conferencia` não distingue "conforme na peça inteira" de "conforme no
@@ -268,6 +273,29 @@ do hackathon:
     fixo e a UI não expõe edição de checkpoint. Unique em `ordem` + política de
     reordenação (renumerar em transação, ou ordem imutável com posição
     derivada) ficam para a rodada de produção.
+16. Adulteração autenticada segue possível no CRUD gerado (é o gap 1 em
+    detalhe, medido na auditoria de superfície de 2026-07-25): `PATCH
+    /transformadores/:id` reescreve numeroSerie/patrimônio (a identidade
+    esperada) DEPOIS de a conferência existir; `PATCH /conferencias/:id`
+    repõe transformador/checkpoint e sobrescreve `observacao` (o aceite de
+    exceção auditável); `PATCH`/`DELETE` de `fotos-evidencia` troca ou some
+    com a evidência de um veredito emitido. Não corrigido de propósito: a
+    correção honesta é RolesGuard + soft delete, trabalho de pós-demo.
+    Fechado o que quebrava a demo ou produzia falso OK (checklist do
+    ProjetoModelo, DELETE de campo conferido, registro público). O que
+    protege o resto é credencial controlada — ver gap 13.
+17. Sem rate limit em `/auth/email/login` (bcrypt online sem freio) e CORS
+    com origem `*` (default `cors: true` do boilerplate). Mitigado pelo
+    escopo de demo: token vive em memória na `/demo` (sem cookie nem
+    localStorage), então a origem permissiva não é exfiltrável. Throttler +
+    origem explícita entram no hardening pós-demo.
+18. RDS público com security group `0.0.0.0/0` em TODO protocolo (o
+    `default` da VPC; a instância precede o projeto). A senha é a única
+    proteção do banco na internet. Decisão do time em 2026-07-25: aceito
+    até a demo para não arriscar a conectividade do App Runner na véspera.
+    Correção definitiva: VPC connector no App Runner + SG restrito à VPC,
+    e rotação da senha (ela transitou por logs de deploy). Receita e custo
+    em docs/deploy.md.
 
 ## Decisões em aberto
 
