@@ -52,6 +52,36 @@ export class ConferenciaRelationalRepository implements ConferenciaRepository {
     return entities.map((entity) => ConferenciaMapper.toDomain(entity));
   }
 
+  async findUltimaPorTransformadores(
+    transformadorIds: string[],
+  ): Promise<Map<string, Conferencia>> {
+    const vigentes = new Map<string, Conferencia>();
+    if (transformadorIds.length === 0) {
+      return vigentes;
+    }
+
+    // DISTINCT ON exige que a expressao seja o prefixo do ORDER BY: por peca,
+    // vence a linha mais recente (createdAt DESC, id DESC desempata). O join
+    // do transformador seleciona SO o id — o eager arrastaria peca + projeto
+    // + checklist para cada linha (gap 3).
+    const entities = await this.conferenciaRepository
+      .createQueryBuilder('conferencia')
+      .distinctOn(['transformador.id'])
+      .leftJoinAndSelect('conferencia.checkpoint', 'checkpoint')
+      .leftJoin('conferencia.transformador', 'transformador')
+      .addSelect('transformador.id')
+      .where('transformador.id IN (:...transformadorIds)', { transformadorIds })
+      .orderBy('transformador.id', 'ASC')
+      .addOrderBy('conferencia.createdAt', 'DESC')
+      .addOrderBy('conferencia.id', 'DESC')
+      .getMany();
+
+    for (const entity of entities) {
+      vigentes.set(entity.transformador.id, ConferenciaMapper.toDomain(entity));
+    }
+    return vigentes;
+  }
+
   async findById(id: Conferencia['id']): Promise<NullableType<Conferencia>> {
     const entity = await this.conferenciaRepository.findOne({
       where: { id },

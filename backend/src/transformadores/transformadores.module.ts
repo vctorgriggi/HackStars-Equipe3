@@ -1,3 +1,4 @@
+import { ClientesModule } from '../clientes/clientes.module';
 import { ProjetosModeloModule } from '../projetos-modelo/projetos-modelo.module';
 import { RelationalConferenciaPersistenceModule } from '../conferencias/infrastructure/persistence/relational/relational-persistence.module';
 import { RelationalPassagemPersistenceModule } from '../passagens/infrastructure/persistence/relational/relational-persistence.module';
@@ -12,6 +13,8 @@ import { RelationalTransformadorPersistenceModule } from './infrastructure/persi
 
 @Module({
   imports: [
+    ClientesModule,
+
     ProjetosModeloModule,
 
     // Modulos FOLHA de persistencia (so TypeOrmModule.forFeature). As rotas

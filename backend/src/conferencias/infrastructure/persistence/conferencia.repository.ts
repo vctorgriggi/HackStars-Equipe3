@@ -29,6 +29,16 @@ export abstract class ConferenciaRepository {
     limit: number;
   }): Promise<Conferencia[]>;
 
+  /**
+   * A conferencia MAIS RECENTE de cada peca do conjunto (o veredito vigente),
+   * numa unica query (DISTINCT ON) — e o que a listagem com situacao consome
+   * para nao pagar uma consulta por linha. Peca sem conferencia simplesmente
+   * nao aparece no mapa: ausencia e estado legitimo, nunca veredito.
+   */
+  abstract findUltimaPorTransformadores(
+    transformadorIds: Transformador['id'][],
+  ): Promise<Map<Transformador['id'], Conferencia>>;
+
   abstract findById(id: Conferencia['id']): Promise<NullableType<Conferencia>>;
 
   abstract findByIds(ids: Conferencia['id'][]): Promise<Conferencia[]>;

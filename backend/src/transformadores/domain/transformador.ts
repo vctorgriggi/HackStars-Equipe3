@@ -1,8 +1,13 @@
+import { Cliente } from '../../clientes/domain/cliente';
+import { Exclude } from 'class-transformer';
 import { ProjetoModelo } from '../../projetos-modelo/domain/projeto-modelo';
 
 import { ApiProperty } from '@nestjs/swagger';
 
 export class Transformador {
+  @Exclude({ toPlainOnly: true })
+  clienteVinculado?: Cliente | null;
+
   @ApiProperty({
     type: () => ProjetoModelo,
     nullable: true,

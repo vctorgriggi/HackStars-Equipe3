@@ -7,6 +7,7 @@ import { ConferenciaRepository } from '../conferencias/infrastructure/persistenc
 import { ProjetosModeloService } from '../projetos-modelo/projetos-modelo.service';
 import { Transformador } from '../transformadores/domain/transformador';
 import { TransformadorRepository } from '../transformadores/infrastructure/persistence/transformador.repository';
+import { ClientesService } from '../clientes/clientes.service';
 import { TransformadoresService } from '../transformadores/transformadores.service';
 
 import { PassagemRegistroService } from './passagem-registro.service';
@@ -99,6 +100,12 @@ function montarBancada(opcoes: { conferencias?: Conferencia[] } = {}): Bancada {
   // payload) e exatamente o mesmo que o endpoint de conferencia usa. So o
   // find-or-create vira espiao, porque tem suite propria.
   const transformadorService = new TransformadoresService(
+    {
+      buscarOuCriarPorNome: jest.fn((nome: string) =>
+        Promise.resolve({ id: 'cliente-1', nome }),
+      ),
+      findById: jest.fn(() => Promise.resolve({ id: 'cliente-1' })),
+    } as unknown as ClientesService,
     { findById: jest.fn() } as unknown as ProjetosModeloService,
     {
       findByNumeroSerie: jest.fn(() => Promise.resolve(null)),

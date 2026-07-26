@@ -154,6 +154,13 @@ function montarBancada(
     findByNumeroSerie: jest.fn(() => Promise.resolve(pecaExistente)),
     create: criarTransformador,
     update: atualizarTransformador,
+    // O find-or-create real vincula o cadastro de Cliente pelo texto do QR;
+    // aqui o cadastro e dublado (tem suite propria em transformadores).
+    clienteService: {
+      buscarOuCriarPorNome: jest.fn((nome: string) =>
+        Promise.resolve({ id: 'cliente-1', nome }),
+      ),
+    },
   } as unknown as TransformadoresService;
   const serviceReal = TransformadoresService.prototype;
   transformadorService.lerPayloadDoQr =

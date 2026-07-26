@@ -13,8 +13,12 @@ import { PassagemRepository } from '../../passagens/infrastructure/persistence/p
 import { IPaginationOptions } from '../../utils/types/pagination-options';
 
 import { Transformador } from '../domain/transformador';
-import { TransformadorRepository } from '../infrastructure/persistence/transformador.repository';
+import {
+  FiltroTransformador,
+  TransformadorRepository,
+} from '../infrastructure/persistence/transformador.repository';
 import { ConferenciaResumo, resumirConferencia } from './conferencia-resumo';
+import { TransformadorComSituacao } from './transformador-situacao';
 
 /**
  * Um evento de transito como a tela de historico precisa dele.
@@ -73,6 +77,62 @@ export class TransformadorConsultasService {
 
     private readonly conferenciaRepository: ConferenciaRepository,
   ) {}
+
+  /**
+   * Listagem de pecas com a SITUACAO derivada por item: veredito vigente
+   * (ultima conferencia, como a engine gravou) e etapa atual (ultima
+   * passagem). Duas queries DISTINCT ON sobre os ids da pagina — nunca uma
+   * consulta por linha. Nada aqui compara nem recalcula: e leitura do que ja
+   * esta no banco, projetada enxuta (sem a checklist eager do projeto).
+   */
+  async listarComSituacao({
+    filterOptions,
+    paginationOptions,
+  }: {
+    filterOptions?: FiltroTransformador | null;
+    paginationOptions: IPaginationOptions;
+  }): Promise<TransformadorComSituacao[]> {
+    const pecas = await this.transformadorRepository.findAllWithPagination({
+      filterOptions,
+      paginationOptions,
+    });
+
+    const ids = pecas.map((peca) => peca.id);
+    const [vigentes, ultimasPassagens] = await Promise.all([
+      this.conferenciaRepository.findUltimaPorTransformadores(ids),
+      this.passagemRepository.findUltimaPorTransformadores(ids),
+    ]);
+
+    return pecas.map((peca) => {
+      const vigente = vigentes.get(peca.id) ?? null;
+      const ultimaPassagem = ultimasPassagens.get(peca.id) ?? null;
+
+      return {
+        id: peca.id,
+        numeroSerie: peca.numeroSerie,
+        patrimonio: peca.patrimonio,
+        cliente: peca.cliente,
+        pedido: peca.pedido ?? null,
+        seq: peca.seq ?? null,
+        descricao: peca.descricao ?? null,
+        createdAt: peca.createdAt,
+        projetoModelo: peca.projetoModelo
+          ? { codigo: peca.projetoModelo.codigo }
+          : null,
+        vereditoVigente: vigente ? resumirConferencia(vigente) : null,
+        etapaAtual: ultimaPassagem
+          ? {
+              checkpoint: {
+                codigo: ultimaPassagem.checkpoint.codigo,
+                nome: ultimaPassagem.checkpoint.nome,
+                ordem: ultimaPassagem.checkpoint.ordem,
+              },
+              em: ultimaPassagem.createdAt,
+            }
+          : null,
+      };
+    });
+  }
 
   /**
    * Historico de transito em ordem CRONOLOGICA (criterio 5 do SPEC). Peca

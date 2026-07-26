@@ -45,8 +45,11 @@ import { ExtracaoModule } from './extracao/extracao.module';
 // Temporário: página de demonstração servida em /demo (remover antes de prod).
 import { DemoModule } from './demo/demo.module';
 
+import { ClientesModule } from './clientes/clientes.module';
+
 @Module({
   imports: [
+    ClientesModule,
     DemoModule,
 
     ExtracaoModule,

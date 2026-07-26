@@ -1,5 +1,6 @@
 import { UnprocessableEntityException } from '@nestjs/common';
 
+import { ClientesService } from '../clientes/clientes.service';
 import { ProjetosModeloService } from '../projetos-modelo/projetos-modelo.service';
 
 import { Transformador } from './domain/transformador';
@@ -46,6 +47,7 @@ interface Bancada {
   criar: jest.Mock;
   atualizar: jest.Mock;
   listar: jest.Mock;
+  buscarOuCriarClientePorNome: jest.Mock;
 }
 
 function montarBancada(
@@ -84,8 +86,27 @@ function montarBancada(
     findById: jest.fn(() => Promise.resolve(null)),
   } as unknown as ProjetosModeloService;
 
+  // Cadastro de cliente dublado: find-or-create devolve sempre o mesmo id,
+  // e o findById (que o create/update do service usa para validar o vinculo)
+  // ecoa o registro.
+  const buscarOuCriarClientePorNome = jest.fn((nome: string) =>
+    Promise.resolve({ id: 'cliente-1', nome, createdAt: AGORA, updatedAt: AGORA }),
+  );
+  const clienteService = {
+    buscarOuCriarPorNome: buscarOuCriarClientePorNome,
+    findById: jest.fn(() =>
+      Promise.resolve({
+        id: 'cliente-1',
+        nome: 'Energisa',
+        createdAt: AGORA,
+        updatedAt: AGORA,
+      }),
+    ),
+  } as unknown as ClientesService;
+
   return {
     service: new TransformadoresService(
+      clienteService,
       projetoModeloService,
       transformadorRepository,
     ),
@@ -93,6 +114,7 @@ function montarBancada(
     criar,
     atualizar,
     listar,
+    buscarOuCriarClientePorNome,
   };
 }
 
@@ -183,8 +205,43 @@ describe('buscarOuCriarPorPayload — chave de negocio e numeroSerie', () => {
 
     expect(atualizar).toHaveBeenCalledWith('transformador-1', {
       cliente: 'CEMIG',
+      // Cliente novo no QR realinha o vinculo com o cadastro.
+      clienteVinculado: expect.objectContaining({ id: 'cliente-1' }),
     });
     expect(resultado.cliente).toBe('CEMIG');
+  });
+
+  it('should vincular o cadastro de cliente pelo texto do QR ao criar a peca', async () => {
+    const { service, criar, buscarOuCriarClientePorNome } = montarBancada({
+      existente: null,
+    });
+
+    await service.buscarOuCriarPorPayload(service.lerPayloadDoQr(payloadQr()));
+
+    expect(buscarOuCriarClientePorNome).toHaveBeenCalledWith('Energisa');
+    expect(criar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clienteVinculado: expect.objectContaining({ id: 'cliente-1' }),
+      }),
+    );
+  });
+
+  it('should criar sem vinculo quando a etiqueta nao traz cliente', async () => {
+    // Ausencia nao e afirmacao: sem cliente no payload, nenhum cadastro nasce.
+    const { service, criar, buscarOuCriarClientePorNome } = montarBancada({
+      existente: null,
+    });
+
+    await service.buscarOuCriarPorPayload(
+      service.lerPayloadDoQr(
+        JSON.stringify({ numeroSerie: '847233', patrimonio: '251328' }),
+      ),
+    );
+
+    expect(buscarOuCriarClientePorNome).not.toHaveBeenCalled();
+    expect(criar).toHaveBeenCalledWith(
+      expect.objectContaining({ numeroSerie: '847233' }),
+    );
   });
 
   it('should sobreviver a corrida de unique violation relendo a peca', async () => {
