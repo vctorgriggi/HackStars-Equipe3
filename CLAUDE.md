@@ -297,6 +297,13 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
   Textract ↔ Bedrock e os testes com mock dependem dessa fronteira.
 - Nunca inventar valor esperado que não veio do payload do QR — fonte da
   verdade única nesta rodada (SPEC, constraint 5).
+- Nunca tratar AUSÊNCIA de informação como afirmação. Mordeu duas vezes na
+  rodada atribuicao-de-marcacao, nas duas pontas do sistema: na extração,
+  "não consegui classificar a marcação" anulava leitura boa em vez de cair na
+  regra anterior; no `/demo`, "a checklist ainda não chegou" fazia a tela
+  pedir as 9 vistas. A forma correta é sempre a mesma — sem informação, o
+  comportamento anterior permanece e o estado se ANUNCIA; fallback permissivo
+  só é aceitável quando ele se declara, nunca disfarçado de instrução.
 
 ## Gaps conhecidos
 
@@ -428,6 +435,17 @@ do hackathon:
     `fonteFisica`/`obrigatorio` também não são persistidos, mas esses a
     releitura RE-RESOLVE da checklist do ProjetoModelo da peça (e devolve
     `null` se a peça não tiver projeto ou a checklist estiver ilegível).
+23. A ETIQUETA cai na mesma classe da serigrafia no classificador de contraste
+    (`adapters/contraste.ts`): as duas são texto escuro sobre fundo claro. Se a
+    serigrafia estiver ausente ou ilegível e a etiqueta aparecer no quadro, o
+    número dela pode virar a leitura do patrimônio serigrafado — e como a
+    etiqueta É a fonte da verdade, o valor sempre bate: `conforme` para
+    marcação que não existe na peça. É o caminho de falso OK mais próximo que
+    resta. Paliativo em vigor: a regra de unicidade recusa quando as duas
+    aparecem (duas tintas → não resolve) e o veto do rótulo pode barrar.
+    Correção proposta (barata, mesmo recorte): luminância ABSOLUTA do entorno
+    como quarto sinal — papel é muito mais claro que chapa pintada. Decisão em
+    aberto no SPEC.
 
 ## Decisões em aberto
 
@@ -444,7 +462,17 @@ do hackathon:
       inventou o patrimônio como o número de série real da peça — falso OK em
       potencial) e não dão confiança calibrada. Bedrock fica FORA da leitura
       numérica por medição, não por bloqueio; segue candidato só ao check
-      qualitativo de layout.
+      qualitativo de layout. Reavaliado UMA VEZ MAIS em 2026-07-26, com a
+      conta liberando os modelos Claude atuais e — de propósito — o mesmo
+      RECORTE que a corroboração usa: aí eles LEEM o relevo (o Haiku 4.5
+      acertou justamente a foto difícil). O teste anterior tinha sido injusto,
+      porque mandava a foto inteira, onde o número vira ~30 px e o modelo
+      reduz a imagem antes de processar. Ficam fora ainda assim, por três
+      razões diferentes das primeiras: inconsistência entre fotos (cada modelo
+      acertou uma e errou outra), erro de UM dígito (plausível, indistinguível
+      de leitura boa sem gabarito) e ausência de confiança calibrada. E o que
+      consertou a leitura foi o recorte, não a troca de motor
+      (docs/visao-ocr.md).
 - [x] **Framework do front** — resolvido: Next.js 16; scaffold já subido pelo
       time venceu o Angular combinado na entrevista (2026-07-25).
 - [ ] **Cliente da demo: `frontend/` (Next) × `mobile/` (Expo)** — o time

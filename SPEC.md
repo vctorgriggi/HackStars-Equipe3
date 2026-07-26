@@ -339,6 +339,19 @@ parcial daquele gate sem ação do operador, com as mesmas garantias dos
 critérios 1–4, e divergência impede o registro de avanço para a etapa
 seguinte.
 
+**Requisito de hardware que saiu de medição, não de opinião: iluminação
+rasante de direção fixa sobre a região da série chumbada** — idealmente duas
+direções alternadas a 90°, para cobrir traço de qualquer orientação. O spike
+de realce de imagem (2026-07-26, docs/visao-ocr.md) mediu que **~60 pontos de
+confiança separam a melhor da pior direção de luz na MESMA foto**, e que a
+direção ótima muda de foto para foto — porque cada uma foi tirada com a luz
+ambiente incidindo num ângulo diferente. O relevo é definido por gradiente de
+sombra: o que decide a legibilidade é o ângulo entre a luz e o traço, e esse
+ângulo é a variável não controlada da captura manual. Não há filtro que o
+corrija depois (17 variantes testadas e reprovadas), mas o gate pode fixá-lo
+antes. É o item de maior alavancagem para levar à TRAEL no projeto das
+câmeras.
+
 ### Integração ERP / sistemas de projeto
 
 O valor esperado passa a ser cruzado com o ERP além do QR; divergência
@@ -478,6 +491,26 @@ consegue criar Conferencia.
       Textract devolve um bounding box por ocorrência (`regiaoLeitura`, já
       persistido) — N caixas distintas no MESMO quadro provam N posições, o
       que habilita uma vista panorâmica satisfazer mais de uma posição.
+- [ ] **As marcações técnicas da face lateral entram na conferência?** — o
+      spike de 2026-07-26 leu na lateral esquerda `G-07/28`, `AL` e `V`
+      (aparentemente lote/data, alumínio e óleo vegetal), marcações reais da
+      peça que a checklist NÃO confere. O time definiu o foco desta rodada em
+      identidade (serigrafia × etiqueta e séries irmãs entre si) e ADIOU estas:
+      se o desenho as exige, hoje é não conformidade passando batido.
+      Confirmar com a TRAEL quais são obrigatórias; incluir é acrescentar itens
+      à checklist, não mexer em código.
+- [ ] **Distinguir a ETIQUETA da serigrafia por contraste** — a discriminação
+      de 2026-07-26 separa três classes (relevo, tinta sobre tanque, claro
+      sobre escuro na placa), mas a etiqueta é texto escuro sobre papel claro e
+      cai na MESMA classe da serigrafia. Consequência medida como risco
+      residual: se a serigrafia estiver ausente ou ilegível e a etiqueta
+      aparecer no quadro, o número dela pode virar a leitura do patrimônio
+      serigrafado — e, sendo a etiqueta a fonte da verdade, o valor SEMPRE
+      bate, produzindo `conforme` para marcação que não existe na peça. A regra
+      de unicidade protege quando as duas aparecem (duas tintas → não resolve).
+      Correção proposta: acrescentar a luminância ABSOLUTA do entorno como
+      quarto sinal — papel é muito mais claro que chapa pintada, e a medida sai
+      do mesmo recorte que já é feito.
 - [ ] **Unicidade do patrimônio entre clientes** — padrão do setor: série do
       fabricante é única, patrimônio é numeração do cliente (único por
       cliente). Confirmar com a TRAEL. Consequência já adotada: find-or-create

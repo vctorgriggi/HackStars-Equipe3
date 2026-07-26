@@ -203,6 +203,24 @@ Depende de: Fase 1 completa.
     contexto "em produção" por passo e o Textract como único caminho de
     destaque; leituras digitadas viraram "modo avançado". Motivo: usuário
     real se perdeu na bancada. `?etapa=` passou a ser respeitado.
+  - Reformulada na rodada atribuicao-de-marcacao (2026-07-26), a pedido do
+    time: assistente de UM passo por vez (concluídos colapsam em linha
+    clicável, futuros inertes), avanço automático onde não há ambiguidade,
+    etapa lembrada no aparelho (a URL vence a memória — cada celular simula
+    uma câmera fixa, então a etapa é praticamente constante), veredito como
+    protagonista abrindo com as DUAS perguntas do time (serigrafia × etiqueta;
+    séries irmãs), campos agrupados por resultado e 11 códigos de erro
+    traduzidos com o caminho de saída.
+  - Bug de conceito corrigido na mesma rodada, achado pelo usuário testando no
+    celular ("na primeira etapa ela pede foto da placa"): a página tratava
+    "checklist ainda não chegou" como ALVO e pedia as 9 vistas — ausência de
+    informação virando afirmação, o MESMO erro que o backend passou a rodada
+    corrigindo. Havia uma segunda metade: `carregarRecorte()` sem `await`
+    deixava a grade de etapas clicável com os dados em voo, então quem tocasse
+    rápido furava a proteção. Correção: máquina de estados explícita da
+    checklist, alvo vazio fora de `pronta`, e o login espera a busca. Falha na
+    busca NÃO bloqueia — o fallback permissivo continua, mas ANUNCIADO, nunca
+    disfarçado de instrução.
 - [x] T2.6 — Conferência parcial por etapa (descoberta desta rodada) · módulo: conformidade
   - Feito em 2026-07-25 (agente Opus): itens da checklist ganharam `etapa`
     (codigo do Checkpoint em que a marcação passa a existir);
@@ -340,6 +358,73 @@ Depende de: Fase 1 completa.
     (obrigatório `nao_conferivel` bloqueia igual); muda a mensagem, de "peça
     defeituosa" para "não posso afirmar, confira a foto". Limitações
     registradas nos gaps 19–21 do CLAUDE.md.
+- [x] T2.13 — Discriminar tinta de relevo pelo contraste (descoberta desta rodada) · módulo: extracao
+  - ACHADO QUE REORIENTOU A SOLUÇÃO (2026-07-26): o `847833 @ 84,6%` da foto
+    lateral — que a T2.12 tratava como "erro de dígito no relevo" e que
+    sustentava a tese de que nenhum limiar corta a faixa dos 84% — NÃO era erro
+    de leitura. Era o Textract lendo a PLACA, que aparece no canto daquela
+    foto, com toda a competência dele. Errou a ATRIBUIÇÃO, não o
+    reconhecimento. Isso explica em retrospecto por que as 17 variantes de
+    realce (T2.12) e o consenso entre motores falharam: nenhum ataca "qual
+    marcação é qual".
+  - Feito em 2026-07-26 (agente Opus, ideia do time): `adapters/contraste.ts`
+    recorta o bounding box que o Textract já devolve e compara com um anel em
+    volta — tinta serigrafada é escura contra o tanque, relevo tem a cor do
+    fundo, placa é claro sobre escuro (terceira classe, que existe para
+    EXCLUIR). Margens medidas em 7 fotos reais: escuridão relevo ≤0,114 ×
+    tinta ≥0,502 (4,4×); claridade relevo ≤0,122 × claro ≥0,290 (2,4×);
+    textura de região chapada 1,3 × relevo ≥11,3 (8,7×). Limiares no meio dos
+    vazios, com faixa morta: quem cai nela é `indeterminado`, e indeterminado
+    não resolve campo nenhum. Calibração reexecutável em
+    `scripts/spike-contraste.ts`.
+  - Invariante (custou 5 testes vermelhos até ficar certo): AUSÊNCIA de
+    evidência (indeterminado, sem `sharp`, flag off, região lisa) cai na regra
+    anterior INTACTA; só EVIDÊNCIA CONTRÁRIA anula leitura. A discriminação
+    existe para resolver ambiguidade que se perdia, nunca para introduzir
+    perda nova.
+  - Aceitação: os 3 irmãos e os 2 patrimônios voltaram a ler com atribuição
+    correta (topo 98,4%, lateral 58,3%, traseira 97,7%, patrimônio-topo
+    98,5%); cenário-âncora intacto (`serie-placa` 847833 @ 99,9%). Cobre parte
+    do gap 21 — medido contra o Textract real.
+  - Desvio: achado colateral, bug que sabotava em silêncio —
+    `sharp(buf,{autoOrient:true}).metadata()` devolve dimensões CRUAS, então
+    em foto com rotação EXIF o recorte era calculado num referencial e
+    aplicado noutro, cortando região vazia. O Textract respeita EXIF; nossa
+    conta não respeitava.
+- [x] T2.14 — Swagger documenta as RESPOSTAS (descoberta desta rodada) · módulo: backend
+  - Motivo: os 6 endpoints que o front vai consumir tinham schema de resposta
+    VAZIO. O NestJS só documenta CLASSES, e os endpoints desta rodada
+    devolviam interfaces TypeScript, que somem na compilação — o front
+    receberia rotas e corpos de requisição, mas teria de ADIVINHAR o formato
+    das respostas, inclusive `incoerencias`, `achadosInconsistentes` e
+    `extracao`.
+  - Feito em 2026-07-26 (agente Opus): interfaces viraram classes no lugar,
+    re-exportadas dos arquivos originais (nenhum import quebrou). Duas
+    exceções deliberadas: `IncoerenciaEntreCampos` e `LeituraDoGrupo` vivem na
+    engine, que é pura e não importa framework — as classes de resposta
+    correspondentes têm a equivalência checada pelo COMPILADOR nos dois
+    sentidos (campo a mais ou a menos de qualquer lado quebra o build).
+  - Aceitação: a REGRA DE NEGÓCIO documentada onde ela vive, não só o tipo —
+    precedência do veredito, a união completa de `motivo` com uma linha
+    operacional por valor, `incoerencias` rebaixa e nunca promove e não é
+    persistida, `etapaAvaliada` significa conferência PARCIAL, e a URL da
+    evidência expira em 1h. Exemplos com os valores reais da peça.
+- [x] T2.15 — Releitura do veredito: `GET /conferencias/:id/campos` (descoberta desta rodada) · módulo: conformidade
+  - Motivo: o veredito campo a campo só existia na resposta do POST.
+    `GET /conferencias/:id` devolvia apenas cabeçalho, e os campos só saíam da
+    paginação global de `campos-conferidos`. Um app com navegação (fotos numa
+    tela, veredito noutra) ou um simples refresh não conseguia remontar a tela
+    — e o critério 1 do SPEC exige a foto-evidência por valor lido.
+  - Feito em 2026-07-26 (agente Opus): projeção própria em
+    `conferencias/consultas/`, com `fotoEvidencia {id, url, fonteFisica}` de
+    URL pronta; peça inexistente → 404 `conferencia-inexistente`; sem
+    paginação de propósito (paginar veredito esconderia campo divergente na
+    segunda página).
+  - Desvio: `@TransformUrlEvidencia` só dispara sobre INSTÂNCIA de classe —
+    objeto literal devolveria a key crua do bucket, ou seja, funcionaria local
+    e falharia sob S3, exatamente no ambiente da demo. Por isso a projeção da
+    foto é classe, com teste que serializa e afirma a URL pronta. O que se
+    perde na releitura está no gap 22.
 
 ## Fase 3 — Fluxo de conferência ponta a ponta
 
@@ -460,12 +545,23 @@ demo.
 
 - **Série chumbada ilegível para OCR** (SPEC, constraint 2) → o risco na forma
   prevista (ilegibilidade) se dissolveu em 2026-07-25: o Textract leu o relevo a
-  99,9% (topo) e 96,7% (diagonal). **Mas voltou em forma pior no mesmo dia**: no
-  relevo a confiança mede ENQUADRAMENTO, não correção (37,3%–95,5% para o mesmo
-  valor certo; certo a 84,3% × errado a 84,6%). Mitigação atual = consenso de
-  recortes + recusa de acusar sem corroboração (T2.12), não mais só o limiar. O
-  plano C (campo `nao_conferivel` com foto) segue valendo para foto ruim —
-  medido: um chumbado saiu a 35,4% e a engine o barrou corretamente.
+  99,9% (topo) e 96,7% (diagonal). Voltou em forma pior no mesmo dia (a
+  confiança no relevo mede ENQUADRAMENTO, não correção: 37,3%–95,5% para o
+  mesmo valor certo), e em 2026-07-26 **mudou de natureza**: o caso que
+  sustentava "certo a 84,3% × errado a 84,6%" era ATRIBUIÇÃO errada, não
+  leitura errada — o Textract lia a placa que aparece no canto da foto lateral
+  e a heurística entregava o número ao campo do chumbado (T2.13). Mitigação
+  atual, em camadas: discriminação por contraste resolve a atribuição; consenso
+  de recortes recupera confiança; a recusa de acusar sem corroboração (T2.12)
+  cobre o resto. O plano C (`nao_conferivel` com foto) segue valendo para foto
+  ruim — medido: um chumbado saiu a 35,4% e a engine o barrou corretamente.
+- **Confiança de OCR não é calibrada para relevo** (risco novo, medido em
+  2026-07-26) → nenhum limiar separa a faixa dos 84%, e 17 variantes de realce
+  de imagem foram medidas e REPROVADAS (25,9% das leituras tratadas saíram
+  erradas ou sumiram; uma produziu valor errado a 83,6%). A alavanca que sobrou
+  não é software: ~60 pontos de confiança separam a melhor da pior direção de
+  luz na MESMA foto, e a direção ótima muda por foto. Vira requisito de
+  hardware para os gates (SPEC, câmeras fixas), não tarefa de código.
 - **Prazo de 2 dias** (SPEC, constraint 1) → Fase 5 opcional; T2.3 com fallback
   de disco local; corte na ordem Could → Should, nunca no Must.
 - **Payload do QR desconhecido** (SPEC, constraint 5) → T1.1 na frente de tudo
@@ -502,4 +598,4 @@ demo.
       checklist do banco desde a T1.2; ingestão automática do PDF virou Fase 6
       opcional (2026-07-25).
 
-<!-- rodada: analise-e-coerencia @ 96f8527 -->
+<!-- rodada: atribuicao-de-marcacao @ 2827fc1 -->
