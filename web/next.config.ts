@@ -12,6 +12,10 @@ const nextConfig: NextConfig = {
   // Cada rota vira pasta/index.html — é o que um servidor estático burro
   // resolve sem regra de rewrite.
   trailingSlash: true,
+  // Servido em /app pela API: sem basePath o HTML pediria os assets em
+  // /_next/... (raiz) e receberia 404 da própria API — página "só HTML".
+  // Condicional para o `npm run dev` continuar na raiz.
+  basePath: process.env.NEXT_PUBLIC_BASE_PATH ?? "",
 };
 
 export default nextConfig;
