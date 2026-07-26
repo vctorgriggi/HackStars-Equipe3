@@ -92,7 +92,8 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
   `conforme` só com todos os campos conformes.
 - Limiar de confiança é parâmetro da engine, não constante enterrada (a
   política de campo parcialmente legível está em aberto e vai mudar isso).
-  Default do endpoint: `LIMIAR_CONFIANCA_PADRAO = 0.8` em
+  Default do endpoint: `LIMIAR_CONFIANCA_PADRAO = 0.9` (medido com a peça
+  real: leituras corretas em 98,4–99,9%, erro de dígito a 84,6%) em
   `conferencia-execucao.service.ts`, sobrescrevível por request.
 - Escrita de veredito tem UM caminho: `CamposConferidosService.criarComVeredito`
   (server-side, sem rota HTTP). Nunca crie outro — é o que mantém a regra de
@@ -299,8 +300,10 @@ do hackathon:
 
 ## Decisões em aberto
 
-- [ ] **Política para campo parcialmente legível** — rejeitar sempre ou
-      similaridade ≥ N% com revisão humana (afeta T1.2).
+- [x] **Política para campo parcialmente legível** — resolvido: rejeitar
+      sempre, com limiar 0.9 medido na peça real; nada de similaridade
+      aproximada. Leitura fraca vira `nao_conferivel` e vai para o olho
+      humano com a foto (rodada nomes-e-analise, 2026-07-25).
 - [ ] **Formato do payload do QR** — campos embutidos ou código de lookup
       (afeta T1.1, T3.1).
 - [x] **Textract vs Bedrock** — resolvido: Textract (spike T2.1 com fotos

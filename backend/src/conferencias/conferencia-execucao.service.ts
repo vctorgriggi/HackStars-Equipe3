@@ -26,8 +26,15 @@ import { ConferenciaRepository } from './infrastructure/persistence/conferencia.
 /**
  * Limiar usado quando o cliente nao manda `limiarConfianca`. Fica aqui (borda),
  * nunca dentro da engine: politica e parametro, nao constante enterrada.
+ *
+ * 0.9 e MEDIDO, nao arbitrado (peca real, Textract, 2026-07-25): as leituras
+ * corretas sairam entre 98,4% e 99,9%, e o unico erro de digito (2 lido como
+ * 8 numa foto lateral do chumbado) veio a 84,6%. Com 0.8 esse erro passava e
+ * virava `divergente` FALSO, quebrando o criterio 2 do SPEC ("o unico campo
+ * divergente e a serie da placa"); com 0.9 ele vira `nao_conferivel`, que e a
+ * resposta honesta — foto ruim vai para o olho humano.
  */
-export const LIMIAR_CONFIANCA_PADRAO = 0.8;
+export const LIMIAR_CONFIANCA_PADRAO = 0.9;
 
 export interface CampoExecutado extends ResultadoCampo {
   campoConferidoId: string;
@@ -321,10 +328,11 @@ export class ConferenciaExecucaoService {
       limiarConfianca,
     );
 
+    const valoresEsperados = montarValoresEsperados(checklist, payload);
     const resultado = conferir(
       checklist,
-      montarValoresEsperados(checklist, payload),
-      leituras,
+      valoresEsperados,
+      marcarLeiturasTrocadas(leituras, valoresEsperados),
       { limiarConfianca },
     );
 
@@ -539,6 +547,50 @@ export class ConferenciaExecucaoService {
     // "string presente" ou "ausente".
     return bruto.map((item) => ({ ...item, etapa: item.etapa ?? undefined }));
   }
+}
+
+/**
+ * Guarda contra TROCA DE CAMPO (medida em campo, 2026-07-25): numa foto que
+ * mostra mais de uma marcação, a heurística do extrator pode casar o número
+ * errado com o campo alvo — o caso real foi a foto da tampa, onde o
+ * patrimônio SERIGRAFADO (tinta preta, alto contraste) foi lido como a série
+ * CHUMBADA (relevo da cor do tanque, quase invisível para o OCR): a única
+ * marcação que o Textract enxergou virou a resposta do campo pedido.
+ *
+ * Regra: leitura que NÃO bate com o esperado do próprio campo mas bate
+ * EXATAMENTE com o esperado de outro campo não é divergência — é a marcação
+ * do vizinho lida no lugar errado. Vira `nao_conferivel`
+ * (`leitura-de-outro-campo`), que manda a foto para o olho humano.
+ *
+ * Por que isto NÃO fere a regra de ouro (usar o esperado para julgar leitura
+ * seria circular): a guarda só sabe DESCONFIAR — todo caminho dela leva a
+ * `nao_conferivel`. Nenhuma leitura vira `conforme` por causa dela, e o campo
+ * genuinamente divergente (placa 847833 × etiqueta 847233) continua
+ * `divergente`, porque 847833 não é o esperado de campo nenhum.
+ */
+export function marcarLeiturasTrocadas(
+  leituras: LeituraCampo[],
+  valoresEsperados: Record<string, string>,
+): LeituraCampo[] {
+  return leituras.map((leitura) => {
+    const valorLido = leitura.valorLido;
+    if (valorLido === null || valorLido.trim().length === 0) {
+      return leitura;
+    }
+
+    const lido = normalizar(valorLido);
+    const esperadoDoProprio = valoresEsperados[leitura.campo];
+    if (esperadoDoProprio && normalizar(esperadoDoProprio) === lido) {
+      return leitura;
+    }
+
+    const pertenceAOutroCampo = Object.entries(valoresEsperados).some(
+      ([campo, esperado]) =>
+        campo !== leitura.campo && normalizar(esperado) === lido,
+    );
+
+    return pertenceAOutroCampo ? { ...leitura, trocado: true } : leitura;
+  });
 }
 
 /** Leitura "melhor": valorLido presente vence; empate decide por confiança. */

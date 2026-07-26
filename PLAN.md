@@ -311,8 +311,10 @@ demo.
 
 ## Decisões em aberto
 
-- [ ] **Política para campo parcialmente legível** — rejeitar sempre ou
-      similaridade ≥ N% com revisão humana; afeta T1.2.
+- [x] **Política para campo parcialmente legível** — resolvido: rejeitar
+      sempre (limiar 0.9, medido com a peça real na T2.1/rodada
+      nomes-e-analise); similaridade aproximada fica fora — em série de
+      transformador, "quase igual" é divergente (2026-07-25).
 - [ ] **Formato do payload do QR** — campos embutidos ou código de lookup;
       afeta T1.1 e T3.1.
 - [x] **Textract vs Bedrock para extração** — resolvido: TEXTRACT, medido com

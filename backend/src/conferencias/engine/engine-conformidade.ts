@@ -120,6 +120,24 @@ export function conferir(
       continue;
     }
 
+    // (b3) marcação do vizinho: o valor lido é o esperado de OUTRO campo. A
+    // foto mostrava mais de uma marcação e o extrator casou a errada — isso
+    // não é divergência da peça, é leitura no lugar errado. Vai para revisão
+    // humana com a foto, nunca para `divergente` (acusaria peça correta).
+    if (leitura?.trocado) {
+      campos.push(
+        montarCampo(
+          item,
+          valorEsperadoBruto,
+          valorLido,
+          confianca,
+          'nao_conferivel',
+          'leitura-de-outro-campo',
+        ),
+      );
+      continue;
+    }
+
     // (c) dado sem lastro nunca vira conforme, mesmo batendo com o esperado.
     // confianca <= 0 nunca é lastro, mesmo com limiar 0 (regra de ouro):
     // sem essa guarda, limiarConfianca=0 + confianca=0 viraria conforme.

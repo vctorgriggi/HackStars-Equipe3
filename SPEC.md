@@ -403,10 +403,14 @@ consegue criar Conferencia.
 
 ## Decisões em aberto (a confirmar)
 
-- [ ] **Política para campo parcialmente legível** — uma letra ilegível no
-      cliente ou um dígito duvidoso no número: rejeitar sempre
-      (`nao_conferivel`) ou aceitar similaridade ≥ N% com marcação para revisão
-      humana? Afeta a engine de comparação (PLAN T1.2).
+- [x] **Política para campo parcialmente legível** — resolvido: **rejeitar
+      sempre**, com limiar de confiança 0.9. O número saiu de medição, não de
+      arbítrio: com a peça real, as leituras corretas do Textract ficaram
+      entre 98,4% e 99,9%, e o único erro de dígito (2 lido como 8 numa foto
+      lateral do chumbado) veio a 84,6% — dentro do limiar antigo de 0.8, o
+      que produzia um `divergente` falso. Similaridade aproximada fica fora
+      por princípio: em número de série, "quase igual" é divergente. Leitura
+      fraca vira `nao_conferivel` com a foto anexada (2026-07-25).
 - [ ] **Formato do payload do QR** — decodificar uma etiqueta real para saber
       se o QR carrega os campos ou só um código de lookup, e se referencia o
       projeto/modelo (a etiqueta impressa traz o código TPD-408136, então o

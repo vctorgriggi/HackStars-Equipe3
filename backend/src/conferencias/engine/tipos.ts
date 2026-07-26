@@ -34,6 +34,15 @@ export interface LeituraCampo {
    * rebaixar o cenário-âncora a `conforme` (achado ALTA da revisão).
    */
   conflitante?: boolean;
+  /**
+   * Fato registrado pelo chamador: o valor lido bate EXATAMENTE com o
+   * esperado de OUTRO campo — sinal de que a foto mostrava mais de uma
+   * marcação e o extrator casou a errada (patrimônio serigrafado lido como
+   * série chumbada). A engine rebaixa para `nao_conferivel`
+   * (`leitura-de-outro-campo`): é marcação do vizinho, não divergência da
+   * peça.
+   */
+  trocado?: boolean;
 }
 
 export interface OpcoesEngine {
