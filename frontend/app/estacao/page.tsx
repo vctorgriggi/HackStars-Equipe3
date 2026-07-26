@@ -37,6 +37,12 @@ export default function EstacaoPage() {
   // relatório
   const [relatorio, setRelatorio] = useState<ResultadoChecagem[] | null>(null);
 
+  // etiqueta (QR) da peça atual — é o ground truth; em produção viria da
+  // leitura automática do QR. Pré-preenchida com a peça de demonstração.
+  const [etiqueta, setEtiqueta] = useState(
+    "Pedido: 68202\nNúm. Série: 847233\nSeq: 86\nPatrimônio: 251328\nCliente: 143091 - Energisa Rondônia Distribuidora de Energia S.A\nTPD-408136",
+  );
+
   // streams vivem fora do ciclo de render
   const streamsPreviewRef = useRef<Map<string, MediaStream>>(new Map()); // deviceId -> stream
   const streamsOpRef = useRef<Map<string, MediaStream>>(new Map()); // checagemId -> stream
@@ -82,6 +88,8 @@ export default function EstacaoPage() {
       }
       const disps = (await navigator.mediaDevices.enumerateDevices())
         .filter((d) => d.kind === "videoinput")
+        // cameras virtuais de software (OBS, DemoCreator...) nao servem para a estacao
+        .filter((d) => !/virtual/i.test(d.label))
         .map((d, i) => ({ deviceId: d.deviceId, label: d.label || `Camera ${i + 1}` }));
       const etapasResp: { etapas: Etapa[] } = await (await fetch("/api/estacao/etapas")).json();
       const configResp: Config | null = await (await fetch("/api/estacao/config")).json();
@@ -203,8 +211,10 @@ export default function EstacaoPage() {
         const deviceId = config.mapeamento[c.id];
         if (!deviceId) continue;
         try {
+          // preview leve: alivia USB/CPU com varias cameras; a captura eleva
+          // a resolucao ao maximo do sensor na hora do frame
           const stream = await navigator.mediaDevices.getUserMedia({
-            video: { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+            video: { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } },
           });
           if (cancelado) {
             stream.getTracks().forEach((t) => t.stop());
@@ -239,51 +249,117 @@ export default function EstacaoPage() {
     !processando &&
     etapaOp !== null &&
     camsAbertas.length === etapaOp.checagens.length &&
-    camsAbertas.length > 0;
+    camsAbertas.length > 0 &&
+    etiqueta.trim().length > 0;
+
+  // -------------------------------------------------------------------------
+  // Captura em resolucao maxima: sobe as constraints ao teto do sensor
+  // (ex: C920 -> 2304x1536 no modo foto 2fps), espera o stream reconfigurar,
+  // tira o frame com JPEG quase sem perda e devolve o preview ao modo leve.
+  // Se a camera recusar o boost, captura na resolucao atual mesmo.
+  // -------------------------------------------------------------------------
+  async function capturarFrameMaximo(
+    checagemId: string,
+    video: HTMLVideoElement,
+  ): Promise<Blob | null> {
+    const track = streamsOpRef.current.get(checagemId)?.getVideoTracks()[0];
+    const larguraAntes = video.videoWidth;
+
+    if (track) {
+      try {
+        await track.applyConstraints({ width: { ideal: 4096 }, height: { ideal: 3072 } });
+        // espera o elemento de video refletir a resolucao nova (ou desiste em 1.2s)
+        await new Promise<void>((resolve) => {
+          const inicio = Date.now();
+          const checar = () => {
+            if (video.videoWidth !== larguraAntes || Date.now() - inicio > 1200) resolve();
+            else setTimeout(checar, 60);
+          };
+          checar();
+        });
+        // um respiro para o primeiro frame na resolucao nova chegar (2fps = ate 500ms)
+        await new Promise((r) => setTimeout(r, 600));
+      } catch {
+        /* camera nao aceitou o boost: segue na resolucao do preview */
+      }
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d")?.drawImage(video, 0, 0);
+    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.98));
+
+    if (track) {
+      try {
+        await track.applyConstraints({ width: { ideal: 1280 }, height: { ideal: 720 } });
+      } catch {
+        /* se nao voltar, o preview fica pesado mas funcional */
+      }
+    }
+    return blob;
+  }
 
   // -------------------------------------------------------------------------
   // Captura do lote
   // -------------------------------------------------------------------------
   const capturarLote = useCallback(async () => {
-    if (!prontoParaCapturar) return;
+    if (!prontoParaCapturar || !config) return;
     setProcessando(true);
-    const lote = "lote-" + new Date().toISOString().replace(/[:.]/g, "-");
 
-    const promessas = camsAbertas.map(async (checagem): Promise<ResultadoChecagem> => {
-      try {
+    try {
+      // fotografa todas as checagens e monta UM lote multipart
+      const dados = new FormData();
+      dados.append("payloadQr", etiqueta.trim());
+      dados.append("etapaCodigo", config.etapaId);
+      for (const checagem of camsAbertas) {
         const video = videosOpRef.current.get(checagem.id);
-        if (!video) throw new Error("video da checagem nao encontrado");
-        const canvas = document.createElement("canvas");
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        canvas.getContext("2d")?.drawImage(video, 0, 0);
-        const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.92));
-        if (!blob) throw new Error("falha ao gerar imagem");
+        if (!video) throw new Error(`video da checagem ${checagem.nome} nao encontrado`);
+        const blob = await capturarFrameMaximo(checagem.id, video);
+        if (!blob) throw new Error(`falha ao gerar imagem da checagem ${checagem.nome}`);
+        dados.append(`foto:${checagem.id}`, blob, `${checagem.id}.jpg`);
+      }
 
-        const resp = await fetch(
-          `/api/estacao/capturas?lote=${lote}&checagem=${checagem.id}`,
-          { method: "POST", body: blob, headers: { "Content-Type": "image/jpeg" } },
-        );
-        const json: { validacao: Validacao } = await resp.json();
-        return { checagem, validacao: json.validacao };
-      } catch (e) {
-        return {
+      // conferencia real: Textract + engine no backend (leva alguns segundos por foto)
+      const resp = await fetch("/api/estacao/conferir", { method: "POST", body: dados });
+      const json: {
+        ok: boolean;
+        erro?: string;
+        resultados?: { checagemId: string; validacao: Validacao }[];
+      } = await resp.json();
+      if (!json.ok || !json.resultados) {
+        throw new Error(json.erro ?? `conferencia respondeu ${resp.status}`);
+      }
+
+      const porChecagem = new Map(json.resultados.map((r) => [r.checagemId, r.validacao]));
+      const resultados: ResultadoChecagem[] = camsAbertas.map((checagem) => ({
+        checagem,
+        validacao:
+          porChecagem.get(checagem.id) ?? {
+            sucesso: false,
+            mensagem: "sem resultado para esta checagem",
+            divergencias: [],
+          },
+      }));
+      setRelatorio(resultados);
+      const oks = resultados.filter((r) => r.validacao.sucesso).length;
+      setStatusOp(`Ultimo lote: ${oks}/${resultados.length} checagem(ns) OK.`);
+    } catch (e) {
+      setRelatorio(
+        camsAbertas.map((checagem) => ({
           checagem,
           validacao: {
             sucesso: false,
-            mensagem: "falha no envio: " + (e as Error).message,
+            mensagem: "falha na conferencia: " + (e as Error).message,
             divergencias: [],
           },
-        };
-      }
-    });
-
-    const resultados = await Promise.all(promessas);
-    setProcessando(false);
-    setRelatorio(resultados);
-    const oks = resultados.filter((r) => r.validacao.sucesso).length;
-    setStatusOp(`Ultimo lote: ${oks}/${resultados.length} checagem(ns) OK.`);
-  }, [prontoParaCapturar, camsAbertas]);
+        })),
+      );
+      setStatusOp("Falha na conferencia — veja o relatorio.");
+    } finally {
+      setProcessando(false);
+    }
+  }, [prontoParaCapturar, camsAbertas, config, etiqueta]);
 
   // -------------------------------------------------------------------------
   // Teclado: Enter captura / Enter fecha relatório aprovado / Esc fecha
@@ -432,6 +508,22 @@ export default function EstacaoPage() {
               </div>
             ))}
           </div>
+          <details className="bg-neutral-900 px-4 py-2 text-sm">
+            <summary className="cursor-pointer text-neutral-400">
+              Etiqueta da peca atual (QR){" "}
+              {etiqueta.trim() ? "" : "— OBRIGATORIA para conferir"}
+            </summary>
+            <textarea
+              value={etiqueta}
+              onChange={(e) => setEtiqueta(e.target.value)}
+              rows={5}
+              spellCheck={false}
+              className="mt-2 w-full max-w-2xl rounded-md border border-neutral-700 bg-neutral-800 p-2 font-mono text-xs"
+            />
+            <p className="mt-1 text-xs text-neutral-500">
+              E dela que saem os valores esperados — em producao a camera le o QR sozinha.
+            </p>
+          </details>
           <footer className="flex items-center gap-4 bg-neutral-900 px-4 py-2.5">
             <button
               onClick={capturarLote}
@@ -450,7 +542,7 @@ export default function EstacaoPage() {
         <div className="fixed inset-0 z-10 flex items-center justify-center">
           <div className="flex items-center gap-3 rounded-xl bg-neutral-900 px-7 py-5">
             <div className="h-5 w-5 animate-spin rounded-full border-[3px] border-neutral-700 border-t-[#2f7a3c]" />
-            <span>Processando lote...</span>
+            <span>Lendo as fotos na visao... (alguns segundos por foto)</span>
           </div>
         </div>
       )}
