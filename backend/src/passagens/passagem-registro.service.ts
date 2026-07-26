@@ -91,7 +91,12 @@ export class PassagemRegistroService {
         })
       )[0];
 
-    const resultado = this.montarResultado(passagem, checkpoint, transformador, ultima);
+    const resultado = this.montarResultado(
+      passagem,
+      checkpoint,
+      transformador,
+      ultima,
+    );
 
     // Difusao no canal de tempo real (esteira). NUNCA falha o scan: a
     // passagem ja esta gravada, e `anunciar()` engole o proprio erro.
@@ -158,7 +163,12 @@ export class PassagemRegistroService {
       })
     )[0];
 
-    const resultado = this.montarResultado(passagem, primeiro, transformador, ultima);
+    const resultado = this.montarResultado(
+      passagem,
+      primeiro,
+      transformador,
+      ultima,
+    );
     await this.anuncioPassagem.anunciar(resultado, checkpointAnterior);
 
     return resultado;

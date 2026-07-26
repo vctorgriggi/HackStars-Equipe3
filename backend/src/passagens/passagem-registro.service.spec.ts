@@ -86,7 +86,9 @@ function conferencia(veredito: string, etapa?: Checkpoint): Conferencia {
 interface Bancada {
   service: PassagemRegistroService;
   buscarOuCriar: jest.SpyInstance;
+  buscarPorSerie: jest.SpyInstance;
   criarPassagem: jest.Mock;
+  apagarPassagens: jest.Mock;
   ultimasConferencias: jest.Mock;
   buscarConferencia: jest.Mock;
   anunciar: jest.Mock;
@@ -99,6 +101,8 @@ function montarBancada(
     ultimaPassagemEm?: Checkpoint;
     /** O que `conferenciaRepository.findById` devolve para o vinculo. */
     conferenciaVinculavel?: Conferencia | null;
+    /** O que o reinicio de apresentacao encontra pela serie (default: a peca). */
+    pecaPorSerie?: Transformador | null;
   } = {},
 ): Bancada {
   const checkpointService = {
@@ -107,6 +111,9 @@ function montarBancada(
         CHECKPOINTS.find((atual) => atual.codigo === codigo) ?? null,
       ),
     ),
+    // Ordenado por `ordem`, como o repositorio real: o reinicio de
+    // apresentacao pega o primeiro.
+    findAll: jest.fn(() => Promise.resolve([...CHECKPOINTS])),
   } as unknown as CheckpointsService;
 
   // Service REAL com repositorio dublado: o parser do QR (e portanto o 422 de
@@ -127,6 +134,11 @@ function montarBancada(
   const buscarOuCriar = jest
     .spyOn(transformadorService, 'buscarOuCriarPorPayload')
     .mockResolvedValue(peca());
+  const buscarPorSerie = jest
+    .spyOn(transformadorService, 'findByNumeroSerie')
+    .mockResolvedValue(
+      opcoes.pecaPorSerie === undefined ? peca() : opcoes.pecaPorSerie,
+    );
 
   let sequencia = 0;
   const criarPassagem = jest.fn((dados: Record<string, unknown>) => {
@@ -138,8 +150,10 @@ function montarBancada(
       updatedAt: AGORA,
     });
   });
+  const apagarPassagens = jest.fn(() => Promise.resolve());
   const passagemRepository = {
     create: criarPassagem,
+    removeAllByTransformador: apagarPassagens,
     findUltimaPorTransformadores: jest.fn(() =>
       Promise.resolve(
         opcoes.ultimaPassagemEm
@@ -176,7 +190,9 @@ function montarBancada(
       anuncioPassagem,
     ),
     buscarOuCriar,
+    buscarPorSerie,
     criarPassagem,
+    apagarPassagens,
     ultimasConferencias,
     buscarConferencia,
     anunciar,
@@ -393,6 +409,71 @@ describe('registrar — ultimaConferencia sustenta o alerta no ato (criterio 6)'
 
     expect(resultado.ultimaConferencia?.vereditoGeral).toBe('conforme');
     expect(resultado.ultimaConferencia?.checkpoint).toBeNull();
+  });
+});
+
+describe('reiniciarApresentacao — a peca volta ao inicio da linha (demo)', () => {
+  it('should apagar o transito e registrar a peca no primeiro checkpoint', async () => {
+    // Peca no fim da linha; o reset a devolve a adesivacao, e o evento leva
+    // o `from` de onde ela estava (a animacao da volta).
+    const { service, apagarPassagens, criarPassagem, anunciar } = montarBancada(
+      { ultimaPassagemEm: CHECKPOINTS[3] },
+    );
+
+    const resultado = await service.reiniciarApresentacao({
+      numeroSerie: '847233',
+    });
+
+    expect(apagarPassagens).toHaveBeenCalledWith('transformador-1');
+    // Delete ANTES do insert: senao a passagem inicial nova seria apagada.
+    expect(apagarPassagens.mock.invocationCallOrder[0]).toBeLessThan(
+      criarPassagem.mock.invocationCallOrder[0],
+    );
+    expect(resultado.checkpoint).toEqual({
+      codigo: 'adesivacao',
+      nome: 'adesivacao',
+      ordem: 1,
+    });
+    expect(resultado.passagem.observacao).toBe('reinicio de apresentacao');
+    expect(anunciar).toHaveBeenCalledWith(resultado, {
+      codigo: 'fixacao-placa',
+      nome: 'fixacao-placa',
+      ordem: 4,
+    });
+  });
+
+  it('should responder 404 para serie desconhecida sem apagar nada', async () => {
+    // Reset nao cria peca (nada de find-or-create) e nao pode apagar historico
+    // de peca que nao existe.
+    const { service, apagarPassagens, criarPassagem, anunciar } = montarBancada(
+      { pecaPorSerie: null },
+    );
+
+    await expect(
+      service.reiniciarApresentacao({ numeroSerie: '000000' }),
+    ).rejects.toMatchObject({
+      response: {
+        errors: { numeroSerie: 'transformador-inexistente: 000000' },
+      },
+    });
+
+    expect(apagarPassagens).not.toHaveBeenCalled();
+    expect(criarPassagem).not.toHaveBeenCalled();
+    expect(anunciar).not.toHaveBeenCalled();
+  });
+
+  it('should preservar a ultima conferencia da peca (auditoria intacta)', async () => {
+    // O reset reescreve TRANSITO, nunca veredito: a conferencia vigente
+    // continua a que a engine gravou.
+    const { service } = montarBancada({
+      conferencias: [conferencia('divergente', CHECKPOINTS[3])],
+    });
+
+    const resultado = await service.reiniciarApresentacao({
+      numeroSerie: '847233',
+    });
+
+    expect(resultado.ultimaConferencia?.vereditoGeral).toBe('divergente');
   });
 });
 

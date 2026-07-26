@@ -13,6 +13,12 @@ import { MapaEsteira } from "./_components/mapa";
 import { ContagemEsteira, EventFeed } from "./_components/event-feed";
 import { SelectedPanel } from "./_components/selected-panel";
 
+// Peça de demonstração (mesma série da etiqueta default da estação e do
+// painel de câmeras). O botão de reset só existe para a apresentação: devolve
+// ESTA peça ao primeiro checkpoint da linha — quem move a esteira é o evento
+// Socket.IO que o backend emite, nunca estado local.
+const SERIE_DEMO = "847233";
+
 // O estado de conexão SE ANUNCIA: nada de "Conectado" hardcoded — desconexão
 // congela a esteira e o header é quem conta.
 const CONEXAO_UI: Record<EstadoConexao, { cor: string; rotulo: string }> = {
@@ -26,7 +32,35 @@ export default function TempoRealPage() {
   const conexao = useRealtime((s) => s.conexao);
   const nomes = etapas.map((e) => e.nome);
   const [sel, setSel] = useState<number | null>(null);
+  const [resetando, setResetando] = useState(false);
+  const [erroReset, setErroReset] = useState("");
   const ui = CONEXAO_UI[conexao];
+
+  async function resetarApresentacao() {
+    setResetando(true);
+    setErroReset("");
+    try {
+      const resp = await fetch("/api/tempo-real/reiniciar-apresentacao", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ numeroSerie: SERIE_DEMO }),
+      });
+      if (!resp.ok) {
+        const json = await resp.json().catch(() => null);
+        throw new Error(
+          json?.errors?.numeroSerie ??
+            json?.message ??
+            `falha no reset (${resp.status})`,
+        );
+      }
+      // Sucesso: nada a fazer aqui — o evento `passagem-registrada` chega
+      // pelo socket e move a peça na esteira de todo mundo.
+    } catch (e) {
+      setErroReset((e as Error).message);
+    } finally {
+      setResetando(false);
+    }
+  }
 
   return (
     <div className="grid gap-4">
@@ -43,10 +77,25 @@ export default function TempoRealPage() {
         <span className="t-mono text-xs text-text-3">
           socket.io · /tempo-real
         </span>
-        <span className="ml-auto">
+        <span className="ml-auto flex items-center gap-3">
+          <button
+            type="button"
+            onClick={resetarApresentacao}
+            disabled={resetando}
+            title={`Devolve a peça ${SERIE_DEMO} ao primeiro checkpoint da linha`}
+            className="flex h-9 items-center gap-1.5 rounded-md border border-line px-3 text-sm text-text-2 hover:bg-surface-3 hover:text-text-1 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:[box-shadow:var(--ring-focus)]"
+          >
+            {resetando ? "Resetando…" : "Resetar apresentação"}
+          </button>
           <ContagemEsteira />
         </span>
       </div>
+
+      {erroReset && (
+        <p className="rounded-md border border-reading-mismatch bg-reading-mismatch-soft px-3 py-2 text-sm text-reading-mismatch">
+          Reset falhou: {erroReset}
+        </p>
+      )}
 
       {etapas.length === 0 ? (
         // Pré-snapshot: a checklist de etapas ainda não chegou — anunciar,
