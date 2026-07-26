@@ -45,7 +45,9 @@ export const LEITURAS_DEMO: Record<string, string | null> = {
   'patrimonio-serigrafia-frente': '251328',
   'cliente-serigrafia-frente':
     '143091 - Energisa Rondônia Distribuidora de Energia S.A',
-  'potencia-serigrafia-frente': '10 kVA',
+  // Marcacao completa do desenho (esperadoFixo '1H - 10 kVA', 2026-07-26):
+  // mock desalinhado acusaria potencia pelo motivo errado em toda rodada local.
+  'potencia-serigrafia-frente': '1H - 10 kVA',
   'serie-placa': '847833',
   'patrimonio-placa': '251328',
   // QR DA PLACA — a marcacao que o adapter real decodifica localmente, sem

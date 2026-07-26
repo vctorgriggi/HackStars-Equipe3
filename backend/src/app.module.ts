@@ -50,6 +50,10 @@ import { ClientesModule } from './clientes/clientes.module';
 // servida em /esteira, para o telão da demo. Remover os DOIS logo após a
 // apresentação — a página faz login sem guard, como a /demo.
 import { EsteiraModule } from './esteira/esteira.module';
+// Temporário, MESMO PRAZO DA /demo e da /esteira (gap 13): modo câmera fixa
+// servido em /gate, para o celular montado no tripé. Sai junto com as outras
+// duas logo após a apresentação — também faz login sem guard.
+import { GateModule } from './gate/gate.module';
 // O app de producao web/ e exportado estatico (next output: export) e servido
 // pela PROPRIA API em /app: mesmo dominio HTTPS do App Runner (camera do
 // celular exige origem segura) e nenhum servico novo. O diretorio web-app/ e
@@ -68,6 +72,7 @@ import { TempoRealModule } from './tempo-real/tempo-real.module';
     ClientesModule,
     DemoModule,
     EsteiraModule,
+    GateModule,
     ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), 'web-app'),
       serveRoot: '/app',

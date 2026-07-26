@@ -556,7 +556,16 @@ consegue criar Conferencia.
       para peça correta. Quando legível, ela segue conferida e coerida com as
       irmãs; a obrigatoriedade das outras duas chumbadas segue cobrando a
       redundância física. Volta a obrigatória (ou muda de vista) com a
-      resposta da TRAEL. Duas perguntas juntas:
+      resposta da TRAEL. **Mesmo precedente, segunda peça (2026-07-26):
+      `patrimonio-placa` também foi rebaixado a OPCIONAL, porque ele nunca
+      leu em NENHUMA medição real — as duas rodadas de gala do dia e o spike
+      de docs/visao-ocr.md saíram todas com `sem-leitura`, o que levanta a
+      suspeita de que a placa não imprime patrimônio (o número nela é a
+      série)**; pergunta registrada para a TRAEL. Nada se perde na cobertura:
+      o patrimônio da placa continua conferido por `patrimonio-placa-qr`
+      (obrigatório, decodificado do QR da própria placa a 1.0 e sem custo de
+      visão), e o item volta a obrigatório se a TRAEL confirmar a marcação
+      impressa. Duas perguntas juntas:
       (a) o 3× do chumbado é padrão de fábrica (vira esqueleto fixo de
       checklist) ou varia por modelo (segue dado por modelo — a checklist
       suporta os dois)? (b) as vistas medidas são as do desenho ou coincidência
