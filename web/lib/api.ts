@@ -28,6 +28,7 @@ import type {
   FonteFisica,
   FotoEvidenciaEnviada,
   Indicadores,
+  LaudoDaConferencia,
   PassagemResumo,
   PlanoDeFotos,
   RegistrarPassagemEntrada,
@@ -97,6 +98,8 @@ const MENSAGENS: Record<string, string> = {
   "checklist-etapa-desconhecida":
     "A checklist aponta uma etapa que não existe na linha.",
   "conferencia-inexistente": "Esta conferência não existe (ou foi apagada).",
+  "laudo-indisponivel":
+    "O serviço de redação está indisponível — o veredito acima segue valendo.",
   "campo-conferido-imutavel":
     "Veredito já emitido não pode ser alterado — a trilha de auditoria é imutável. Faça uma nova conferência.",
 
@@ -472,6 +475,32 @@ export function lerVeredito(
   return pedir<VereditoConferencia>(
     `/conferencias/${encodeURIComponent(conferenciaId)}/campos`,
     { sinal },
+  );
+}
+
+/**
+ * `POST /conferencias/:id/laudo` — o laudo em prosa da conferência, redigido
+ * por IA a partir do veredito que a engine JÁ emitiu.
+ *
+ * Duas coisas que esta função NÃO faz, e que a tela também não pode fazer:
+ *
+ * 1. NÃO é fonte de veredito. O texto é redação sobre fatos gravados; se ele
+ *    discordar do veredito na tela, quem vale é o veredito (o próprio laudo
+ *    termina dizendo isso, e a API garante a frase).
+ * 2. NÃO roda sozinha. Cada chamada é uma chamada paga (~US$ 0,01) e só sai no
+ *    clique do operador — mesma regra da visão. Nada de `useEffect` disparando
+ *    laudo ao abrir a tela.
+ *
+ * Falha do serviço de redação vem como `laudo-indisponivel` (503) e é isso que
+ * a tela mostra: erro explícito, nunca um texto vazio no lugar do laudo.
+ */
+export function gerarLaudo(
+  conferenciaId: string,
+  sinal?: AbortSignal,
+): Promise<LaudoDaConferencia> {
+  return pedir<LaudoDaConferencia>(
+    `/conferencias/${encodeURIComponent(conferenciaId)}/laudo`,
+    { metodo: "POST", sinal },
   );
 }
 

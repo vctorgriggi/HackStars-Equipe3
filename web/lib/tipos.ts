@@ -86,7 +86,7 @@ export const ROTULO_FONTE_FISICA: Record<FonteFisica, string> = {
  * COMO a marcação foi gravada — deduzido do nome do campo pelo backend
  * (gap 19). Origem: `TIPOS_DE_MARCACAO` em `dto/plano-de-fotos.dto.ts`.
  */
-export type TipoDeMarcacao = "relevo" | "tinta" | "indefinido";
+export type TipoDeMarcacao = "relevo" | "tinta" | "qr" | "indefinido";
 
 /* ------------------------------------------------------------------ *
  * Projeções compartilhadas
@@ -277,6 +277,40 @@ export interface VereditoConferencia {
   /** Na ordem da checklist do ProjetoModelo. */
   campos: CampoVeredito[];
 }
+
+/* ------------------------------------------------------------------ *
+ * Laudo por IA
+ * Origem: conferencias/dto/laudo.dto.ts
+ * ------------------------------------------------------------------ */
+
+/**
+ * Resposta de `POST /conferencias/:id/laudo`.
+ *
+ * O laudo é REDAÇÃO sobre o veredito que a engine já emitiu — não é veredito e
+ * não pode ser lido como um. Ele nasce dos MESMOS fatos persistidos que
+ * `GET /conferencias/:id/campos` devolve, e o texto sempre termina dizendo que
+ * não substitui o veredito (a API carimba a frase se o modelo a esquecer).
+ *
+ * Não é persistido: dois cliques geram dois textos possivelmente diferentes.
+ */
+export interface LaudoDaConferencia {
+  /** Parágrafos separados por linha em branco; sem markdown. */
+  laudo: string;
+  /** Modelo que redigiu. `mock` = texto SIMULADO, exiba isso ao usuário. */
+  modelo: string;
+  geradoEm: string;
+}
+
+/**
+ * A frase que fecha todo laudo. Origem: `DISCLAIMER_LAUDO` em
+ * `extracao/ports/redator.port.ts` — a API garante que ela está no texto.
+ *
+ * A cópia existe aqui por um motivo de tela, não de contrato: é por ela que a
+ * UI reconhece o parágrafo do disclaimer para exibi-lo EM DESTAQUE em vez de
+ * escondido no fim da prosa (`web/components/conferencia/veredito.tsx`).
+ */
+export const DISCLAIMER_LAUDO =
+  "Laudo redigido por IA a partir do veredito da engine — não substitui o veredito.";
 
 /* ------------------------------------------------------------------ *
  * Plano de fotos

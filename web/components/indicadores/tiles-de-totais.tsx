@@ -9,15 +9,27 @@
  * fica sem veredito, e um tile "sem veredito" derivado por subtração seria a
  * tela inventando um número que a API não deu. Em vez disso, a nota embaixo diz
  * o que a soma significa.
+ *
+ * A tela se recarrega sozinha a cada 5 s, então cada tile PISCA quando o texto
+ * que ele exibe muda de uma carga para a outra (`ao-vivo.tsx`). É comparação de
+ * exibição — "o que estava escrito aqui é diferente do que está escrito agora"
+ * —, não de negócio: o tile não sabe o que conta, não compara com limiar nenhum
+ * e não deriva veredito. O destaque some em `prefers-reduced-motion`.
  */
 
 import { CabecalhoCartao, Cartao } from "@/components/ui";
 import { juntarClasses } from "@/lib/classes";
 import type { TotaisIndicadores } from "@/lib/tipos";
 
+import {
+  DestaqueDeMudanca,
+  EstilosAoVivo,
+  useDestaqueDeMudanca,
+  type TomDoDestaque,
+} from "./ao-vivo";
 import { formatarInteiro } from "./formato";
 
-type TomTile = "neutro" | "divergente" | "nao_conferivel" | "conforme";
+type TomTile = TomDoDestaque;
 
 const MOLDURA: Record<TomTile, string> = {
   neutro: "border-borda bg-superficie",
@@ -45,11 +57,22 @@ function Tile({
   /** Explicação do que o número conta — o rótulo curto não cabe explicar. */
   titulo: string;
 }) {
+  const texto = formatarInteiro(valor);
+  // O que se compara é o TEXTO já formatado, o mesmo que está na tela.
+  const destaque = useDestaqueDeMudanca(texto);
+
   return (
+    // `isolate` + `overflow-hidden` seguram a camada do destaque dentro do
+    // tile e atrás do conteúdo — ver `DestaqueDeMudanca`.
     <div
       title={titulo}
-      className={juntarClasses("rounded-xl border p-3", MOLDURA[tom])}
+      className={juntarClasses(
+        "relative isolate overflow-hidden rounded-xl border p-3",
+        MOLDURA[tom],
+      )}
     >
+      <DestaqueDeMudanca geracao={destaque} tom={tom} />
+
       <p className="text-xs font-medium tracking-wide text-conteudo-suave uppercase">
         {rotulo}
       </p>
@@ -61,7 +84,7 @@ function Tile({
           VALOR[tom],
         )}
       >
-        {formatarInteiro(valor)}
+        {texto}
       </p>
     </div>
   );
@@ -70,6 +93,8 @@ function Tile({
 export function TilesDeTotais({ totais }: { totais: TotaisIndicadores }) {
   return (
     <Cartao>
+      <EstilosAoVivo />
+
       <CabecalhoCartao
         titulo="Números da linha"
         descricao="Tudo o que a engine já gravou, contado pela API."

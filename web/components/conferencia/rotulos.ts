@@ -59,6 +59,9 @@ export function ehFonteFisica(valor: string): valor is FonteFisica {
 export const ROTULO_MARCACAO: Record<TipoDeMarcacao, string> = {
   relevo: "Relevo",
   tinta: "Tinta",
+  // Decodificado localmente da imagem (sem OCR, sem custo) — o QR impresso na
+  // propria placa e uma marcacao dela (2026-07-26).
+  qr: "QR da placa",
   indefinido: "Placa/rótulo",
 };
 

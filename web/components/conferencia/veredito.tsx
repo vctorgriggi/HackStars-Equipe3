@@ -21,20 +21,27 @@
  *    peça inteira (gap 14): a faixa diz sempre qual recorte foi avaliado.
  */
 
+import { useState } from "react";
+
+import { gerarLaudo } from "@/lib/api";
 import { juntarClasses } from "@/lib/classes";
 import {
   comoVeredito,
+  DISCLAIMER_LAUDO,
   type AchadoInconsistente,
   type CampoExecutado,
   type IncoerenciaEntreCampos,
+  type LaudoDaConferencia,
   type ResultadoExecucaoComExtracao,
   type Veredito,
 } from "@/lib/tipos";
 import {
   Aviso,
+  AvisoDeErro,
   Botao,
   BotaoLink,
   CabecalhoCartao,
+  CarregandoAcao,
   Cartao,
   Chip,
   EXPLICACAO_VEREDITO,
@@ -185,6 +192,10 @@ export function TelaDeVeredito({
       ) : null}
 
       <ResumoDaExtracao resultado={resultado} />
+
+      {resultado.conferencia.id ? (
+        <BlocoDoLaudo conferenciaId={resultado.conferencia.id} />
+      ) : null}
 
       <div className="space-y-2 pb-4">
         <Botao tamanho="grande" onClick={aoNovaConferencia}>
@@ -471,6 +482,131 @@ function BlocoDeAchados({ achados }: { achados: AchadoInconsistente[] }) {
           </li>
         ))}
       </ul>
+    </Cartao>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Laudo por IA — redação sobre o veredito, nunca veredito
+ * ------------------------------------------------------------------ */
+
+/**
+ * Três regras desta seção, e nenhuma é estética:
+ *
+ * 1. SÓ NO CLIQUE. Cada geração é uma chamada paga; nada de `useEffect`
+ *    disparando laudo ao abrir a tela. O preço vai no rótulo do botão porque
+ *    quem aperta tem de saber que apertou algo que custa.
+ * 2. O DISCLAIMER É PARTE DA TELA, não do texto. A API garante a frase dentro
+ *    do laudo; aqui ela é EXTRAÍDA da prosa e exibida em destaque, para não
+ *    virar a última linha que ninguém lê num bloco de texto corrido.
+ * 3. ERRO É ERRO. Serviço de redação fora do ar mostra o aviso vermelho e a
+ *    lembrança de que o veredito acima continua valendo — nunca um texto vazio
+ *    ou um "não foi possível analisar", que ao lado de uma peça divergente
+ *    seriam lidos como "nada a relatar".
+ */
+
+/** Normaliza para comparar frase sem depender de acento, caixa ou pontuação. */
+function achatar(valor: string): string {
+  return valor
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+const DISCLAIMER_ACHATADO = achatar(DISCLAIMER_LAUDO);
+
+/**
+ * Separa o corpo do laudo do parágrafo de disclaimer.
+ *
+ * O disclaimer sai da prosa e vira bloco próprio. Se o modelo o parafraseou (a
+ * API só garante que a frase ESTÁ lá, não que está idêntica), o parágrafo pode
+ * escapar do filtro — por isso o bloco de destaque é renderizado SEMPRE, com o
+ * texto canônico: no pior caso a advertência aparece duas vezes, nunca zero.
+ */
+function separarLaudo(texto: string): string[] {
+  return texto
+    .split(/\n\s*\n/)
+    .map((paragrafo) => paragrafo.trim())
+    .filter((paragrafo) => paragrafo.length > 0)
+    .filter((paragrafo) => !achatar(paragrafo).includes(DISCLAIMER_ACHATADO));
+}
+
+function BlocoDoLaudo({ conferenciaId }: { conferenciaId: string }) {
+  const [laudo, setLaudo] = useState<LaudoDaConferencia | null>(null);
+  const [gerando, setGerando] = useState(false);
+  const [erro, setErro] = useState<unknown>(null);
+
+  async function aoGerar() {
+    setGerando(true);
+    setErro(null);
+    try {
+      setLaudo(await gerarLaudo(conferenciaId));
+    } catch (falha) {
+      setErro(falha);
+      setLaudo(null);
+    } finally {
+      setGerando(false);
+    }
+  }
+
+  if (gerando) {
+    return (
+      <CarregandoAcao mensagem="Redigindo o laudo desta conferência… isso leva alguns segundos." />
+    );
+  }
+
+  if (!laudo) {
+    return (
+      <div className="space-y-2">
+        <Botao variante="secundario" tamanho="grande" onClick={aoGerar}>
+          Gerar laudo desta conferência (IA — ~US$ 0,01)
+        </Botao>
+        <p className="px-1 text-xs text-conteudo-suave">
+          Um texto curto sobre o veredito acima, para anexar ou passar adiante.
+          A IA apenas redige: ela não confere nada e não muda veredito nenhum.
+        </p>
+        {erro ? <AvisoDeErro erro={erro} /> : null}
+      </div>
+    );
+  }
+
+  const paragrafos = separarLaudo(laudo.laudo);
+
+  return (
+    <Cartao faixa="acento">
+      <CabecalhoCartao
+        titulo="Laudo da conferência"
+        descricao="Redigido por IA a partir do veredito que a API já gravou."
+        acao={<Chip tom={laudo.modelo === "mock" ? "alerta" : "neutro"}>IA</Chip>}
+      />
+
+      <div className="space-y-3 text-sm leading-relaxed text-conteudo">
+        {paragrafos.map((paragrafo, indice) => (
+          <p key={indice}>{paragrafo}</p>
+        ))}
+      </div>
+
+      <Aviso tom="alerta" className="mt-4">
+        {DISCLAIMER_LAUDO}
+      </Aviso>
+
+      {laudo.modelo === "mock" ? (
+        <p className="mt-2 text-xs text-nao-conferivel">
+          Servidor em modo simulado: este texto NÃO foi redigido por IA — é um
+          exemplo fixo montado a partir dos mesmos dados.
+        </p>
+      ) : null}
+
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-borda pt-3">
+        <p className="font-mono text-xs break-all text-conteudo-suave">
+          {laudo.modelo} · {formatarDataHora(laudo.geradoEm)}
+        </p>
+        <Botao variante="fantasma" onClick={aoGerar}>
+          Gerar de novo
+        </Botao>
+      </div>
     </Cartao>
   );
 }
