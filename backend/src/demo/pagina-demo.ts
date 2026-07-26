@@ -289,6 +289,12 @@ export const PAGINA_DEMO = `<!doctype html>
   }
   .botao-foto.grande { min-height: 60px; min-width: 118px; font-size: 16px; font-weight: 600; }
   .botao-foto.galeria { min-height: 60px; min-width: 78px; font-size: 14px; color: var(--tinta-fraca); }
+  /* Vista que a etapa NÃO pede: o botão existe (escape), mas não pode ter cara
+     de pedido — botão grande se lê como ordem de serviço. */
+  .botao-foto.discreto {
+    min-height: 44px; min-width: 92px; font-size: 13px; font-weight: 400;
+    color: var(--tinta-fraca); border-color: var(--borda); border-style: dashed;
+  }
   .miniatura {
     width: 46px; height: 46px; object-fit: cover;
     border: 1px solid var(--borda); border-radius: 4px; background: #e6e9ec;
@@ -455,7 +461,7 @@ export const PAGINA_DEMO = `<!doctype html>
       <span class="acao">trocar</span>
     </button>
     <div class="corpo">
-      <p class="contexto">Em produção o aparelho da etapa já nasce autenticado; aqui entramos com o usuário de demonstração para a API liberar as chamadas.</p>
+      <p class="contexto">Entre com o usuário de demonstração (já vem preenchido) e toque em ENTRAR. Em produção o aparelho de cada ponto da linha já vem liberado de fábrica — ninguém digita senha no chão de fábrica.</p>
       <div id="login-corpo">
         <label class="rotulo" for="email">E-mail</label>
         <input type="email" id="email" value="admin@example.com" autocomplete="username" autocapitalize="none" spellcheck="false">
@@ -480,9 +486,10 @@ export const PAGINA_DEMO = `<!doctype html>
       <span class="acao">trocar</span>
     </button>
     <div class="corpo">
-      <p class="contexto">Em produção cada câmera fixa nasce amarrada a <b>uma</b> etapa; aqui você escolhe qual câmera este celular está simulando. A escolha fica guardada neste aparelho — abrir a página de novo já volta nela.</p>
+      <p class="contexto">Em que ponto da linha este celular está? Em produção cada câmera fica fixa em <b>um</b> ponto; aqui o celular faz esse papel. A resposta fica guardada neste aparelho — na próxima vez já vem escolhida.</p>
+      <p class="contexto">Isso muda <b>quais fotos</b> serão pedidas: cada ponto da linha só confere as marcações que já foram gravadas na peça até ali. A placa de identificação, por exemplo, é rebitada na última etapa — antes dela, não há placa para fotografar.</p>
       <div class="grade-etapas" id="grade-etapas"></div>
-      <p class="dica" id="etapa-dica">Carregando as etapas da linha...</p>
+      <p class="dica" id="etapa-dica">Buscando as etapas da linha...</p>
     </div>
   </section>
 
@@ -494,7 +501,7 @@ export const PAGINA_DEMO = `<!doctype html>
       <span class="acao">trocar</span>
     </button>
     <div class="corpo">
-      <p class="contexto">Em produção a câmera lê o QR sozinha quando a peça chega. A etiqueta é a <b>fonte da verdade</b>: todo valor esperado sai daqui, e o sistema nunca inventa nenhum. Esta página não interpreta o conteúdo — quem lê os campos é a API.</p>
+      <p class="contexto">Aponte para o QR da etiqueta adesiva da peça. A etiqueta é a <b>referência</b>: é dela que saem os números que o sistema espera encontrar na peça, e o sistema nunca inventa um número que não esteja aqui. Em produção a câmera lê esse QR sozinha quando a peça chega.</p>
       <div class="linha-botoes">
         <button id="btn-camera" class="principal alternativa largo">LER O QR COM A CÂMERA</button>
       </div>
@@ -508,20 +515,20 @@ export const PAGINA_DEMO = `<!doctype html>
       <div class="linha-botoes" style="margin-top:10px">
         <button id="btn-etiqueta-demo" class="secundario">Atalho de teste: etiqueta da peça de demonstração</button>
       </div>
-      <p class="dica">O atalho preenche a etiqueta da peça de demonstração (série 847233, patrimônio 251328, cliente Energisa) para repetir o teste sem escanear de novo. <b>Existe só nesta página de teste</b> — o caminho de verdade é ler o QR.</p>
-      <label class="rotulo" for="payload">Conteúdo da etiqueta (o texto que a API vai interpretar)</label>
+      <p class="dica">O atalho já escreve a etiqueta da peça de demonstração (série 847233, patrimônio 251328, cliente Energisa), para repetir o teste sem ter que escanear de novo. <b>Ele existe só nesta página de teste</b> — o caminho de verdade é ler o QR.</p>
+      <label class="rotulo" for="payload">Texto da etiqueta (é isso que o sistema vai ler)</label>
       <textarea id="payload" spellcheck="false" autocapitalize="none">Pedido: 68202\nNúm. Série: 847233\nSeq: 86\nPatrimônio: 251328\nCliente: 143091 - Energisa Rondônia Distribuidora de Energia S.A\nTPD-408136</textarea>
       <div class="linha-botoes" style="margin-top:8px">
-        <button id="btn-usar-etiqueta" class="secundario">Usar esta etiqueta e seguir</button>
+        <button id="btn-usar-etiqueta" class="secundario">Usar este texto e seguir</button>
       </div>
       <div id="qr-bruto" class="bloco-bruto" hidden>
-        <p class="titulo-bruto">Conteúdo bruto lido do QR (texto exato da etiqueta)</p>
+        <p class="titulo-bruto">Texto exato que veio do QR, sem nenhuma alteração</p>
         <pre id="qr-bruto-texto"></pre>
         <div class="linha-botoes" style="margin-top:8px">
           <button id="btn-copiar-qr" class="secundario">Copiar</button>
         </div>
       </div>
-      <p class="dica">Se a API responder que o formato não é reconhecido, ou que o QR traz só um código de lookup (HTTP 422), <b>copie o conteúdo bruto e mande para o time</b>: o formato do QR da TRAEL ainda está sendo fechado. Não é defeito da peça nem erro seu.</p>
+      <p class="dica">Se o sistema disser que não entendeu o texto da etiqueta, <b>copie o texto e mande para o time</b>: o formato do QR da TRAEL ainda está sendo definido. Não é defeito da peça nem erro seu.</p>
     </div>
   </section>
 
@@ -533,15 +540,16 @@ export const PAGINA_DEMO = `<!doctype html>
       <span class="acao">trocar</span>
     </button>
     <div class="corpo">
-      <p class="contexto">Em produção a câmera captura sozinha as vistas ao detectar a peça. Uma foto por vista: cada cartão diz quais marcações daquela face o sistema vai conferir.</p>
+      <p class="contexto">Em produção a câmera desta etapa fotografa sozinha quando a peça chega. Aqui quem fotografa é você: <b>uma foto por lado da peça</b>. A lista abaixo mostra só os lados que <b>esta</b> etapa precisa — os outros ficam recolhidos no fim.</p>
+      <div id="fotos-estado" class="aviso neutro" hidden></div>
       <div id="fotos-progresso" class="progresso" hidden></div>
-      <p class="dica" id="fotos-recorte">Escolha uma etapa no passo 1 para ver quais vistas ela confere.</p>
+      <p class="dica" id="fotos-recorte">Escolha a etapa no passo 1 para a página saber quais fotos pedir.</p>
       <div id="lista-fotos"></div>
       <details id="outras-vistas" hidden>
-        <summary id="outras-vistas-titulo">Outras vistas</summary>
+        <summary id="outras-vistas-titulo">Ver as outras vistas da peça</summary>
         <div class="corpo-outras" id="lista-outras"></div>
       </details>
-      <p class="dica">Vista com <b>mais de uma marcação</b> (o topo tem série chumbada e patrimônio serigrafado): enquadre as duas. Se a visão só ler um número, o sistema devolve <b>não conferível</b> em vez de adivinhar qual dos dois ele é — é o que impede o patrimônio serigrafado de entrar como série chumbada.</p>
+      <p class="dica">Quando o cartão diz que a foto <b>tem de mostrar 2 marcações</b> (o topo tem o número de série chumbado e o patrimônio pintado), enquadre as duas na mesma foto. Se o sistema conseguir ler só um número, ele responde <b>não conferível</b> em vez de adivinhar de qual dos dois se trata.</p>
       <div id="fotos-aviso" class="aviso neutro" hidden></div>
     </div>
   </section>
@@ -554,11 +562,12 @@ export const PAGINA_DEMO = `<!doctype html>
       <span class="acao">trocar</span>
     </button>
     <div class="corpo">
-      <p class="contexto">Em produção dispara automático na passagem da peça; aqui é um toque porque cada chamada de visão consome crédito AWS (nada roda em loop).</p>
+      <p class="contexto">Agora o sistema lê os números nas fotos e compara com a etiqueta. <b>Quem decide o resultado é o servidor</b> — este celular só mostra a resposta.</p>
+      <p class="contexto">É um toque, e de propósito: cada leitura de foto é paga. Nada fica rodando sozinho em segundo plano. Em produção, quem dá esse toque é a passagem da peça pela câmera.</p>
       <div class="linha-botoes">
         <button id="btn-extrair" class="principal largo" disabled>EXTRAIR COM TEXTRACT</button>
       </div>
-      <p class="dica" id="extrair-dica">Envie ao menos uma foto no passo 3 para liberar a extração.</p>
+      <p class="dica" id="extrair-dica">Envie ao menos uma foto no passo 3 para poder conferir.</p>
       <div id="conferir-aviso" class="aviso neutro" hidden></div>
     </div>
   </section>
@@ -571,17 +580,17 @@ export const PAGINA_DEMO = `<!doctype html>
       <span class="acao">abrir</span>
     </button>
     <div class="corpo">
-      <p class="dica" id="veredito-vazio">Ainda sem veredito: conclua o passo 4.</p>
+      <p class="dica" id="veredito-vazio">Ainda sem resultado: toque em EXTRAIR no passo 4.</p>
       <div id="resultado"></div>
       <div class="linha-botoes" id="acoes-fim" style="margin-top:14px" hidden>
         <button id="btn-de-novo" class="principal largo">CONFERIR DE NOVO</button>
       </div>
       <div class="linha-botoes" id="acoes-fim-2" style="margin-top:8px" hidden>
-        <button id="btn-trocar-etapa" class="secundario">Conferir em outra etapa</button>
-        <button id="btn-zerar" class="secundario">Começar do zero</button>
+        <button id="btn-trocar-etapa" class="secundario">Conferir em outro ponto da linha</button>
+        <button id="btn-zerar" class="secundario">Próxima peça</button>
       </div>
-      <p class="dica" id="dica-fim" hidden>"Conferir de novo" reaproveita a peça e as fotos desta sessão — as mesmas imagens sobem como evidências novas, porque cada foto pertence a uma conferência só. "Começar do zero" descarta as fotos e volta para a etiqueta, mantendo a etapa deste aparelho.</p>
-      <p class="contexto">Esta resposta é exatamente o que a tela final do app vai renderizar — o veredito nasce na API, nunca no navegador.</p>
+      <p class="dica" id="dica-fim" hidden><b>Conferir de novo</b> repete o teste com esta mesma peça e estas mesmas fotos, sem você voltar até ela. <b>Próxima peça</b> descarta as fotos e volta para a etiqueta, mantendo o ponto da linha deste celular.</p>
+      <p class="contexto">Este resultado é exatamente o que o app final vai mostrar. Quem comparou os números foi o servidor — este celular não decide nada, só exibe.</p>
     </div>
   </section>
 
@@ -745,6 +754,11 @@ export const PAGINA_DEMO = `<!doctype html>
     // Passo aberto do assistente: 'login' | 'etapa' | 'etiqueta' | 'fotos' |
     // 'conferir' | 'veredito'.
     passo: 'login',
+    // 'nao-carregada' | 'carregando' | 'pronta' | 'falhou'. Enquanto não é
+    // 'pronta' a página NÃO SABE quais vistas a etapa exige, e o passo 3 diz
+    // isso em vez de pedir todas — ver carregarRecorte.
+    checklistEstado: 'nao-carregada',
+    motivoDaFalha: '',
     etapa: null,
     // Escolha EXPLÍCITA de etapa já foi feita? "Sem etapa" é uma escolha
     // válida (checklist inteira) e precisa ser distinguível de "ainda não
@@ -857,12 +871,15 @@ export const PAGINA_DEMO = `<!doctype html>
       concluido: function () { return fotosEnviadas().length > 0; },
       texto: function () {
         var enviadas = fotosEnviadas();
+        if (estado.checklistEstado === 'carregando' || estado.checklistEstado === 'nao-carregada') {
+          return enviadas.length ? enviadas.length + ' foto(s)' : 'aguardando a checklist';
+        }
         var alvo = fontesAlvo();
         if (!alvo.length) {
-          return enviadas.length ? enviadas.length + ' foto(s)' : 'nenhuma vista';
+          return enviadas.length ? enviadas.length + ' foto(s)' : 'nenhuma foto';
         }
         var feitas = alvo.filter(function (fonte) { return !!estado.fotos[fonte]; });
-        return feitas.length + ' de ' + alvo.length + ' vistas';
+        return feitas.length + ' de ' + alvo.length + ' fotos';
       }
     },
     {
@@ -1027,10 +1044,18 @@ export const PAGINA_DEMO = `<!doctype html>
       liberar(true);
       var usuario = resposta.corpo.user && resposta.corpo.user.email ? resposta.corpo.user.email : el('email').value;
       mostrarLoginCompacto(usuario);
-      carregarRecorte();
-      // A etapa deste aparelho já pode ter vindo da URL ou da memória local:
-      // nesse caso o assistente pula o passo 1 sozinho.
-      avancarDe('login');
+      aviso('login-aviso', 'Conectado. Buscando as etapas da linha e a checklist do modelo desta peça...', 'neutro');
+      // O assistente SÓ avança com os dados na mão. Abrir os passos antes da
+      // checklist chegar era a janela em que a tela pedia foto de vista que a
+      // etapa não confere (a placa no gate da adesivação, relatado no celular).
+      // O custo é uma espera de uma requisição; o benefício é nunca instruir
+      // errado.
+      carregarRecorte().then(function () {
+        aviso('login-aviso', '');
+        // A etapa deste aparelho já pode ter vindo da URL ou da memória local:
+        // nesse caso o assistente pula o passo 1 sozinho.
+        avancarDe('login');
+      });
     }).catch(function (erro) {
       liberar(false);
       mostrarLoginAberto();
@@ -1046,10 +1071,38 @@ export const PAGINA_DEMO = `<!doctype html>
   // ProjetoModelo (cada item traz 'etapa' = codigo do Checkpoint em que a
   // marcação passa a existir na peça) cruzada com a ordem dos Checkpoints.
   // A regra é a MESMA da API (cumulativa): a etapa N confere o que ela e as
-  // anteriores gravaram. Falhou a busca? mapaFontes fica null e a página
-  // mostra tudo sem destaque — nunca bloqueia o upload.
+  // anteriores gravaram.
+  //
+  // ESTADOS, e por que eles existem separados: enquanto a checklist não chega,
+  // a página NÃO SABE quais vistas a etapa exige — e "não sei" nunca pode ser
+  // renderizado como "preciso de todas". Era o bug do celular: no gate da
+  // adesivação a tela pedia a placa, que só é fixada na última etapa. É o mesmo
+  // erro que a engine evita no backend ("não sei" vira nao_conferivel, nunca
+  // conforme), aqui na forma de instrução ao operador.
+  //
+  // Falhou a busca? O fallback permissivo continua (todas as vistas visíveis,
+  // upload liberado), mas ele se ANUNCIA na tela — fallback disfarçado de
+  // instrução é o que confundiu quem estava com o celular na mão.
+  // Enquanto a checklist não chegou, os passos que DEPENDEM dela ficam
+  // intocáveis. O aviso de estado já explicava a espera, mas a grade de etapas
+  // continuava clicável — e escolher a etapa nessa janela mostrava um passo 3
+  // sem nada a fazer. Bloquear é mais honesto que explicar.
+  function bloquearPelaChecklist(bloquear) {
+    ['sec-etapa', 'sec-fotos', 'sec-conferir'].forEach(function (id) {
+      if (bloquear) {
+        el(id).setAttribute('data-bloqueado', '1');
+      } else if (estado.token) {
+        el(id).removeAttribute('data-bloqueado');
+      }
+    });
+  }
+
   function carregarRecorte() {
-    Promise.all([
+    estado.checklistEstado = 'carregando';
+    bloquearPelaChecklist(true);
+    montarFotos();
+    atualizarPassos();
+    return Promise.all([
       pedir(API + '/checkpoints?page=1&limit=50'),
       pedir(API + '/projetos-modelo?page=1&limit=50')
     ]).then(function (respostas) {
@@ -1104,6 +1157,9 @@ export const PAGINA_DEMO = `<!doctype html>
       estado.ordemPorCodigo = ordens;
       estado.nomePorCodigo = nomes;
       estado.mapaFontes = mapa;
+      estado.checklistEstado = 'pronta';
+      estado.motivoDaFalha = '';
+      bloquearPelaChecklist(false);
       // atualizarTextoEtapa remonta a lista de fotos com o recorte no lugar.
       atualizarTextoEtapa();
       // O modo avançado nasceu com a tabela de fallback: refaz o formulário
@@ -1112,10 +1168,13 @@ export const PAGINA_DEMO = `<!doctype html>
       aplicarPreset(estado.preset || PRESET_DEMO);
     }).catch(function (erro) {
       estado.mapaFontes = null;
-      montarFotos();
-      el('fotos-recorte').textContent =
-        'Não consegui carregar a checklist do projeto (' + erro.message +
-        '): todas as vistas aparecem sem destaque. O upload continua liberado.';
+      estado.checklistEstado = 'falhou';
+      estado.motivoDaFalha = erro.message;
+      // Falha NÃO bloqueia: o fallback permissivo continua liberado, só que
+      // anunciado (ver estadoDoPasso3). Travar a página por causa de uma busca
+      // que falhou tiraria do time a única ferramenta de teste que ele tem.
+      bloquearPelaChecklist(false);
+      atualizarTextoEtapa();
     });
   }
 
@@ -1139,7 +1198,14 @@ export const PAGINA_DEMO = `<!doctype html>
     var nome = registro.etapaCodigo && estado.nomePorCodigo
       ? (estado.nomePorCodigo[registro.etapaCodigo] || registro.etapaCodigo)
       : null;
-    return { situacao: 'fora-etapa', campos: registro.campos, entraEm: nome };
+    // O NÚMERO da etapa em que a marcação nasce entra junto: "é gravada na
+    // etapa 4" localiza o operador na linha melhor que só o nome dela.
+    return {
+      situacao: 'fora-etapa',
+      campos: registro.campos,
+      entraEm: nome,
+      ordemQueGrava: registro.ordem
+    };
   }
 
   var PESO_SITUACAO = {
@@ -1163,27 +1229,50 @@ export const PAGINA_DEMO = `<!doctype html>
     return !!estado.fotos[fonte] || !!estado.enviando[fonte] || !!estado.falhas[fonte];
   }
 
-  // As vistas que ESTA etapa cobra. É a base do progresso do passo 3 — a
+  // As fotos que ESTA etapa pede. É a base do progresso do passo 3 — a
   // pergunta "o que falta agora" tem resposta contável, não 9 cartões iguais.
+  //
+  // 'indefinido' (a checklist ainda não chegou) NÃO é alvo, de propósito: sem
+  // a checklist a página não sabe o que a etapa exige, e pedir tudo "por
+  // garantia" é transformar ausência de informação em afirmação — foi o que
+  // fez o gate da adesivação pedir a foto da placa, que nem existe na peça
+  // naquele ponto do fluxo.
   function fontesAlvo() {
+    if (estado.checklistEstado !== 'pronta') { return []; }
     return fontesOrdenadas().filter(function (fonte) {
       var situacao = situacaoDaFonte(fonte).situacao;
-      return situacao === 'desta-etapa' || situacao === 'sem-etapa' || situacao === 'indefinido';
+      return situacao === 'desta-etapa' || situacao === 'sem-etapa';
     });
   }
 
-  // Vistas em destaque = as da etapa + as que já têm estado. O resto vai para
-  // "outras vistas" (recolhido): a base e a lateral esquerda não têm campo na
-  // checklist da demo, e listá-las com o mesmo peso é o que fazia o time se
-  // perder no passo 3.
+  // Vistas em destaque = as que a etapa pede + as que já têm estado. O resto
+  // vai para "outras vistas" (recolhido): a base e a lateral esquerda não têm
+  // marcação na checklist da demo, e listá-las com o mesmo peso é o que fazia
+  // o time se perder no passo 3.
+  //
+  // Sem checklist não há destaque nenhum: com 'carregando' a lista fica VAZIA
+  // (o passo 3 mostra só o estado de carregamento) e com 'falhou' todas
+  // aparecem, mas embaixo de um aviso que diz que a página não sabe qual a
+  // etapa exige.
   function fontesPrincipais() {
+    if (estado.checklistEstado === 'carregando' || estado.checklistEstado === 'nao-carregada') {
+      return fontesOrdenadas().filter(temEstado);
+    }
+    if (estado.checklistEstado === 'falhou') {
+      return fontesOrdenadas();
+    }
     var alvo = fontesAlvo();
     return fontesOrdenadas().filter(function (fonte) {
       return alvo.indexOf(fonte) !== -1 || temEstado(fonte);
     });
   }
 
+  // Sem checklist não existe "outras vistas": rotular 9 cartões de
+  // "nenhuma precisa de foto agora" seria afirmar o que a página não sabe — o
+  // mesmo erro do bug, só mais discreto. Enquanto carrega, quem fala é o aviso
+  // de estado, e a lista fica vazia.
   function fontesRecolhidas() {
+    if (estado.checklistEstado !== 'pronta') { return []; }
     var principais = fontesPrincipais();
     return fontesOrdenadas().filter(function (fonte) {
       return principais.indexOf(fonte) === -1;
@@ -1215,18 +1304,30 @@ export const PAGINA_DEMO = `<!doctype html>
 
   function atualizarTextoRecorte() {
     var alvo = el('fotos-recorte');
-    if (!estado.mapaFontes) { return; }
+    // Sem checklist, quem fala é o aviso de estado (estadoDoPasso3): esta linha
+    // não pode inventar recorte nenhum.
+    if (estado.checklistEstado !== 'pronta') {
+      alvo.textContent = '';
+      return;
+    }
+    if (!estado.etapaDefinida) {
+      alvo.textContent = 'Escolha a etapa no passo 1 para a página saber quais fotos pedir.';
+      return;
+    }
     if (!estado.etapa) {
-      alvo.textContent = 'Escolha uma etapa no passo 1 para ver quais vistas ela confere. Sem etapa, a conferência cobra a checklist inteira do projeto.';
+      alvo.textContent = 'Sem etapa escolhida: a conferência cobra a peça inteira, então a página pede as ' +
+        fontesAlvo().length + ' fotos da checklist do modelo.';
+      return;
+    }
+    if (ordemDaEtapaAtual() === undefined) {
+      alvo.textContent = 'A etapa "' + estado.etapa + '" não está cadastrada na linha, então a página não sabe ' +
+        'quais fotos ela pede. Confira o código da etapa com o time.';
       return;
     }
     var doGate = fontesDesta('desta-etapa');
-    if (ordemDaEtapaAtual() === undefined) {
-      alvo.textContent = 'A etapa "' + estado.etapa + '" não está cadastrada como checkpoint — sem recorte, todas as vistas aparecem sem destaque.';
-      return;
-    }
-    alvo.textContent = 'Esta etapa confere: ' + resumoDeFontes(doGate) +
-      '. A conferência é cumulativa — a etapa confere o que ela e as anteriores gravaram na peça. As demais vistas ainda não existem aqui, mas o upload continua liberado.';
+    alvo.textContent = 'Esta etapa fecha com ' + doGate.length + ' foto(s): ' + resumoDeFontes(doGate) +
+      '. Ela confere as marcações desta etapa e das anteriores — as marcações das etapas seguintes ' +
+      'ainda não existem na peça, e por isso não são pedidas aqui.';
   }
 
   // --- C. Passo 1: etapa --------------------------------------------------
@@ -1278,7 +1379,7 @@ export const PAGINA_DEMO = `<!doctype html>
       var vistas = vistasDaEtapa(etapa.codigo);
       var sub = etapa.codigo;
       if (vistas.length) {
-        sub = 'confere ' + vistas.length + ' vista(s)' +
+        sub = 'pede ' + vistas.length + ' foto(s)' +
           (vistas.length <= 3 ? ': ' + resumoDeFontes(vistas) : '');
       }
       return '<button type="button" class="secundario etapa" data-codigo="' + esc(etapa.codigo) +
@@ -1289,21 +1390,27 @@ export const PAGINA_DEMO = `<!doctype html>
 
     html += '<button type="button" class="secundario etapa sem-etapa" data-codigo=""' +
       ' aria-pressed="' + (estado.etapaDefinida && !estado.etapa ? 'true' : 'false') + '">' +
-      '<span class="nome-etapa">Sem etapa</span>' +
-      '<span class="sub-etapa">cobra a checklist inteira do projeto — a peça completa, não um gate</span></button>';
+      '<span class="nome-etapa">Nenhuma etapa: conferir a peça inteira</span>' +
+      '<span class="sub-etapa">pede todas as fotos do modelo de uma vez — para testar a peça pronta, não um ponto da linha</span></button>';
 
     el('grade-etapas').innerHTML = html;
   }
 
   function atualizarTextoEtapa() {
     var dica = el('etapa-dica');
-    if (!estado.etapaDefinida) {
-      dica.textContent = 'Escolha a etapa que este aparelho simula. Em produção isso vem provisionado na câmera — aqui fica guardado no aparelho.';
+    if (estado.checklistEstado === 'falhou') {
+      dica.textContent = 'Não consegui carregar a checklist do modelo (' + estado.motivoDaFalha +
+        '), então não sei quantas fotos cada etapa pede. Escolha a etapa e confira as fotos com o time.';
+    } else if (estado.checklistEstado === 'carregando') {
+      dica.textContent = 'Buscando as etapas da linha e a checklist do modelo...';
+    } else if (!estado.etapaDefinida) {
+      dica.textContent = 'Escolha em que ponto da linha este celular está. Cada botão diz quantas fotos aquele ponto pede.';
     } else if (!estado.etapa) {
-      dica.textContent = 'Sem etapa: a conferência cobra a checklist inteira do projeto. Serve para testar a peça completa, não um gate da linha.';
+      dica.textContent = 'Conferindo a peça inteira: a página vai pedir todas as fotos do modelo, não só as de um ponto da linha.';
     } else {
-      dica.textContent = 'Simulando a câmera de: ' + nomeDaEtapa(estado.etapa) + ' (' + estado.etapa +
-        ') — a conferência nasce vinculada a ela, e o gate é cumulativo (confere o que esta etapa e as anteriores gravaram).';
+      dica.textContent = 'Este celular está fazendo o papel da câmera de ' + nomeDaEtapa(estado.etapa) +
+        '. A conferência fica registrada nesse ponto da linha e confere as marcações que já existem na peça aqui — ' +
+        'as das etapas seguintes ainda não foram gravadas.';
     }
     atualizarTextoRecorte();
     montarEtapas();
@@ -1504,12 +1611,32 @@ export const PAGINA_DEMO = `<!doctype html>
 
   // --- E. Passo 3: fotos --------------------------------------------------
 
+  // O rótulo tem de responder "por que este cartão está aqui" sem ninguém
+  // explicar. As três situações são coisas DIFERENTES e antes soavam iguais:
+  //  - desta-etapa      -> pedido de agora;
+  //  - fora-etapa       -> a marcação AINDA NÃO foi gravada na peça (o gate é
+  //                        cumulativo, então "fora" só pode ser etapa
+  //                        posterior — a placa no gate 1 é este caso);
+  //  - fora-da-checklist-> ESTE MODELO não tem marcação nesta vista (nunca vai
+  //                        ter, não é questão de esperar).
   function rotuloDaSituacao(info) {
-    if (info.situacao === 'desta-etapa') { return 'desta etapa'; }
+    if (info.situacao === 'desta-etapa') { return 'precisa nesta etapa'; }
     if (info.situacao === 'fora-etapa') {
-      return info.entraEm ? 'não é desta etapa — entra em ' + info.entraEm : 'não é desta etapa';
+      // NÃO é "não é desta etapa" (que soa como preferência): a marcação
+      // literalmente ainda não foi feita na peça. A placa de identificação é
+      // rebitada na última etapa — no gate da adesivação não existe placa para
+      // fotografar, e é isso que o cartão tem de dizer.
+      if (!info.entraEm) { return 'ainda não existe na peça neste ponto da linha'; }
+      var onde = info.ordemQueGrava
+        ? 'etapa ' + info.ordemQueGrava + ' (' + info.entraEm + ')'
+        : 'etapa ' + info.entraEm;
+      return 'ainda não existe na peça — só é marcada na ' + onde;
     }
-    if (info.situacao === 'fora-da-checklist') { return 'fora da checklist deste projeto'; }
+    if (info.situacao === 'fora-da-checklist') {
+      // Diferente do caso acima: aqui não é questão de esperar. Este MODELO
+      // não tem marcação nenhuma nessa face, em etapa nenhuma.
+      return 'este modelo não tem marcação neste lado da peça';
+    }
     return '';
   }
 
@@ -1517,22 +1644,29 @@ export const PAGINA_DEMO = `<!doctype html>
     var classe = 'item-foto';
     if (info.situacao === 'desta-etapa') { classe += ' desta-etapa'; }
     if (info.situacao === 'fora-etapa') { classe += ' fora-etapa'; }
+    if (info.situacao === 'fora-da-checklist') { classe += ' fora-etapa'; }
     return classe;
   }
 
+  // Uma vista é "pedida" só quando a checklist já disse que ela é pedida. Fora
+  // disso o cartão existe como escape, e não pode ter cara de instrução.
+  function ePedida(info) {
+    return info.situacao === 'desta-etapa' || info.situacao === 'sem-etapa';
+  }
+
   function trechoDosCampos(info) {
-    return info.campos && info.campos.length
-      ? '<span class="estado">confere: ' + esc(info.campos.join(', ')) + '</span>'
-      : '';
+    if (!info.campos || !info.campos.length) { return ''; }
+    var verbo = ePedida(info) ? 'o sistema lê nesta foto: ' : 'quando chegar a hora, lê: ';
+    return '<span class="estado">' + verbo + esc(info.campos.join(', ')) + '</span>';
   }
 
   // Vista que carrega DUAS marcações ou mais (topo: série chumbada +
   // patrimônio serigrafado; frente: 3; placa: 2). Dizer isso no cartão é o que
   // faz o operador enquadrar as duas em vez de fotografar só a que enxergou.
   function trechoDasMarcacoes(info) {
-    if (!info.campos || info.campos.length < 2) { return ''; }
-    return '<span class="multi">' + info.campos.length +
-      ' marcações nesta vista — enquadre todas</span>';
+    if (!ePedida(info) || !info.campos || info.campos.length < 2) { return ''; }
+    return '<span class="multi">esta foto tem de mostrar ' + info.campos.length +
+      ' marcações — enquadre todas de uma vez</span>';
   }
 
   function trechoDaMarca(info) {
@@ -1555,8 +1689,19 @@ export const PAGINA_DEMO = `<!doctype html>
   // boa já está no rolo do celular, e obrigar a refotografar a peça a cada
   // rodada é fricção pura (em produção não existe nenhum dos dois — quem
   // captura é a câmera fixa).
+  //
+  // O BOTÃO SÓ FICA EM DESTAQUE QUANDO A FOTO É PEDIDA. Vista que a etapa não
+  // cobra (a placa no gate da adesivação) ganha um botão discreto e escrito
+  // como escape — "Enviar mesmo assim" —, nunca um "Fotografar" grande, que se
+  // lê como ordem de serviço.
   function cartaoDaVista(fonte, info) {
     var foto = estado.fotos[fonte];
+    var pedida = ePedida(info);
+    var classePrincipal = pedida ? 'botao-foto grande' : 'botao-foto discreto';
+    var rotuloPrincipal = foto
+      ? (pedida ? 'Refotografar' : 'Trocar')
+      : (pedida ? 'Fotografar' : 'Enviar mesmo assim');
+
     return '<div class="' + classeDoCartao(info) + (foto ? ' tem-foto' : '') +
       '" data-fonte="' + esc(fonte) + '">' +
       '<img class="miniatura" alt="" ' + (foto && foto.url ? 'src="' + esc(foto.url) + '"' : 'hidden') + '>' +
@@ -1565,9 +1710,9 @@ export const PAGINA_DEMO = `<!doctype html>
       '<span class="estado envio' + (estado.falhas[fonte] ? ' falhou' : '') + '">' +
       esc(textoDoEnvio(fonte)) + '</span></span>' +
       '<span class="acoes-vista">' +
-      '<label class="botao-foto grande">' + (foto ? 'Refotografar' : 'Fotografar') +
+      '<label class="' + classePrincipal + '">' + rotuloPrincipal +
       '<input type="file" accept="image/*" capture="environment" hidden></label>' +
-      '<label class="botao-foto galeria">Galeria' +
+      '<label class="botao-foto galeria' + (pedida ? '' : ' discreto') + '">Galeria' +
       '<input type="file" accept="image/*" hidden></label>' +
       '</span></div>';
   }
@@ -1586,9 +1731,10 @@ export const PAGINA_DEMO = `<!doctype html>
     });
   }
 
-  // "Faltam 2 de 3 vistas desta etapa" responde de relance a única pergunta do
+  // "Faltam 2 das 3 fotos desta etapa" responde de relance a única pergunta do
   // passo 3. A lista do que falta vem junto: saber que falta não adianta se
-  // ainda for preciso caçar qual cartão está vazio.
+  // ainda for preciso caçar qual cartão está vazio. Fala em FOTOS, não em
+  // "vistas do recorte" — "vista" só aparece como nome de cada cartão.
   function atualizarProgresso() {
     var caixa = el('fotos-progresso');
     var alvo = fontesAlvo();
@@ -1602,23 +1748,53 @@ export const PAGINA_DEMO = `<!doctype html>
     var faltando = alvo.filter(function (fonte) { return !estado.fotos[fonte]; });
     var feitas = alvo.length - faltando.length;
     var pronto = faltando.length === 0;
-    var quais = estado.etapa && ordemDaEtapaAtual() !== undefined ? 'desta etapa' : 'da checklist';
+    var ondeFecha = estado.etapa && ordemDaEtapaAtual() !== undefined
+      ? 'desta etapa'
+      : 'da peça inteira';
     var largura = Math.round((feitas / alvo.length) * 100);
 
     caixa.hidden = false;
     caixa.className = 'progresso' + (pronto ? ' completo' : '');
+    var quantasFaltam = faltando.length === 1
+      ? 'Falta 1 das ' + alvo.length + ' fotos '
+      : 'Faltam ' + faltando.length + ' das ' + alvo.length + ' fotos ';
+
     caixa.innerHTML =
       '<div class="texto">' + (pronto
-        ? 'Pronto: as ' + alvo.length + ' vistas ' + quais + ' estão fotografadas.'
-        : 'Faltam ' + faltando.length + ' de ' + alvo.length + ' vistas ' + quais + '.') +
+        ? 'Pronto: as ' + alvo.length + ' fotos ' + ondeFecha + ' já foram enviadas.'
+        : quantasFaltam + ondeFecha + '.') +
       '</div>' +
       '<div class="barra"><div class="cheio" style="width:' + largura + '%"></div></div>' +
       (pronto
-        ? '<div class="faltando">' + feitas + ' de ' + alvo.length + ' enviadas.</div>'
-        : '<div class="faltando">Sem foto: <b>' + esc(resumoDeFontes(faltando)) + '</b></div>');
+        ? '<div class="faltando">Pode seguir para o passo 4.</div>'
+        : '<div class="faltando">Ainda falta fotografar: <b>' + esc(resumoDeFontes(faltando)) +
+          '</b></div>');
+  }
+
+  // O passo 3 em três situações, e cada uma diz a verdade sobre o que a página
+  // sabe. A do meio é a que faltava e virou bug no celular.
+  function estadoDoPasso3() {
+    if (estado.checklistEstado === 'pronta') { return ''; }
+    if (estado.checklistEstado === 'falhou') {
+      return ['erro',
+        'Não consegui carregar a checklist deste modelo (' + estado.motivoDaFalha +
+        '), então NÃO SEI quais fotos esta etapa exige. As vistas abaixo são todas as ' +
+        'possíveis — confira com o time quais a etapa pede antes de fotografar. O envio ' +
+        'continua liberado.'];
+    }
+    return ['neutro',
+      'Carregando a checklist deste modelo... até ela chegar a página não sabe quais fotos ' +
+      'esta etapa exige, e por isso não pede nenhuma.'];
   }
 
   function montarFotos() {
+    var situacaoGeral = estadoDoPasso3();
+    if (situacaoGeral) {
+      aviso('fotos-estado', situacaoGeral[1], situacaoGeral[0]);
+    } else {
+      aviso('fotos-estado', '');
+    }
+
     var principais = fontesPrincipais();
     var recolhidas = fontesRecolhidas();
 
@@ -1635,8 +1811,7 @@ export const PAGINA_DEMO = `<!doctype html>
     } else {
       el('outras-vistas').hidden = false;
       el('outras-vistas-titulo').textContent =
-        'Outras ' + recolhidas.length + ' vista(s) — nada a conferir nelas aqui (' +
-        resumoDeFontes(recolhidas) + ')';
+        'Ver as outras ' + recolhidas.length + ' vistas da peça (nenhuma precisa de foto agora)';
       el('lista-outras').innerHTML = recolhidas.map(function (fonte) {
         return cartaoDaVista(fonte, situacaoDaFonte(fonte));
       }).join('');
@@ -1708,7 +1883,7 @@ export const PAGINA_DEMO = `<!doctype html>
     var faltando = alvo.filter(function (fonte) { return !estado.fotos[fonte]; });
     if (faltando.length) { return; }
     estado.avancouDasFotos = true;
-    aviso('fotos-aviso', 'Todas as vistas desta etapa estão fotografadas — passo 4 liberado.', 'ok');
+    aviso('fotos-aviso', 'Todas as fotos desta etapa foram enviadas — agora dá para conferir.', 'ok');
     irPara('conferir');
   }
 
@@ -1748,29 +1923,37 @@ export const PAGINA_DEMO = `<!doctype html>
 
     if (enviadas.length === 0) {
       botao.textContent = 'EXTRAIR COM TEXTRACT';
-      dica.textContent = 'Envie ao menos uma foto no passo 3 para liberar a extração.';
+      dica.textContent = 'Envie ao menos uma foto no passo 3 para poder conferir.';
       return;
     }
 
+    // Quantas fotos da etapa ainda faltam — sem prever veredito nenhum (quem
+    // julga é a API): só o fato de que sem foto não há o que ler.
+    var faltando = fontesAlvo().filter(function (fonte) { return !estado.fotos[fonte]; });
+    var alerta = faltando.length
+      ? ' ATENÇÃO: ainda faltam ' + faltando.length + ' foto(s) desta etapa (' +
+        resumoDeFontes(faltando) + '). Dá para conferir assim, mas o que não tem foto não pode ser lido.'
+      : '';
+
     if (usadas.length === 0) {
       botao.textContent = 'EXTRAIR COM TEXTRACT';
-      dica.textContent = 'Vai enviar ' + enviadas.length + ' foto(s) (' +
-        resumoDeFontes(enviadas) + ') à visão da API. Uma chamada por foto, sem repetição automática.';
+      dica.textContent = 'Vai mandar ' + enviadas.length + ' foto(s) para a leitura automática (' +
+        resumoDeFontes(enviadas) + '). Uma leitura por foto, sem repetir sozinho.' + alerta;
       return;
     }
 
     var semArquivo = usadas.filter(function (fonte) { return !estado.fotos[fonte].arquivo; });
     if (semArquivo.length) {
       botao.textContent = 'EXTRAIR COM TEXTRACT';
-      dica.textContent = 'Estas fotos já lastreiam a conferência anterior e a página não guardou o arquivo original delas (' +
-        resumoDeFontes(semArquivo) + '): refotografe essas vistas no passo 3 antes de conferir de novo.';
+      dica.textContent = 'Estas fotos já foram usadas na conferência anterior e a página não guardou o arquivo original delas (' +
+        resumoDeFontes(semArquivo) + '): fotografe essas vistas outra vez no passo 3 antes de conferir de novo.';
       return;
     }
 
     botao.textContent = 'REENVIAR AS MESMAS FOTOS E CONFERIR';
-    dica.textContent = 'Repetindo o teste: ' + usadas.length + ' foto(s) já lastreiam a conferência anterior (' +
-      resumoDeFontes(usadas) + ') e a API não reaproveita evidência — cada foto pertence a uma conferência só. ' +
-      'Este botão sobe as MESMAS imagens de novo, sem refotografar: dá para trocar a etapa no passo 1 e conferir outra vez.';
+    dica.textContent = 'Repetindo o teste com as mesmas ' + usadas.length + ' foto(s) (' +
+      resumoDeFontes(usadas) + '). Cada foto vale para uma conferência só, então este botão sobe as MESMAS ' +
+      'imagens outra vez — você não precisa voltar à peça. Dá para trocar a etapa no passo 1 antes de tocar.' + alerta;
   }
 
   // --- G. Modo avançado: leituras digitadas -------------------------------
@@ -2410,7 +2593,7 @@ export const PAGINA_DEMO = `<!doctype html>
     el('acoes-fim-2').hidden = true;
     el('dica-fim').hidden = true;
     aviso('conferir-aviso', '');
-    aviso('qr-aviso', 'Sessão zerada — leia a etiqueta da próxima peça. A etapa deste aparelho foi mantida.', 'neutro');
+    aviso('qr-aviso', 'Pronto para a próxima peça: leia a etiqueta dela. O ponto da linha deste celular continua o mesmo.', 'neutro');
     irPara('etiqueta');
   });
 
