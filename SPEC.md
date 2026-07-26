@@ -548,7 +548,15 @@ consegue criar Conferencia.
       sim em qual VISTA cada marcação vive. O mapa do seed foi MEDIDO nas
       fotos reais (docs/visao-ocr.md: série chumbada em topo, lateral direita
       e traseira; patrimônio serigrafado em topo e frente), não lido do
-      desenho — **confirmar face a face com a TRAEL**. Duas perguntas juntas:
+      desenho — **confirmar face a face com a TRAEL**. Mitigação interina
+      (decisão do time, 2026-07-26): `serie-chumbada-traseira` rebaixada a
+      OPCIONAL no seed, porque a "traseira" foi medida numa foto DIAGONAL que
+      enxerga duas faces — pode ser a marcação da lateral vista de ângulo; um
+      obrigatório em posição inexistente tornaria o `conforme` inalcançável
+      para peça correta. Quando legível, ela segue conferida e coerida com as
+      irmãs; a obrigatoriedade das outras duas chumbadas segue cobrando a
+      redundância física. Volta a obrigatória (ou muda de vista) com a
+      resposta da TRAEL. Duas perguntas juntas:
       (a) o 3× do chumbado é padrão de fábrica (vira esqueleto fixo de
       checklist) ou varia por modelo (segue dado por modelo — a checklist
       suporta os dois)? (b) as vistas medidas são as do desenho ou coincidência

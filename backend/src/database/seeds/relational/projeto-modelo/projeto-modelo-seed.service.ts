@@ -69,9 +69,15 @@ export class ProjetoModeloSeedService {
         etapa: 'adesivacao',
       },
       {
+        // OPCIONAL até a TRAEL confirmar a posição (decisão de 2026-07-26): a
+        // vista "traseira" foi medida numa foto DIAGONAL que enxerga duas
+        // faces — a marcação pode ser a da lateral vista de ângulo. Opcional
+        // não trava peça correta se a posição não existir; quando legível,
+        // segue conferida e coerida com as irmãs. Volta a obrigatória (ou
+        // muda de vista) com a resposta da TRAEL.
         campo: 'serie-chumbada-traseira',
         fonteFisica: 'traseira',
-        obrigatorio: true,
+        obrigatorio: false,
         etapa: 'adesivacao',
       },
       {
