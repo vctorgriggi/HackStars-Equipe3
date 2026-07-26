@@ -1,20 +1,27 @@
-// Donut de aprovação: r=48, stroke 14, arco em reading-success sobre
+// Donut de percentual: r=48, stroke 14, arco em reading-success sobre
 // viz-track; o % é overlay HTML (não <text> SVG — herda a mono com tnum e é
 // texto real para leitor de tela). dashoffset animado por transição CSS.
+// Legenda é dado do chamador: corClasse precisa ser classe LITERAL no call
+// site (bg-reading-success…) — o scanner do Tailwind não vê string montada.
 
 const R = 48;
 const CIRC = 2 * Math.PI * R; // 301.593
 
 export function DonutChart({
   pct,
-  aprovados,
-  reprovados,
+  ariaLabel,
+  rotuloCentro,
+  legenda,
 }: {
   pct: number;
-  aprovados: string;
-  reprovados: string;
+  ariaLabel: string;
+  rotuloCentro: string;
+  legenda: { corClasse: string; label: string; valor: string }[];
 }) {
-  const pctTexto = `${pct.toLocaleString("pt-BR", { minimumFractionDigits: 1 })}%`;
+  const pctTexto = `${pct.toLocaleString("pt-BR", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  })}%`;
   const arco = (CIRC * pct) / 100;
 
   return (
@@ -22,7 +29,7 @@ export function DonutChart({
       <div
         className="relative h-[132px] w-[132px] flex-none"
         role="img"
-        aria-label={`Taxa de aprovação em ensaios: ${pctTexto}`}
+        aria-label={`${ariaLabel}: ${pctTexto}`}
       >
         <svg
           width={132}
@@ -58,27 +65,21 @@ export function DonutChart({
           <span className="t-mono text-xl font-bold text-text-1">
             {pctTexto}
           </span>
-          <span className="text-2xs text-text-3">aprovados</span>
+          <span className="text-2xs text-text-3">{rotuloCentro}</span>
         </div>
       </div>
 
       <dl className="grid gap-2 text-xs">
-        <div className="flex items-center gap-2">
-          <span
-            className="h-[9px] w-[9px] flex-none rounded-full bg-reading-success"
-            aria-hidden
-          />
-          <dt className="text-text-2">Aprovados ·</dt>
-          <dd className="t-mono text-text-2">{aprovados}</dd>
-        </div>
-        <div className="flex items-center gap-2">
-          <span
-            className="h-[9px] w-[9px] flex-none rounded-full bg-reading-mismatch"
-            aria-hidden
-          />
-          <dt className="text-text-2">Reprovados ·</dt>
-          <dd className="t-mono text-text-2">{reprovados}</dd>
-        </div>
+        {legenda.map((item) => (
+          <div key={item.label} className="flex items-center gap-2">
+            <span
+              className={`h-[9px] w-[9px] flex-none rounded-full ${item.corClasse}`}
+              aria-hidden
+            />
+            <dt className="text-text-2">{item.label} ·</dt>
+            <dd className="t-mono text-text-2">{item.valor}</dd>
+          </div>
+        ))}
       </dl>
     </div>
   );

@@ -3,9 +3,8 @@
 // compartilhados). Nada aqui é derivado no front: veredito e etapa chegam
 // prontos (`vereditoVigente`/`etapaAtual` nascem na API — regra de ouro).
 //
-// Distintos do `Transformador` mock de ./types de propósito: o mock alimenta
-// as telas ainda não integradas (tempo-real, dashboard); estes alimentam
-// listagem/detalhe reais.
+// O `Transformador` mock que coexistia em ./types foi removido junto com as
+// últimas telas mockadas (dashboard/alertas, 2026-07-26).
 
 import type { Veredito } from "./types";
 

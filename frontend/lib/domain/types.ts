@@ -22,17 +22,6 @@ export const VEREDITO_TO_READING: Record<Veredito, ReadingStatus> = {
   nao_conferivel: "lowconf",
 };
 
-export interface Transformador {
-  serie: string; // TR-######
-  kva: number;
-  clienteNome: string;
-  /** Índice do checkpoint atual (0..5). Nome é join no render via
-   *  useCheckpoints() — nenhum acessor devolve nome de etapa. */
-  etapaIndex: number;
-  status: ReadingStatus;
-  entregaPrevista: string;
-}
-
 export interface Cliente {
   id: string;
   nome: string;
@@ -97,41 +86,6 @@ export interface ConfigNotificacoes {
   divergencia: boolean;
   resumoDiario: boolean;
   entregasProximas: boolean;
-}
-
-export type PeriodoDashboard = "hoje" | "7d" | "30d" | "custom";
-
-export interface DashboardData {
-  /** KPI 1 — unidades com etapaIndex < 5. */
-  emProducao: number;
-  /** KPI 2 — produção do período. */
-  prodLabel: string;
-  prodValor: string;
-  prodSub: string;
-  /** KPI 3 — aprovação em ensaios (%). */
-  aprovacaoPct: number;
-  nAprovados: string;
-  nReprovados: string;
-  /** KPI 4 — tempo médio total (dias). */
-  tempoMedioTotalDias: number;
-  /** Gráfico de barras — granularidade muda com o período. */
-  prodTitulo: string;
-  prodSerie: { label: string; valor: number }[];
-  /** Funil — contagem POR ÍNDICE de etapa (nome via useCheckpoints). */
-  funilPorEtapa: number[];
-  /** Tempo médio por checkpoint, em dias, por índice. */
-  tempoPorEtapa: number[];
-}
-
-/** Item da timeline do detalhe — sem nome de etapa (join no render). */
-export interface EtapaTimeline {
-  stageIndex: number;
-  estado: "concluida" | "atual" | "prevista";
-  /** Só quando atual: o status da peça manda no chip/cor. */
-  statusAtual: ReadingStatus | null;
-  descricao: string;
-  data: string; // "14 jul · 08:12" | "hoje · 09:18" | "—"
-  temFoto: boolean;
 }
 
 // ---- Tempo real (esteira) ----

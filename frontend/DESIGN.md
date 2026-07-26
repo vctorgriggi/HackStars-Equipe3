@@ -89,7 +89,7 @@ A regra dos 3+ usos disparou com as 12 telas — `components/` existe:
   select, toggle, slider, skeleton, empty-state, section-card, icon…).
 - `components/chrome/` — o shell (sidebar, bottom-nav, topbar, sino, avatar,
   theme-toggle, realtime-driver).
-- `components/charts/` — os 4 gráficos do dashboard (SVG/CSS puros, sem lib).
+- `components/charts/` — os 3 gráficos do dashboard (SVG/CSS puros, sem lib).
 - `components/vision/` — componentes de domínio compartilhados entre telas
   (ex.: banner de alertas).
 - `app/(vision)/<rota>/_components/` — componentes de UMA tela. Promoção para
@@ -102,7 +102,10 @@ adicionar `lucide-react`.
 
 - Dados de domínio: react-query sobre `lib/data/api.ts` (a costura mock→API).
   Checkpoints têm UMA query (`['checkpoints']`); nomes de etapa são join no
-  render — é o que faz rename propagar para mapa/funil/filtros/timeline.
+  render — é o que faz rename propagar para mapa/filtros/timeline. O
+  dashboard e o banner de alertas leem a API real (`use-indicadores-api` +
+  `use-esteira-api`): toda linha de gráfico nasce do objeto da API, nunca de
+  join por índice.
 - Esteira: zustand (`lib/stores/realtime.ts`), dirigida pela API — snapshot
   `GET /api/tempo-real/esteira` + evento Socket.IO `passagem-registrada`
   (`RealtimeSocketDriver`, namespace `/tempo-real`, nunca forçar
