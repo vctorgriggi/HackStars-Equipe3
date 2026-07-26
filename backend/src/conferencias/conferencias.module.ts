@@ -9,12 +9,18 @@ import {
   forwardRef,
   Module,
 } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { CampoConferidoEntity } from '../campos-conferidos/infrastructure/persistence/relational/entities/campo-conferido.entity';
+import { PassagemEntity } from '../passagens/infrastructure/persistence/relational/entities/passagem.entity';
+import { TransformadorEntity } from '../transformadores/infrastructure/persistence/relational/entities/transformador.entity';
 import { ConferenciasService } from './conferencias.service';
 import { ConferenciaConsultasService } from './consultas/conferencia-consultas.service';
+import { IndicadoresService } from './consultas/indicadores.service';
 import { ConferenciaExecucaoService } from './conferencia-execucao.service';
 import { ConferenciaExtracaoService } from './conferencia-extracao.service';
 import { ConferenciaPlanoService } from './plano/conferencia-plano.service';
 import { ConferenciasController } from './conferencias.controller';
+import { ConferenciaEntity } from './infrastructure/persistence/relational/entities/conferencia.entity';
 import { RelationalConferenciaPersistenceModule } from './infrastructure/persistence/relational/relational-persistence.module';
 
 @Module({
@@ -38,6 +44,18 @@ import { RelationalConferenciaPersistenceModule } from './infrastructure/persist
     // storage — custo que nao se paga nesta rodada.
     forwardRef(() => FotosEvidenciaModule),
 
+    // Repositorios TypeORM crus para o LADO DE LEITURA (IndicadoresService):
+    // dashboard e auditoria sao COUNT/GROUP BY no banco, e as portas de
+    // persistencia so devolvem agregados de dominio com relacoes eager (gap 3)
+    // — contar em memoria a fabrica inteira e o que este registro evita. Nada
+    // aqui escreve: a escrita de veredito segue com um caminho unico.
+    TypeOrmModule.forFeature([
+      ConferenciaEntity,
+      CampoConferidoEntity,
+      PassagemEntity,
+      TransformadorEntity,
+    ]),
+
     // do not remove this comment
     RelationalConferenciaPersistenceModule,
   ],
@@ -48,6 +66,7 @@ import { RelationalConferenciaPersistenceModule } from './infrastructure/persist
     ConferenciaExtracaoService,
     ConferenciaConsultasService,
     ConferenciaPlanoService,
+    IndicadoresService,
   ],
   exports: [
     ConferenciasService,
@@ -55,6 +74,7 @@ import { RelationalConferenciaPersistenceModule } from './infrastructure/persist
     ConferenciaExtracaoService,
     ConferenciaConsultasService,
     ConferenciaPlanoService,
+    IndicadoresService,
     RelationalConferenciaPersistenceModule,
   ],
 })

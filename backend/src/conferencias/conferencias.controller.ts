@@ -16,7 +16,9 @@ import { ConferenciaConsultasService } from './consultas/conferencia-consultas.s
 import { ConferenciaExecucaoService } from './conferencia-execucao.service';
 import { ConferenciaExtracaoService } from './conferencia-extracao.service';
 import { ConferenciaPlanoService } from './plano/conferencia-plano.service';
+import { IndicadoresService } from './consultas/indicadores.service';
 import { CreateConferenciaDto } from './dto/create-conferencia.dto';
+import { Indicadores } from './dto/indicadores.dto';
 import { PlanoDeFotos, PlanoDeFotosQueryDto } from './dto/plano-de-fotos.dto';
 import { ExecutarComFotosDto } from './dto/executar-com-fotos.dto';
 import { ExecutarConferenciaDto } from './dto/executar-conferencia.dto';
@@ -57,6 +59,7 @@ export class ConferenciasController {
     private readonly conferenciaExtracaoService: ConferenciaExtracaoService,
     private readonly conferenciaConsultasService: ConferenciaConsultasService,
     private readonly conferenciaPlanoService: ConferenciaPlanoService,
+    private readonly indicadoresService: IndicadoresService,
   ) {}
 
   @Post()
@@ -206,6 +209,45 @@ export class ConferenciasController {
   })
   planoDeFotos(@Query() query: PlanoDeFotosQueryDto): Promise<PlanoDeFotos> {
     return this.conferenciaPlanoService.planoDeFotos(query?.projeto);
+  }
+
+  // ATENCAO A ORDEM: como a rota acima, esta precisa vir ANTES de `@Get(':id')`
+  // — senao o parametro dinamico engole 'indicadores'.
+  @Get('indicadores')
+  @ApiOperation({
+    summary: 'DASHBOARD E AUDITORIA: os numeros da linha, agregados no banco',
+    description:
+      'Uma leitura so com as quatro perguntas do painel: quanto ja se ' +
+      'conferiu (`totais`), em QUAL ETAPA a nao conformidade aparece ' +
+      '(`porEtapa`), QUAIS CAMPOS mais dao problema (`porCampo`) e ONDE cada ' +
+      'peca esta com QUAL veredito vigente (`linha`, o dashboard de linha).\n\n' +
+      'NENHUM RECALCULO ACONTECE AQUI. Todo numero e `COUNT` sobre o veredito ' +
+      'que a engine JA GRAVOU (`conferencia.vereditoGeral` e ' +
+      '`campo_conferido.veredito`) — a rota agrega, nunca compara. Conferencia ' +
+      'sem veredito (linha crua do CRUD) entra no total e em nenhum balde, ' +
+      'entao `divergentes + naoConferiveis + conformes` pode ser menor que ' +
+      '`totais.conferencias`.\n\n' +
+      'ATENCAO AO GAP 14 do CLAUDE.md: a conferencia nao persiste marca de ' +
+      'cobertura, entao `conforme` COM etapa preenchida atesta apenas o ' +
+      'recorte daquele gate — nunca a peca inteira. Por isso a etapa viaja ' +
+      'colada ao veredito em `linha[].ultimaConferencia` e os grupos de ' +
+      '`porEtapa` nunca sao somados num "conforme geral da fabrica" pela API. ' +
+      'Exibir veredito sem etapa produz o falso OK que a regra de ouro proibe.\n\n' +
+      'SEM PAGINACAO nesta rodada (volume de demo): `linha` traz no maximo 200 ' +
+      'pecas, escolhidas pelo movimento mais recente; `totais.pecas` conta ' +
+      'TODAS, e a diferenca entre os dois denuncia o corte.\n\n' +
+      'Somente LEITURA: nao cria peca, nao chama visao e nao gasta credito AWS.',
+  })
+  @ApiOkResponse({
+    type: Indicadores,
+    description:
+      'Indicadores do banco inteiro. `porEtapa` vem na ordem da linha com o ' +
+      'grupo sem etapa (peca inteira) por ultimo; `porCampo` vem por ' +
+      'divergentes desc (o topo e onde investigar primeiro); `linha` vem pela ' +
+      'passagem mais recente, com quem nunca passou por checkpoint no fim.',
+  })
+  indicadores(): Promise<Indicadores> {
+    return this.indicadoresService.indicadores();
   }
 
   @Get()
