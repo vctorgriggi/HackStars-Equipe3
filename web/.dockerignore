@@ -1,0 +1,7 @@
+# Contexto de build mínimo. `.env*` fica FORA da imagem pela mesma razão do
+# backend (docs/deploy.md): camada Docker é aditiva e vaza segredo — aqui nem
+# deveria existir segredo (só NEXT_PUBLIC_*), mas a regra é a mesma.
+node_modules
+.next
+.env*
+verificacao-tmp
