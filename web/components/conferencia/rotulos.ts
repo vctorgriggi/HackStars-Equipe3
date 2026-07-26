@@ -143,6 +143,76 @@ export function explicarMotivo(
 }
 
 /* ------------------------------------------------------------------ *
+ * Que TIPO de pendência é aquele âmbar
+ * ------------------------------------------------------------------ */
+
+/**
+ * O âmbar da API é um estado só (`nao_conferivel`), mas para quem está com a
+ * peça na frente ele é três coisas MUITO diferentes — e tratá-las como uma só
+ * é o que faz a tela parecer um campo minado:
+ *
+ * - `captura`  — a foto não deu para afirmar. Ação: refotografar. Não diz nada
+ *                sobre a peça (a peça pode estar perfeita).
+ * - `cobertura`— a etiqueta não traz o dado. Não há o que fotografar; o campo
+ *                simplesmente não é conferível nesta rodada.
+ * - `atencao`  — a leitura casou com o valor esperado de OUTRO campo. Aqui a
+ *                hipótese "a peça está gravada errada" está viva, e por isso
+ *                este é o único âmbar que merece destaque próprio.
+ *
+ * Isto é ROTULAGEM do `motivo` que a API mandou: nada aqui muda veredito, e
+ * nenhuma classe transforma âmbar em aprovação — as três continuam sendo
+ * "não posso afirmar".
+ */
+export type ClasseDoMotivo = "captura" | "cobertura" | "atencao";
+
+export const CLASSE_DO_MOTIVO: Record<MotivoCampo, ClasseDoMotivo> = {
+  "sem-leitura": "captura",
+  "leituras-conflitantes": "captura",
+  "confianca-abaixo-do-limiar": "captura",
+  "leitura-nao-corroborada": "captura",
+  "sem-valor-esperado": "cobertura",
+  "leitura-de-outro-campo": "atencao",
+};
+
+/** Chip curto do cartão — cabe ao lado do motivo sem empurrar layout. */
+export const CHIP_DA_CLASSE: Record<ClasseDoMotivo, string> = {
+  captura: "captura",
+  cobertura: "fora da etiqueta",
+  atencao: "atenção",
+};
+
+/** Frase da linha-síntese do topo, quando a classe tem campos. */
+export const RESUMO_DA_CLASSE: Record<ClasseDoMotivo, string> = {
+  captura: "por captura — refotografe e repita",
+  cobertura: "sem dado na etiqueta — não coberto por ela",
+  atencao: "com número de outro campo — pode ser a peça",
+};
+
+export function classificarMotivo(
+  motivo: MotivoCampo | undefined,
+): ClasseDoMotivo | null {
+  if (!motivo) return null;
+  return CLASSE_DO_MOTIVO[motivo] ?? null;
+}
+
+/**
+ * A ação em uma linha, JÁ com a vista dentro dela ("Refotografe a vista Topo").
+ * O operador não deveria ter de casar o texto genérico do motivo com o chip da
+ * vista três linhas acima — é ele que vai andar até a peça.
+ */
+export function acaoDoCampo(
+  motivo: MotivoCampo | undefined,
+  fonteFisica: string,
+): string | null {
+  const classe = classificarMotivo(motivo);
+  if (!classe) return null;
+  if (classe === "captura") return `Refotografe a vista ${rotuloVista(fonteFisica)}.`;
+  if (classe === "atencao")
+    return `Confira na peça a marcação da vista ${rotuloVista(fonteFisica)}.`;
+  return "Nada a fazer na peça: a etiqueta não traz este dado.";
+}
+
+/* ------------------------------------------------------------------ *
  * Números
  * ------------------------------------------------------------------ */
 

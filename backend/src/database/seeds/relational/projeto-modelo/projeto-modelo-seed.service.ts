@@ -44,7 +44,8 @@ export class ProjetoModeloSeedService {
     // | potencia-serigrafia-frente     | frente           | NAO    | serigrafia    |
     // |   ^ esperado do PROJETO: '1H - 10 kVA' (esperadoFixo — ver o item)      |
     // | serie-placa                    | placa (close)    | sim    | fixacao-placa |
-    // | patrimonio-placa               | placa (close)    | sim    | fixacao-placa |
+    // | patrimonio-placa               | placa (close)    | NAO    | fixacao-placa |
+    // |   ^ nunca leu em medição real — ver o item (2026-07-26)                 |
     // | serie-placa-qr                 | placa (close)    | sim    | fixacao-placa |
     // | patrimonio-placa-qr            | placa (close)    | sim    | fixacao-placa |
     //
@@ -138,9 +139,26 @@ export class ProjetoModeloSeedService {
         etapa: 'fixacao-placa',
       },
       {
+        // OPCIONAL desde 2026-07-26 (decisão do dono, mesmo precedente da
+        // traseira): este campo NUNCA LEU em nenhuma medição real — duas
+        // rodadas de gala hoje com fotos da placa e o spike de
+        // docs/visao-ocr.md, todas com `sem-leitura`. A suspeita é que a placa
+        // simplesmente NÃO IMPRIME o patrimônio (o número que aparece nela é a
+        // série); a pergunta está registrada para a TRAEL no SPEC.
+        //
+        // Por que rebaixar em vez de remover: se a placa imprimir patrimônio em
+        // outro modelo, o item continua conferindo e coerindo com as irmãs
+        // normalmente. Obrigatório em marcação que talvez não exista torna o
+        // `conforme` inalcançável para peça CORRETA (critério 3 do SPEC) e
+        // enche a tela de âmbar que não é defeito nenhum.
+        //
+        // O que NÃO se perde: o patrimônio da placa segue coberto com folga por
+        // `patrimonio-placa-qr` — OBRIGATÓRIO, lido do QR da própria placa por
+        // decode local, a 1.0 de confiança e sem custo de visão. Volta a
+        // obrigatório com a resposta da TRAEL.
         campo: 'patrimonio-placa',
         fonteFisica: 'placa',
-        obrigatorio: true,
+        obrigatorio: false,
         etapa: 'fixacao-placa',
       },
       // O QR DA PLACA É UMA MARCAÇÃO DA PLACA, e passou a ser conferido em

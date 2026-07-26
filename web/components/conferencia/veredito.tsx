@@ -19,6 +19,14 @@
  *    até a peça à toa.
  * 3. A ETAPA ANDA COLADA NO VEREDITO. `conforme` de gate parcial NÃO atesta a
  *    peça inteira (gap 14): a faixa diz sempre qual recorte foi avaliado.
+ * 4. HIERARQUIA, NÃO COR (feedback do dono do produto, 2026-07-26: "âmbar
+ *    demais assusta; o principal é se as letras e os números batem com o
+ *    plano"). A tela abre com a síntese de contagem (`ResumoExecutivo`), o
+ *    âmbar é enquadrado como "sem afirmação — não é defeito confirmado" e os
+ *    achados livres viram bloco recolhido. Nada disso mexe em regra: o
+ *    divergente continua dominando cor e primeira frase, âmbar nunca é
+ *    apresentado como aprovado, e o obrigatório sem afirmação nunca fica
+ *    atrás de um clique.
  */
 
 import { useState } from "react";
@@ -51,11 +59,16 @@ import {
 
 import { EvidenciaDaLeitura } from "./evidencia";
 import {
+  acaoDoCampo,
+  CHIP_DA_CLASSE,
+  classificarMotivo,
   explicarMotivo,
   formatarConfianca,
   formatarDataHora,
+  RESUMO_DA_CLASSE,
   rotuloCampo,
   rotuloVista,
+  type ClasseDoMotivo,
 } from "./rotulos";
 
 /* ------------------------------------------------------------------ *
@@ -163,11 +176,17 @@ export function TelaDeVeredito({
         </Aviso>
       ) : null}
 
+      <ResumoExecutivo campos={resultado.campos} />
+
       <CartaoDaPeca resultado={resultado} />
 
       {ORDEM_DOS_GRUPOS.map((veredito) => {
         const campos = porVeredito(veredito);
         if (!campos.length) return null;
+
+        if (veredito === "nao_conferivel") {
+          return <GruposSemAfirmacao key={veredito} campos={campos} />;
+        }
 
         return (
           <GrupoDeCampos
@@ -210,6 +229,166 @@ export function TelaDeVeredito({
         </BotaoLink>
       </div>
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Resumo executivo — a pergunta do dono do produto, em uma linha
+ * ------------------------------------------------------------------ */
+
+/**
+ * "As letras e os números batem com o plano?" é a pergunta que o produto faz;
+ * a tela respondia com uma pilha de cartões e deixava o operador somar sozinho.
+ * Este bloco responde antes de qualquer lista.
+ *
+ * O QUE ELE É: contagem dos vereditos e dos motivos que a API mandou, dita em
+ * português. O QUE ELE NÃO É: comparação, limiar, promoção nem rebaixamento —
+ * remova todos os campos daqui e o veredito da faixa acima continua o mesmo
+ * (regra de ouro do CLAUDE.md). Duas travas de conteúdo:
+ *
+ * 1. DIVERGENTE DOMINA. Havendo divergência, ela é a cor do bloco e a primeira
+ *    frase; nenhuma contagem de conformes aparece antes dela.
+ * 2. ÂMBAR NUNCA VIRA APROVAÇÃO. "Sem afirmação" é dito com essas palavras,
+ *    separado dos conformes, e a frase termina lembrando que não é liberação.
+ *    Suavizar o âmbar é o objetivo; escondê-lo seria o falso OK do domínio.
+ */
+
+interface SinteseDoVeredito {
+  conformes: number;
+  divergentes: number;
+  semAfirmacao: number;
+  /** Veredito fora dos três conhecidos — nunca somado aos outros. */
+  semClasse: number;
+  porClasse: { classe: ClasseDoMotivo; quantos: number }[];
+  /** Âmbar sem motivo na resposta (releitura antiga) não é contado como captura. */
+  semMotivo: number;
+}
+
+/** Atenção primeiro: é o único âmbar em que a hipótese "é a peça" está viva. */
+const ORDEM_DAS_CLASSES: ClasseDoMotivo[] = ["atencao", "captura", "cobertura"];
+
+function sintetizar(campos: CampoExecutado[]): SinteseDoVeredito {
+  const contagem = new Map<ClasseDoMotivo, number>();
+  let semMotivo = 0;
+
+  for (const campo of campos) {
+    if (comoVeredito(campo.veredito) !== "nao_conferivel") continue;
+    const classe = classificarMotivo(campo.motivo);
+    if (!classe) {
+      semMotivo += 1;
+      continue;
+    }
+    contagem.set(classe, (contagem.get(classe) ?? 0) + 1);
+  }
+
+  const quantos = (veredito: Veredito) =>
+    campos.filter((campo) => comoVeredito(campo.veredito) === veredito).length;
+
+  return {
+    conformes: quantos("conforme"),
+    divergentes: quantos("divergente"),
+    semAfirmacao: quantos("nao_conferivel"),
+    semClasse: campos.filter((campo) => comoVeredito(campo.veredito) === null)
+      .length,
+    porClasse: ORDEM_DAS_CLASSES.filter((classe) => contagem.has(classe)).map(
+      (classe) => ({ classe, quantos: contagem.get(classe) ?? 0 }),
+    ),
+    semMotivo,
+  };
+}
+
+function ResumoExecutivo({ campos }: { campos: CampoExecutado[] }) {
+  if (!campos.length) return null;
+
+  const sintese = sintetizar(campos);
+
+  const conferem =
+    sintese.conformes === 1
+      ? "1 marcação confere"
+      : `${sintese.conformes} marcações conferem`;
+
+  const divergem =
+    sintese.divergentes === 0
+      ? "nenhuma diverge"
+      : sintese.divergentes === 1
+        ? "1 diverge"
+        : `${sintese.divergentes} divergem`;
+
+  // A frase do âmbar só promete "limitação de captura" quando TODO o âmbar é de
+  // captura. Com um `leitura-de-outro-campo` no meio, dizer isso seria mentir
+  // para baixo — e é justamente o âmbar que pode ser a peça.
+  const tudoCaptura =
+    sintese.semAfirmacao > 0 &&
+    sintese.porClasse.length === 1 &&
+    sintese.porClasse[0].classe === "captura" &&
+    sintese.semMotivo === 0;
+
+  return (
+    <Cartao faixa={sintese.divergentes ? "divergente" : undefined}>
+      <p className="text-xs font-semibold tracking-widest text-conteudo-suave uppercase">
+        Conteúdo × plano
+      </p>
+
+      {sintese.divergentes ? (
+        <p className="mt-1 text-2xl font-extrabold text-divergente">
+          {sintese.divergentes === 1
+            ? "1 marcação não bate com o plano."
+            : `${sintese.divergentes} marcações não batem com o plano.`}
+        </p>
+      ) : (
+        <p className="mt-1 text-2xl font-bold text-conteudo">
+          Nenhuma marcação lida diverge do plano.
+        </p>
+      )}
+
+      <p className="mt-1 text-base text-conteudo">
+        <strong className="text-conforme">{conferem}</strong>,{" "}
+        <strong
+          className={sintese.divergentes ? "text-divergente" : "text-conteudo"}
+        >
+          {divergem}
+        </strong>
+        .
+      </p>
+
+      {sintese.semAfirmacao ? (
+        <div className="mt-3 border-t border-borda pt-3">
+          <p className="text-sm text-conteudo">
+            <strong className="text-nao-conferivel">
+              {sintese.semAfirmacao === 1
+                ? "1 sem afirmação"
+                : `${sintese.semAfirmacao} sem afirmação`}
+            </strong>{" "}
+            {tudoCaptura
+              ? "— limitação de captura, não defeito confirmado."
+              : "— o sistema se recusou a afirmar; não é defeito confirmado."}{" "}
+            <span className="text-conteudo-suave">
+              Sem afirmação também não é aprovação: cada uma pede olho humano.
+            </span>
+          </p>
+
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {sintese.porClasse.map(({ classe, quantos }) => (
+              <Chip key={classe} tom={classe === "atencao" ? "alerta" : "neutro"}>
+                {quantos} {RESUMO_DA_CLASSE[classe]}
+              </Chip>
+            ))}
+            {sintese.semMotivo ? (
+              <Chip tom="neutro">
+                {sintese.semMotivo} sem motivo informado
+              </Chip>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {sintese.semClasse ? (
+        <p className="mt-2 text-sm text-conteudo-suave">
+          {sintese.semClasse} campo(s) com veredito que esta tela não reconhece
+          — abertos na lista abaixo, sem contagem.
+        </p>
+      ) : null}
+    </Cartao>
   );
 }
 
@@ -260,22 +439,28 @@ function CartaoDaPeca({
 
 const TITULO_DO_GRUPO: Record<Veredito, string> = {
   divergente: "Divergentes — pare a peça",
-  nao_conferivel: "Não conferíveis — precisam de olho humano",
-  conforme: "Conformes",
+  nao_conferivel: "Sem afirmação — exige olho humano (não é defeito confirmado)",
+  conforme: "Conferem com o plano",
 };
 
 function GrupoDeCampos({
   veredito,
   campos,
   recolhido,
+  titulo,
+  descricao,
 }: {
   veredito: Veredito | null;
   campos: CampoExecutado[];
   recolhido: boolean;
+  /** Sobrescreve o título padrão do veredito (usado pelo recorte do âmbar). */
+  titulo?: string;
+  /** Uma frase de contexto abaixo do título — o porquê daquele grupo existir. */
+  descricao?: string;
 }) {
-  const titulo = veredito
-    ? TITULO_DO_GRUPO[veredito]
-    : "Campos sem veredito reconhecido";
+  const cabecalho =
+    titulo ??
+    (veredito ? TITULO_DO_GRUPO[veredito] : "Campos sem veredito reconhecido");
 
   const lista = (
     <ul className="space-y-3">
@@ -290,10 +475,15 @@ function GrupoDeCampos({
   if (!recolhido) {
     return (
       <section className="space-y-3">
-        <h2 className="flex items-center gap-2 px-1 text-base font-semibold text-conteudo">
-          {titulo}
-          <Chip tom="neutro">{campos.length}</Chip>
-        </h2>
+        <div className="px-1">
+          <h2 className="flex items-center gap-2 text-base font-semibold text-conteudo">
+            {cabecalho}
+            <Chip tom="neutro">{campos.length}</Chip>
+          </h2>
+          {descricao ? (
+            <p className="mt-1 text-sm text-conteudo-suave">{descricao}</p>
+          ) : null}
+        </div>
         {lista}
       </section>
     );
@@ -302,20 +492,60 @@ function GrupoDeCampos({
   return (
     <details className="rounded-2xl border border-borda bg-superficie p-3">
       <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2 py-2 text-base font-semibold text-conteudo">
-        {titulo}
+        {cabecalho}
         <Chip tom="neutro">{campos.length}</Chip>
         <span aria-hidden className="ml-auto text-conteudo-suave">
           ▾
         </span>
       </summary>
+      {descricao ? (
+        <p className="px-1 text-sm text-conteudo-suave">{descricao}</p>
+      ) : null}
       <div className="mt-3">{lista}</div>
     </details>
+  );
+}
+
+/**
+ * O âmbar em DOIS grupos, e a divisão não é estética: campo OBRIGATÓRIO sem
+ * afirmação é o que segura a peça — ele fica sempre aberto, nunca atrás de um
+ * clique. O opcional pode ficar recolhido com a contagem à mostra: ele não
+ * trava nada (a API já contou isso no veredito geral) e é a maior parte do
+ * âmbar que estava assustando o time.
+ */
+function GruposSemAfirmacao({ campos }: { campos: CampoExecutado[] }) {
+  const obrigatorios = campos.filter((campo) => campo.obrigatorio);
+  const opcionais = campos.filter((campo) => !campo.obrigatorio);
+
+  return (
+    <>
+      {obrigatorios.length ? (
+        <GrupoDeCampos
+          veredito="nao_conferivel"
+          campos={obrigatorios}
+          recolhido={false}
+          descricao="O sistema se recusou a afirmar. Quase sempre é enquadramento da foto, não defeito da peça — cada cartão diz que vista refotografar. Nenhum destes é acusação contra a peça; nenhum deles é liberação."
+        />
+      ) : null}
+
+      {opcionais.length ? (
+        <GrupoDeCampos
+          veredito="nao_conferivel"
+          campos={opcionais}
+          recolhido
+          titulo="Sem afirmação em campos opcionais"
+          descricao="Opcional sem afirmação não trava a peça — a API já considerou isso no veredito acima."
+        />
+      ) : null}
+    </>
   );
 }
 
 function CartaoDeCampo({ campo }: { campo: CampoExecutado }) {
   const classe = comoVeredito(campo.veredito);
   const motivo = explicarMotivo(campo.motivo);
+  const classeDoMotivo = classificarMotivo(campo.motivo);
+  const acao = acaoDoCampo(campo.motivo, campo.fonteFisica);
 
   return (
     <Cartao compacto faixa={classe ?? undefined}>
@@ -363,17 +593,40 @@ function CartaoDeCampo({ campo }: { campo: CampoExecutado }) {
 
       {motivo ? (
         <div className="mt-3 rounded-xl border border-borda bg-superficie-2 p-3 text-sm">
-          <p className="font-medium text-conteudo">
-            {motivo.titulo}
-            {campo.campoDaLeitura ? (
-              <span className="font-normal text-conteudo-suave">
-                {" "}
-                (o número lido é de{" "}
-                <code className="font-mono">{campo.campoDaLeitura}</code>)
-              </span>
+          <div className="flex items-start justify-between gap-2">
+            <p className="min-w-0 font-medium text-conteudo">
+              {motivo.titulo}
+              {campo.campoDaLeitura ? (
+                <span className="font-normal text-conteudo-suave">
+                  {" "}
+                  (o número lido é de{" "}
+                  <code className="font-mono">{campo.campoDaLeitura}</code>)
+                </span>
+              ) : null}
+            </p>
+            {classeDoMotivo ? (
+              <Chip
+                tom={classeDoMotivo === "atencao" ? "alerta" : "neutro"}
+                titulo="Que tipo de pendência é esta"
+              >
+                {CHIP_DA_CLASSE[classeDoMotivo]}
+              </Chip>
             ) : null}
-          </p>
-          <p className="mt-1 text-conteudo-suave">{motivo.acao}</p>
+          </div>
+
+          {/* A AÇÃO em destaque e com a vista dentro dela: é a linha que faz o
+              operador levantar e resolver, e ela vinha em cinza no fim do
+              bloco, do mesmo tamanho da explicação. */}
+          {acao ? (
+            <p className="mt-2 flex items-baseline gap-2 rounded-lg bg-superficie px-2.5 py-2 font-semibold text-conteudo">
+              <span aria-hidden className="text-conteudo-suave">
+                →
+              </span>
+              <span className="min-w-0">{acao}</span>
+            </p>
+          ) : null}
+
+          <p className="mt-1.5 text-conteudo-suave">{motivo.acao}</p>
         </div>
       ) : null}
 
@@ -447,18 +700,23 @@ function BlocoDeIncoerencias({
 }
 
 /* ------------------------------------------------------------------ *
- * Achados inconsistentes (âmbar — alarme, nunca veredito)
+ * Achados inconsistentes (informativo — nunca veredito)
  * ------------------------------------------------------------------ */
 
+/**
+ * RECOLHIDO POR PADRÃO, e o motivo é medido: os códigos de barra da própria
+ * etiqueta produzem 3 a 5 achados por rodada. Em bloco âmbar aberto, isso lê
+ * como cinco alarmes numa peça sem defeito nenhum — e alarme que sempre toca
+ * deixa de ser lido justamente no dia em que importa.
+ *
+ * O que NÃO muda: o conteúdo aberto é o mesmo de antes (número, ocorrências e
+ * a foto de cada uma), e o título continua dizendo que a visão leu texto que a
+ * etiqueta não conhece. Isto é rebaixamento de MOLDURA, não de informação — e
+ * nada aqui jamais tocou veredito (é o canal de alarme da T2.8).
+ */
 function BlocoDeAchados({ achados }: { achados: AchadoInconsistente[] }) {
-  return (
-    <Cartao faixa="nao_conferivel">
-      <CabecalhoCartao
-        titulo="Textos na peça que a etiqueta não conhece"
-        descricao="A visão leu estes números em algum lugar das fotos e nenhum deles bate com a etiqueta. É alarme: NÃO altera o veredito e não fica gravado — olhe as fotos antes de liberar."
-      />
-
-      <ul className="space-y-3">
+  const lista = (
+    <ul className="space-y-3">
         {achados.map((achado) => (
           <li
             key={achado.texto}
@@ -481,8 +739,36 @@ function BlocoDeAchados({ achados }: { achados: AchadoInconsistente[] }) {
             </ul>
           </li>
         ))}
-      </ul>
-    </Cartao>
+    </ul>
+  );
+
+  return (
+    <details className="rounded-2xl border border-borda bg-superficie p-3 shadow-cartao">
+      <summary className="flex min-h-12 cursor-pointer list-none items-start gap-2 py-2">
+        <span className="min-w-0">
+          <span className="block text-base font-semibold text-conteudo">
+            {achados.length === 1
+              ? "1 texto lido que não bate com a etiqueta"
+              : `${achados.length} textos lidos que não batem com a etiqueta`}
+          </span>
+          <span className="block text-sm text-conteudo-suave">
+            Informativo — não altera o veredito.
+          </span>
+        </span>
+        <span aria-hidden className="ml-auto text-conteudo-suave">
+          ▾
+        </span>
+      </summary>
+
+      <p className="mb-3 px-1 text-sm text-conteudo-suave">
+        A visão leu estes números em algum lugar das fotos e nenhum deles bate
+        com a etiqueta. Boa parte costuma ser código de barras da própria
+        etiqueta. Não fica gravado e não entra no veredito — olhe as fotos se
+        algum número parecer de outra peça.
+      </p>
+
+      {lista}
+    </details>
   );
 }
 

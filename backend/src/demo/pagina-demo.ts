@@ -29,11 +29,18 @@
  *    reaproveita (cada FotoEvidencia pertence a UMA conferência — 422
  *    foto-evidencia-de-outra-conferencia), mas os bytes sobem de novo sem
  *    ninguém voltar à peça.
- * 3. O veredito abre com as DUAS PERGUNTAS do produto (serigrafia × etiqueta;
- *    séries irmãs entre si) e os campos vêm agrupados por resultado, não pela
- *    ordem da checklist. Isso é AGRUPAMENTO E ROTULAGEM do que a API mandou:
- *    nenhuma comparação, nenhum limiar e nenhum veredito nascem aqui — a
- *    página conta vereditos prontos (regra de ouro do CLAUDE.md).
+ * 3. O veredito abre com a SÍNTESE "conteúdo × plano" (quantas marcações
+ *    conferem, quantas divergem, quantas ficaram sem afirmação) e as DUAS
+ *    PERGUNTAS do produto (serigrafia × etiqueta; séries irmãs entre si); os
+ *    campos vêm agrupados por resultado, não pela ordem da checklist. Isso é
+ *    AGRUPAMENTO E ROTULAGEM do que a API mandou: nenhuma comparação, nenhum
+ *    limiar e nenhum veredito nascem aqui — a página conta vereditos prontos
+ *    (regra de ouro do CLAUDE.md).
+ * 4. HIERARQUIA, NÃO COR (feedback do dono do produto, 2026-07-26: "âmbar
+ *    demais assusta"). O âmbar é enquadrado como "sem afirmação — não é
+ *    defeito confirmado", o achado livre virou bloco recolhido e informativo,
+ *    e o divergente segue dominando cor e primeira frase. O que nunca se
+ *    recolhe: campo OBRIGATÓRIO sem afirmação.
  */
 export const PAGINA_DEMO = `<!doctype html>
 <html lang="pt-BR">
@@ -382,6 +389,40 @@ export const PAGINA_DEMO = `<!doctype html>
     font-family: ui-monospace, Menlo, Consolas, monospace; word-break: break-word;
   }
   .nota-foco { font-size: 12px; color: var(--tinta-fraca); margin: -4px 0 14px; }
+  /* RESUMO EXECUTIVO — a pergunta do dono do produto ("as letras e os números
+     batem com o plano?") respondida por CONTAGEM dos vereditos que a API
+     mandou, antes de qualquer lista. Moldura NEUTRA por padrão: só o
+     divergente pinta, porque só ele para a peça (âmbar demais assusta e o
+     alarme deixa de ser lido). */
+  .resumo-plano {
+    border: 2px solid var(--borda); background: var(--papel);
+    border-radius: 6px; padding: 14px; margin-bottom: 12px;
+  }
+  .resumo-plano.tem-divergente { border-color: var(--vermelho); background: var(--vermelho-fundo); }
+  .resumo-plano .rotulo-resumo {
+    font-size: 12px; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--tinta-fraca);
+  }
+  .resumo-plano .frase-principal { font-size: 21px; font-weight: 800; line-height: 1.2; margin-top: 4px; }
+  .resumo-plano.tem-divergente .frase-principal { color: var(--vermelho); }
+  .resumo-plano .contagem { font-size: 15px; margin-top: 4px; color: var(--tinta); }
+  .resumo-plano .contagem b.conferem { color: var(--verde); }
+  .resumo-plano .contagem b.divergem { color: var(--vermelho); }
+  .resumo-plano .sem-afirmacao {
+    font-size: 14px; margin: 10px 0 0; padding-top: 10px;
+    border-top: 1px solid var(--borda); color: var(--tinta);
+  }
+  .resumo-plano .sem-afirmacao b { color: var(--ambar); }
+  .resumo-plano .sem-afirmacao .lembrete { color: var(--tinta-fraca); }
+  .resumo-plano .chips-motivo { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .resumo-plano .chip-motivo {
+    font-size: 12px; padding: 3px 9px; border-radius: 999px;
+    border: 1px solid var(--borda); color: var(--tinta-fraca); background: #eef1f4;
+  }
+  .resumo-plano .chip-motivo.c-atencao {
+    border-color: var(--ambar); color: var(--ambar); background: var(--ambar-fundo);
+  }
+  .resumo-plano .fora-do-mapa { font-size: 13px; color: var(--tinta-fraca); margin: 8px 0 0; }
   /* Campos agrupados por RESULTADO (divergente → não conferível → conforme):
      na ordem da checklist, o que impede o conforme se perdia no meio. */
   .grupo-campos { margin-bottom: 12px; }
@@ -392,6 +433,13 @@ export const PAGINA_DEMO = `<!doctype html>
   .grupo-campos.g-divergente .titulo-grupo { color: var(--vermelho); }
   .grupo-campos.g-nao_conferivel .titulo-grupo { color: var(--ambar); }
   .grupo-campos.g-conforme > summary { color: var(--verde); font-weight: 700; }
+  .grupo-campos.g-nao_conferivel > summary { color: var(--ambar); font-weight: 700; }
+  /* Uma frase de contexto por grupo: sem ela, "não conferível" continua sendo
+     lido como defeito da peça — que é exatamente o que ele NÃO é. */
+  .grupo-campos .descricao-grupo {
+    font-size: 13px; color: var(--tinta-fraca); margin: -2px 0 8px;
+    text-transform: none; letter-spacing: 0; font-weight: 400;
+  }
   details.grupo-campos { background: transparent; border: 0; }
   details.grupo-campos > summary {
     padding: 10px 0; font-size: 14px; letter-spacing: .05em; text-transform: uppercase;
@@ -434,13 +482,22 @@ export const PAGINA_DEMO = `<!doctype html>
   }
   .bloco-coerencia .detalhe { font-size: 14px; color: var(--tinta); margin-top: 4px; }
   .bloco-coerencia a { color: var(--acento); font-size: 14px; display: inline-block; min-height: 24px; margin-top: 4px; }
+  /* ACHADO LIVRE: informativo, e RECOLHIDO por padrão. Os códigos de barra da
+     própria etiqueta rendem 3–5 achados por rodada — em caixa âmbar aberta
+     isso lê como cinco alarmes numa peça sem defeito. A moldura vira neutra;
+     o conteúdo aberto é o mesmo de sempre. */
   .alarme-consistencia {
-    border: 2px solid var(--ambar); background: var(--ambar-fundo);
-    border-radius: 6px; padding: 14px; margin-bottom: 14px;
+    border: 1px solid var(--borda); background: var(--papel);
+    border-radius: 6px; padding: 12px 14px; margin-bottom: 14px;
   }
+  .alarme-consistencia > summary {
+    cursor: pointer; list-style: none; padding: 6px 0; min-height: 44px;
+  }
+  .alarme-consistencia > summary::-webkit-details-marker { display: none; }
   .alarme-consistencia .titulo-alarme {
-    font-size: 17px; font-weight: 700; line-height: 1.3; color: var(--ambar);
+    display: block; font-size: 16px; font-weight: 700; line-height: 1.3; color: var(--tinta);
   }
+  .alarme-consistencia .sub-alarme { display: block; font-size: 13px; color: var(--tinta-fraca); }
   .alarme-consistencia .explica { font-size: 13px; margin: 6px 0 0; color: var(--tinta-fraca); }
   .alarme-consistencia .explica b { color: var(--ambar); }
   .alarme-consistencia .achado {
@@ -465,7 +522,24 @@ export const PAGINA_DEMO = `<!doctype html>
   .cartao-campo.v-conforme { border-color: var(--verde); background: var(--verde-fundo); }
   .cartao-campo .topo { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
   .cartao-campo .nome-campo { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 15px; color: var(--tinta); }
+  .cartao-campo .marcas { flex: none; display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
   .cartao-campo .marca { font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  /* QUE TIPO de pendência é aquele âmbar: "captura" (a foto não deu) é
+     discreto; "atenção" (o número lido é de outro campo — pode ser a peça) é
+     o único que ganha cor. */
+  .cartao-campo .chip-classe {
+    font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+    padding: 2px 7px; border-radius: 999px; border: 1px solid var(--borda);
+    color: var(--tinta-fraca); background: #eef1f4; white-space: nowrap;
+  }
+  .cartao-campo .chip-classe.c-atencao { border-color: var(--ambar); color: var(--ambar); background: #fff; }
+  /* A AÇÃO, com a vista dentro dela. Vinha em cinza no fim do cartão, do mesmo
+     tamanho da explicação — e é a linha que faz alguém levantar e resolver. */
+  .cartao-campo .acao-campo {
+    display: block; margin-top: 8px; padding: 8px 10px; background: var(--papel);
+    border: 1px solid var(--borda); border-radius: 4px;
+    font-size: 14px; font-weight: 700; color: var(--tinta);
+  }
   .cartao-campo dl { margin: 8px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 14px; }
   .cartao-campo dt { color: var(--tinta-fraca); }
   .cartao-campo dd { margin: 0; word-break: break-word; color: var(--tinta); }
@@ -2439,12 +2513,18 @@ export const PAGINA_DEMO = `<!doctype html>
         '<ul>' + linhas + '</ul></div>';
     }).join('');
 
-    return '<div class="alarme-consistencia">' +
-      '<div class="titulo-alarme">Números encontrados que não batem com a etiqueta</div>' +
+    var quantos = achados.length === 1
+      ? '1 texto lido que não bate com a etiqueta'
+      : achados.length + ' textos lidos que não batem com a etiqueta';
+
+    return '<details class="alarme-consistencia">' +
+      '<summary><span class="titulo-alarme">' + esc(quantos) + '</span>' +
+      '<span class="sub-alarme">Informativo — não altera o veredito. Toque para abrir.</span></summary>' +
       '<p class="explica">Verificação extra, independente da checklist: a visão leu estes textos na peça e ' +
-      'nenhum corresponde a um valor da etiqueta. <b>Não altera o veredito acima</b> — é alerta para ' +
+      'nenhum corresponde a um valor da etiqueta. Boa parte costuma ser código de barras da própria ' +
+      'etiqueta. <b>Não altera o veredito acima</b> — é alerta para ' +
       'conferência humana (placa de outra peça, etiqueta trocada, peça trocada na esteira).</p>' +
-      itens + '</div>';
+      itens + '</details>';
   }
 
   function faixaDaExtracao(extracao) {
@@ -2468,6 +2548,92 @@ export const PAGINA_DEMO = `<!doctype html>
     return '<div class="faixa-extracao">Extração: driver ' + esc(extracao.driver) +
       ' · ' + esc(extracao.fotos) + ' foto(s) · ' + esc(extracao.leiturasProduzidas) + ' leitura(s)' +
       fora + livres + '</div>';
+  }
+
+  // --- H.0 Resumo executivo: conteúdo × plano -----------------------------
+
+  // A primeira coisa que o dono do produto pergunta: "as letras e os números
+  // batem com o plano?". A tela respondia com uma pilha de cartões e deixava
+  // quem olha somar sozinho.
+  //
+  // O QUE ESTE BLOCO É: contagem dos vereditos e dos motivos que a API mandou,
+  // dita em português. O QUE ELE NÃO É: comparação, limiar, promoção ou
+  // rebaixamento — apague-o inteiro e o veredito da faixa acima continua o
+  // mesmo (regra de ouro do CLAUDE.md). Duas travas de conteúdo:
+  //   1. DIVERGENTE DOMINA: havendo divergência, ela é a cor do bloco e a
+  //      primeira frase — nenhuma contagem de conforme aparece antes dela.
+  //   2. ÂMBAR NUNCA VIRA APROVAÇÃO: "sem afirmação" é dito com essas palavras,
+  //      separado dos conformes, e a frase termina lembrando que não libera.
+  function blocoDoResumo(campos) {
+    if (!campos || !campos.length) { return ''; }
+
+    var conformes = 0;
+    var divergentes = 0;
+    var ambar = 0;
+    var foraDoMapa = 0;
+    var semMotivo = 0;
+    var porClasse = { atencao: 0, captura: 0, cobertura: 0 };
+
+    campos.forEach(function (campo) {
+      if (campo.veredito === 'conforme') { conformes += 1; return; }
+      if (campo.veredito === 'divergente') { divergentes += 1; return; }
+      if (campo.veredito === 'nao_conferivel') {
+        ambar += 1;
+        var classe = CLASSE_DO_MOTIVO[campo.motivo];
+        if (classe) { porClasse[classe] += 1; } else { semMotivo += 1; }
+        return;
+      }
+      foraDoMapa += 1;
+    });
+
+    var principal = divergentes
+      ? (divergentes === 1
+        ? '1 marcação não bate com o plano.'
+        : divergentes + ' marcações não batem com o plano.')
+      : 'Nenhuma marcação lida diverge do plano.';
+
+    var conferem = conformes === 1 ? '1 marcação confere' : conformes + ' marcações conferem';
+    var divergem = divergentes === 0
+      ? 'nenhuma diverge'
+      : (divergentes === 1 ? '1 diverge' : divergentes + ' divergem');
+
+    var html = '<div class="resumo-plano' + (divergentes ? ' tem-divergente' : '') + '">' +
+      '<div class="rotulo-resumo">Conteúdo × plano</div>' +
+      '<div class="frase-principal">' + esc(principal) + '</div>' +
+      '<div class="contagem"><b class="conferem">' + esc(conferem) + '</b>, ' +
+      '<b class="' + (divergentes ? 'divergem' : '') + '">' + esc(divergem) + '</b>.</div>';
+
+    if (ambar) {
+      // "Limitação de captura" só é dito quando TODO o âmbar é de captura: com
+      // um 'leitura-de-outro-campo' no meio, essa frase seria mentira para
+      // baixo — e é justamente o âmbar que pode ser a peça.
+      var tudoCaptura = porClasse.captura === ambar;
+      html += '<p class="sem-afirmacao"><b>' +
+        esc(ambar === 1 ? '1 sem afirmação' : ambar + ' sem afirmação') + '</b> ' +
+        (tudoCaptura
+          ? '— limitação de captura, não defeito confirmado. '
+          : '— o sistema se recusou a afirmar; não é defeito confirmado. ') +
+        '<span class="lembrete">Sem afirmação também não é aprovação: cada uma pede olho humano.</span></p>';
+
+      // Atenção primeiro: é o único âmbar em que a hipótese "é a peça" vive.
+      var chips = ['atencao', 'captura', 'cobertura'].filter(function (classe) {
+        return porClasse[classe] > 0;
+      }).map(function (classe) {
+        return '<span class="chip-motivo c-' + esc(classe) + '">' + porClasse[classe] + ' ' +
+          esc(RESUMO_DA_CLASSE[classe]) + '</span>';
+      });
+      if (semMotivo) {
+        chips.push('<span class="chip-motivo">' + semMotivo + ' sem motivo informado</span>');
+      }
+      html += '<div class="chips-motivo">' + chips.join('') + '</div>';
+    }
+
+    if (foraDoMapa) {
+      html += '<p class="fora-do-mapa">' + foraDoMapa +
+        ' campo(s) com veredito que esta página não reconhece — listados abaixo, sem contagem.</p>';
+    }
+
+    return html + '</div>';
   }
 
   // --- H.1 As duas perguntas que importam ---------------------------------
@@ -2567,11 +2733,55 @@ export const PAGINA_DEMO = `<!doctype html>
     'leitura-nao-corroborada': 'marcação em relevo sem segunda leitura concordante — a API não acusa divergência com uma leitura só'
   };
 
+  // O âmbar da API é UM estado, mas para quem está na frente da peça ele é três
+  // coisas diferentes — e tratá-las como uma só é o que faz a tela parecer um
+  // campo minado. Classificação é ROTULAGEM do motivo que a API mandou:
+  //   captura   → a foto não deu. Refotografar. Não diz nada sobre a peça.
+  //   cobertura → a etiqueta não traz o dado. Não há o que fotografar.
+  //   atencao   → o número lido é o esperado de OUTRO campo: pode ser a peça.
+  // Nenhuma classe transforma âmbar em aprovação: as três continuam sendo
+  // "não posso afirmar".
+  var CLASSE_DO_MOTIVO = {
+    'sem-leitura': 'captura',
+    'leituras-conflitantes': 'captura',
+    'confianca-abaixo-do-limiar': 'captura',
+    'leitura-nao-corroborada': 'captura',
+    'sem-valor-esperado': 'cobertura',
+    'leitura-de-outro-campo': 'atencao'
+  };
+
+  var CHIP_DA_CLASSE = {
+    captura: 'captura',
+    cobertura: 'fora da etiqueta',
+    atencao: 'atenção'
+  };
+
+  var RESUMO_DA_CLASSE = {
+    captura: 'por captura — refotografe e repita',
+    cobertura: 'sem dado na etiqueta — não coberto por ela',
+    atencao: 'com número de outro campo — pode ser a peça'
+  };
+
+  // A ação em UMA linha, já com a vista dentro dela: o operador não deveria ter
+  // de casar o texto genérico do motivo com o nome da vista três linhas acima.
+  function acaoDoCampo(motivo, fonte) {
+    var classe = CLASSE_DO_MOTIVO[motivo];
+    if (!classe) { return ''; }
+    if (classe === 'captura') { return 'Refotografe a vista ' + fonte + '.'; }
+    if (classe === 'atencao') { return 'Confira na peça a marcação da vista ' + fonte + '.'; }
+    return 'Nada a fazer na peça: a etiqueta não traz este dado.';
+  }
+
   function cartaoDoCampo(campo) {
     var url = urlDaFonte(campo.fonteFisica);
+    var classeMotivo = CLASSE_DO_MOTIVO[campo.motivo];
+    var chip = classeMotivo
+      ? '<span class="chip-classe c-' + esc(classeMotivo) + '">' + esc(CHIP_DA_CLASSE[classeMotivo]) + '</span>'
+      : '';
     var bloco = '<div class="cartao-campo v-' + esc(campo.veredito) + '">' +
       '<div class="topo"><span class="nome-campo">' + esc(campo.campo) + '</span>' +
-      '<span class="marca">' + esc(campo.veredito) + '</span></div>' +
+      '<span class="marcas">' + chip +
+      '<span class="marca">' + esc(campo.veredito) + '</span></span></div>' +
       '<dl>' +
       '<dt>esperado</dt><dd class="mono">' + esc(campo.valorEsperado === null ? '(sem valor esperado)' : campo.valorEsperado) + '</dd>' +
       '<dt>lido</dt><dd class="mono">' + esc(campo.valorLido === null ? '(sem leitura)' : campo.valorLido) + '</dd>' +
@@ -2585,6 +2795,11 @@ export const PAGINA_DEMO = `<!doctype html>
       bloco += '<dt>casou com</dt><dd class="mono">' + esc(campo.campoDaLeitura) + '</dd>';
     }
     bloco += '</dl>';
+
+    var acao = acaoDoCampo(campo.motivo, campo.fonteFisica);
+    if (acao) {
+      bloco += '<div class="acao-campo">→ ' + esc(acao) + '</div>';
+    }
 
     // Evidência VISUAL primeiro: a API agora manda a foto do campo (url
     // assinada) e a região da leitura, então o operador vê o número marcado em
@@ -2605,9 +2820,38 @@ export const PAGINA_DEMO = `<!doctype html>
   // e são justamente os que ninguém precisa ler. Nenhum campo é omitido:
   // veredito fora dos três conhecidos cai no grupo "não previsto".
   var GRUPOS_VEREDITO = [
-    ['divergente', 'divergente(s) — a peça não segue'],
-    ['nao_conferivel', 'não conferível(is) — exigem olho humano']
+    ['divergente', 'divergente(s) — a peça não segue']
   ];
+
+  // O âmbar em DOIS grupos, e a divisão não é estética: campo OBRIGATÓRIO sem
+  // afirmação é o que segura a peça — fica sempre aberto, nunca atrás de um
+  // clique. O opcional pode ficar recolhido COM A CONTAGEM à mostra: ele não
+  // trava nada (a API já contou isso no veredito geral) e é a maior parte do
+  // âmbar que estava assustando o time.
+  function gruposSemAfirmacao(campos) {
+    var obrigatorios = campos.filter(function (campo) { return campo.obrigatorio; });
+    var opcionais = campos.filter(function (campo) { return !campo.obrigatorio; });
+    var html = '';
+
+    if (obrigatorios.length) {
+      html += '<div class="grupo-campos g-nao_conferivel">' +
+        '<p class="titulo-grupo">' + obrigatorios.length +
+        ' sem afirmação — exigem olho humano (não é defeito confirmado)</p>' +
+        '<p class="descricao-grupo">O sistema se recusou a afirmar. Quase sempre é enquadramento da ' +
+        'foto, não defeito da peça — cada cartão diz que vista refotografar. Nenhum destes é acusação ' +
+        'contra a peça; nenhum deles é liberação.</p>' +
+        obrigatorios.map(cartaoDoCampo).join('') + '</div>';
+    }
+
+    if (opcionais.length) {
+      html += '<details class="grupo-campos g-nao_conferivel"><summary>' + opcionais.length +
+        ' sem afirmação em campo(s) opcional(is) — não travam a peça</summary>' +
+        '<p class="descricao-grupo">A API já considerou isso no veredito acima.</p>' +
+        opcionais.map(cartaoDoCampo).join('') + '</details>';
+    }
+
+    return html;
+  }
 
   function blocoDosCampos(campos) {
     var html = '';
@@ -2622,11 +2866,15 @@ export const PAGINA_DEMO = `<!doctype html>
         doGrupo.map(cartaoDoCampo).join('') + '</div>';
     });
 
+    var ambar = restantes.filter(function (campo) { return campo.veredito === 'nao_conferivel'; });
+    restantes = restantes.filter(function (campo) { return campo.veredito !== 'nao_conferivel'; });
+    html += gruposSemAfirmacao(ambar);
+
     var conformes = restantes.filter(function (campo) { return campo.veredito === 'conforme'; });
     restantes = restantes.filter(function (campo) { return campo.veredito !== 'conforme'; });
     if (conformes.length) {
       html += '<details class="grupo-campos g-conforme"><summary>' + conformes.length +
-        ' campo(s) conforme(s) — abrir</summary>' +
+        ' campo(s) que conferem com o plano — abrir</summary>' +
         conformes.map(cartaoDoCampo).join('') + '</details>';
     }
 
@@ -2658,9 +2906,10 @@ export const PAGINA_DEMO = `<!doctype html>
       '<div class="sub">' + esc(linhaDaEtapa(resposta)) + '</div>' +
       '</div>';
 
-    // As duas perguntas do produto vêm antes de qualquer lista de campo: é o
-    // que o time realmente quer saber, e no celular o que está embaixo não é
-    // lido.
+    // A síntese "conteúdo × plano" abre o veredito: é a pergunta do produto em
+    // uma linha. Depois vêm as duas perguntas do time — ambas antes de qualquer
+    // lista de campo, porque no celular o que está embaixo não é lido.
+    html += blocoDoResumo(resposta.campos || []);
     html += blocoDoFoco(resposta);
 
     // Logo abaixo para não passar despercebido no celular, e com forma/cor
