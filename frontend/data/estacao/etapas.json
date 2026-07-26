@@ -1,0 +1,23 @@
+{
+  "etapas": [
+    {
+      "id": "etapa-1",
+      "nome": "Etapa 1",
+      "checagens": [
+        { "id": "e1-c1", "nome": "Checagem 1" },
+        { "id": "e1-c2", "nome": "Checagem 2" },
+        { "id": "e1-c3", "nome": "Checagem 3" }
+      ]
+    },
+    {
+      "id": "etapa-2",
+      "nome": "Etapa 2",
+      "checagens": [
+        { "id": "e2-c1", "nome": "Checagem 1" },
+        { "id": "e2-c2", "nome": "Checagem 2" },
+        { "id": "e2-c3", "nome": "Checagem 3" },
+        { "id": "e2-c4", "nome": "Checagem 4" }
+      ]
+    }
+  ]
+}
