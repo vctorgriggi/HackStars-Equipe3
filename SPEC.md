@@ -186,6 +186,17 @@ erDiagram
 
 ### Could
 
+- Conferência de consistência por achados livres: o extrator já devolve TODO
+  o texto de cada foto e hoje descarta o que não é alvo — custo AWS zero em
+  reaproveitar. Cada achado é cruzado contra o conjunto TIPADO de valores do
+  QR (série, patrimônio, cliente); achado que não bate com nenhum vira
+  alarme de inconsistência (pega placa errada mesmo sem rótulo de fonte,
+  peça trocada na esteira e etiqueta impressa divergente do próprio QR).
+  Regra de ferro: achado livre só rebaixa ou alerta, NUNCA promove a
+  `conforme` — consistência não enxerga ausência (peça com uma marcação só
+  é trivialmente consistente), então o `conforme` continua nascendo
+  exclusivamente da checklist. Cruzamento é contra o QR, nunca "tudo contra
+  tudo": série e patrimônio são números diferentes por design.
 - Dashboard de linha: peças × último checkpoint × status de conformidade.
 - Indicadores de auditoria: contagem de divergências por etapa (checkpoint) e
   por campo, agregando os dados que o Must já persiste.
