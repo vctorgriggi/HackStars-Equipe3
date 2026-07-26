@@ -10,6 +10,7 @@ import {
   Module,
 } from '@nestjs/common';
 import { ConferenciasService } from './conferencias.service';
+import { ConferenciaConsultasService } from './consultas/conferencia-consultas.service';
 import { ConferenciaExecucaoService } from './conferencia-execucao.service';
 import { ConferenciaExtracaoService } from './conferencia-extracao.service';
 import { ConferenciasController } from './conferencias.controller';
@@ -44,11 +45,13 @@ import { RelationalConferenciaPersistenceModule } from './infrastructure/persist
     ConferenciasService,
     ConferenciaExecucaoService,
     ConferenciaExtracaoService,
+    ConferenciaConsultasService,
   ],
   exports: [
     ConferenciasService,
     ConferenciaExecucaoService,
     ConferenciaExtracaoService,
+    ConferenciaConsultasService,
     RelationalConferenciaPersistenceModule,
   ],
 })

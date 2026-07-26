@@ -1,5 +1,11 @@
 import { Logger } from '@nestjs/common';
 
+import {
+  EstatisticasDeRegiao,
+  histogramaDe,
+  resumirHistograma,
+} from './contraste';
+
 /**
  * RECORTE DE REGIAO NA RESOLUCAO NATIVA — a unica manipulacao de imagem do
  * backend, e a mais boba possivel de proposito.
@@ -19,10 +25,19 @@ import { Logger } from '@nestjs/common';
  * `normalize`, `sharpen` ou `greyscale` aqui esta desfazendo uma medicao.
  *
  * EXIF: `autoOrient` aplica a orientacao gravada na foto (rotacao de 90 graus,
- * sem reamostrar) e faz a metadata ja reportar as dimensoes finais. Foto de
- * celular chega deitada com muita frequencia; sem isso as coordenadas do
- * bounding box cairiam em outro lugar da peca e o recorte nao corroboraria
- * nada — falharia SEMPRE, e falharia calado.
+ * sem reamostrar). Foto de celular chega deitada com muita frequencia; sem isso
+ * as coordenadas do bounding box cairiam em outro lugar da peca e o recorte nao
+ * corroboraria nada — falharia SEMPRE, e falharia calado.
+ *
+ * ARMADILHA MEDIDA em 2026-07-26, que ja estava CUSTANDO a corroboracao:
+ * `sharp(buf, { autoOrient: true }).metadata()` devolve as dimensoes CRUAS do
+ * arquivo, nao as de depois da rotacao (sharp 0.35.3). Em `PLACA-4.jpg`
+ * (orientation 6) a metadata dizia 4096x2304 enquanto o pipeline recortava uma
+ * imagem 2304x4096 — e o `extract` estourava com `bad extract area` ou, pior,
+ * caia numa regiao vazia da foto. O Textract, por sua vez, RESPEITA o EXIF:
+ * verificado recortando o bounding box de `847833` nos dois referenciais — no
+ * cru sai um borrao, no orientado sai o numero legivel. Por isso as dimensoes
+ * sao trocadas a mao quando `orientation` e 5..8 (`dimensoesOrientadas`).
  */
 
 /** Bounding box do Textract: coordenadas normalizadas 0..1. */
@@ -54,6 +69,16 @@ export interface ImagemRecortavel {
   altura: number;
   /** `null` quando o recorte nao pode ser produzido (nunca lanca). */
   recortar(caixa: CaixaNormalizada, margem: number): Promise<Recorte | null>;
+  /**
+   * Luminancia DENTRO da caixa e no ANEL em volta dela — a materia-prima da
+   * discriminacao tinta x relevo (`contraste.ts`). `null` quando nao da para
+   * medir (nunca lanca); quem chama trata como `indeterminado`.
+   *
+   * NAO manda nada para OCR e nao altera pixel nenhum: so conta. O que o spike
+   * reprovou foi PRE-PROCESSAR a imagem enviada ao Textract; medir e outra
+   * coisa, e e de graca.
+   */
+  medirRegiao(caixa: CaixaNormalizada): Promise<EstatisticasDeRegiao | null>;
 }
 
 /**
@@ -223,6 +248,66 @@ export function mapearCaixaNoRecorte(
   };
 }
 
+/**
+ * Largura do ANEL de referencia, em ALTURAS do proprio bounding box, aplicada
+ * nos quatro lados. Funcao PURA.
+ *
+ * A escala e a ALTURA e nao a largura porque a altura de uma linha de texto e o
+ * tamanho do caractere: uma linha larga e baixa ('10 kVA 251328', 1361x327 px)
+ * com margem proporcional a LARGURA traria meia peca para dentro do anel, e o
+ * anel deixaria de descrever o fundo IMEDIATO da marcacao — que e a unica coisa
+ * que torna a medida invariante a iluminacao.
+ *
+ * O valor 1,0 e o que foi calibrado com as fotos reais (tabela em
+ * `contraste.ts`); mudar aqui invalida os limiares de la.
+ */
+const ANEL_EM_ALTURAS = 1;
+
+/**
+ * Retangulo expandido igualmente nos quatro lados, limitado a foto. Funcao PURA.
+ */
+export function calcularEnvelope(
+  dentro: RetanguloPx,
+  folgaEmPx: number,
+  largura: number,
+  altura: number,
+): RetanguloPx {
+  const esquerda = Math.max(0, Math.floor(dentro.left - folgaEmPx));
+  const topo = Math.max(0, Math.floor(dentro.top - folgaEmPx));
+  const direita = Math.min(
+    largura,
+    Math.ceil(dentro.left + dentro.width + folgaEmPx),
+  );
+  const base = Math.min(
+    altura,
+    Math.ceil(dentro.top + dentro.height + folgaEmPx),
+  );
+
+  return {
+    left: esquerda,
+    top: topo,
+    width: direita - esquerda,
+    height: base - topo,
+  };
+}
+
+/**
+ * Dimensoes da imagem DEPOIS da rotacao EXIF, a partir do que a metadata crua
+ * informa. Funcao PURA — e a correcao da armadilha descrita no topo do arquivo.
+ *
+ * Tags 5..8 do EXIF envolvem transposicao (rotacao de 90 ou 270 graus): a foto
+ * decodificada troca largura por altura. 1..4 (e ausente/invalida) nao trocam.
+ */
+export function dimensoesOrientadas(
+  largura: number,
+  altura: number,
+  orientacao: number | undefined,
+): { largura: number; altura: number } {
+  return orientacao !== undefined && orientacao >= 5 && orientacao <= 8
+    ? { largura: altura, altura: largura }
+    : { largura, altura };
+}
+
 /** Area da intersecao entre duas caixas normalizadas (0 = nao se tocam). */
 export function areaDaIntersecao(
   a: CaixaNormalizada,
@@ -257,11 +342,17 @@ export async function abrirImagem(
   let altura: number;
 
   try {
-    // `autoOrient` faz a metadata ja falar das dimensoes DEPOIS da rotacao
-    // EXIF — as mesmas coordenadas em que o servico de visao leu a foto.
+    // A metadata fala das dimensoes CRUAS (ver "ARMADILHA MEDIDA" no topo);
+    // `dimensoesOrientadas` as traz para o referencial em que o servico de
+    // visao leu a foto, que e o unico em que o bounding box faz sentido.
     const metadata = await sharp(imagem, { autoOrient: true }).metadata();
-    largura = metadata.width ?? 0;
-    altura = metadata.height ?? 0;
+    const orientadas = dimensoesOrientadas(
+      metadata.width ?? 0,
+      metadata.height ?? 0,
+      metadata.orientation,
+    );
+    largura = orientadas.largura;
+    altura = orientadas.altura;
   } catch (erro) {
     logger.warn(
       `imagem nao decodificou para recorte ` +
@@ -312,5 +403,65 @@ export async function abrirImagem(
         return null;
       }
     },
+
+    async medirRegiao(
+      caixa: CaixaNormalizada,
+    ): Promise<EstatisticasDeRegiao | null> {
+      const dentro = calcularRecorte(caixa, largura, altura, 0);
+      if (dentro === null) {
+        return null;
+      }
+
+      const fora = calcularEnvelope(
+        dentro,
+        dentro.height * ANEL_EM_ALTURAS,
+        largura,
+        altura,
+      );
+
+      try {
+        // Duas leituras de pixel do MESMO buffer. O anel sai por SUBTRACAO de
+        // histogramas (fora menos dentro) — o retangulo interno esta contido no
+        // externo, entao a conta e exata e nao materializa milhoes de pixels.
+        const [pixelsDentro, pixelsFora] = await Promise.all([
+          cinzaDe(sharp, imagem, dentro),
+          cinzaDe(sharp, imagem, fora),
+        ]);
+
+        const baldesDentro = histogramaDe(pixelsDentro);
+        const baldesFora = histogramaDe(pixelsFora);
+        const baldesAnel = new Uint32Array(256);
+        for (let valor = 0; valor < 256; valor++) {
+          baldesAnel[valor] = Math.max(
+            0,
+            baldesFora[valor] - baldesDentro[valor],
+          );
+        }
+
+        return {
+          dentro: resumirHistograma(baldesDentro),
+          anel: resumirHistograma(baldesAnel),
+        };
+      } catch (erro) {
+        logger.warn(
+          `medicao de contraste falhou: ` +
+            `${erro instanceof Error ? erro.message : String(erro)}`,
+        );
+        return null;
+      }
+    },
   };
+}
+
+/** Pixels em tom de cinza de um retangulo, na resolucao nativa. */
+function cinzaDe(
+  sharp: Sharp,
+  imagem: Buffer,
+  retangulo: RetanguloPx,
+): Promise<Buffer> {
+  return sharp(imagem, { autoOrient: true })
+    .extract(retangulo)
+    .greyscale()
+    .raw()
+    .toBuffer();
 }

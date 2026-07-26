@@ -18,6 +18,39 @@
 //      partir de uma leitura sozinha (`engine/corroboracao.ts`).
 
 /**
+ * COMO A MARCACAO FOI GRAVADA, como vocabulario fechado.
+ *
+ * - `relevo`: gravado no metal, mesma cor do tanque (serie chumbada);
+ * - `tinta`: serigrafia preta sobre o tanque;
+ * - `indefinido`: o nome do campo nao diz. Inclui de proposito os campos de
+ *   PLACA (`serie-placa`, `patrimonio-placa`): a placa da TRAEL e preta com
+ *   texto claro, mas placa clara com texto escuro existe, e amarrar o tipo dela
+ *   a um modelo especifico seria falso conhecimento. Placa resolve por ROTULO
+ *   (`N°`/`PATRIMONIO`), que e evidencia melhor que fisica de pixel.
+ */
+export type TipoDeMarcacao = 'relevo' | 'tinta' | 'indefinido';
+
+/**
+ * Tipo de marcacao esperado num campo, derivado do NOME (mesma limitacao,
+ * mesma saida futura e mesma falha segura descritas em `ehMarcacaoEmRelevo`).
+ *
+ * `-serigrafia-` e o segmento que a checklist do seed usa para tinta
+ * (`patrimonio-serigrafia-topo`), espelhando `-chumbada-` para relevo. Campo
+ * que nao declara nenhum dos dois fica `indefinido` — e `indefinido` NUNCA e
+ * casado por contraste, entao esquecer de nomear degrada para o comportamento
+ * de hoje (campo nulo, `nao_conferivel`), nunca para uma leitura chutada.
+ */
+export function tipoDeMarcacaoDoCampo(campo: string): TipoDeMarcacao {
+  if (ehMarcacaoEmRelevo(campo)) {
+    return 'relevo';
+  }
+
+  return segmentos(campo).some((segmento) => segmento.startsWith('serigrafia'))
+    ? 'tinta'
+    : 'indefinido';
+}
+
+/**
  * Marcacao gravada em RELEVO (baixo contraste), derivada do NOME DO CAMPO.
  *
  * LIMITACAO CONHECIDA, deliberada: a checklist do ProjetoModelo nao declara
@@ -44,17 +77,19 @@
  * nunca um `conforme` a mais.
  */
 export function ehMarcacaoEmRelevo(campo: string): boolean {
-  const normalizado = campo
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase();
-
   // Segmentos do nome, nunca `includes` solto: 'descumbrado' nao e chumbado.
   // 'relevo' entra como escape para o cliente que nomear a posicao de outro
   // jeito ('serie-relevo-topo') sem esperar a checklist estruturada.
-  return normalizado
-    .split('-')
-    .some(
-      (segmento) => segmento.startsWith('chumbad') || segmento === 'relevo',
-    );
+  return segmentos(campo).some(
+    (segmento) => segmento.startsWith('chumbad') || segmento === 'relevo',
+  );
+}
+
+/** Segmentos do nome do campo, sem acento e em caixa baixa. */
+function segmentos(campo: string): string[] {
+  return campo
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .split('-');
 }

@@ -12,6 +12,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { ConferenciasService } from './conferencias.service';
+import { ConferenciaConsultasService } from './consultas/conferencia-consultas.service';
 import { ConferenciaExecucaoService } from './conferencia-execucao.service';
 import { ConferenciaExtracaoService } from './conferencia-extracao.service';
 import { CreateConferenciaDto } from './dto/create-conferencia.dto';
@@ -21,7 +22,9 @@ import { UpdateConferenciaDto } from './dto/update-conferencia.dto';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
+  ApiOperation,
   ApiParam,
   ApiTags,
   ApiUnprocessableEntityResponse,
@@ -47,6 +50,7 @@ export class ConferenciasController {
     private readonly conferenciasService: ConferenciasService,
     private readonly conferenciaExecucaoService: ConferenciaExecucaoService,
     private readonly conferenciaExtracaoService: ConferenciaExtracaoService,
+    private readonly conferenciaConsultasService: ConferenciaConsultasService,
   ) {}
 
   @Post()
@@ -130,6 +134,41 @@ export class ConferenciasController {
       }),
       { page, limit },
     );
+  }
+
+  @Get(':id/campos')
+  @ApiParam({
+    name: 'id',
+    type: String,
+    required: true,
+  })
+  @ApiOperation({
+    summary: 'Releitura do veredito campo a campo, com as evidencias',
+    description:
+      'Remonta a tela de veredito SEM a resposta do POST: refresh, navegacao ' +
+      'entre telas (fotos numa, veredito noutra) ou abertura pelo historico ' +
+      'da peca reconstroem tudo daqui. Cada campo vem com sua foto-evidencia ' +
+      '(criterio 1 do SPEC). O veredito chega como a engine gravou — o front ' +
+      'nao recalcula nada.\n\n' +
+      'ATENCAO 1 — `fotoEvidencia.url` sob `FILE_DRIVER=s3` e uma URL ASSINADA ' +
+      'que EXPIRA EM 1 HORA. Nao persista essa URL em store de longa duracao ' +
+      'no cliente: apos a expiracao ela devolve 403 e a evidencia some da ' +
+      'tela. Recarregue esta rota para obter um link novo.\n\n' +
+      'ATENCAO 2 — o que a releitura NAO devolve, porque nao e persistido ' +
+      'nesta rodada: (a) `motivo` do campo (`sem-leitura`, ' +
+      '`confianca-abaixo-do-limiar`, `leituras-conflitantes`, ' +
+      '`leitura-de-outro-campo`, `leitura-nao-corroborada`) — o VEREDITO esta ' +
+      'gravado, o porque dele so existe na resposta do POST; (b) ' +
+      '`incoerencias` entre campos irmaos; (c) `achadosInconsistentes` da ' +
+      'extracao. O efeito de (b) sobre o `vereditoGeral` esta gravado, mas o ' +
+      'detalhe e efemero.\n\n' +
+      '`fonteFisica` e `obrigatorio` de cada campo sao RE-RESOLVIDOS da ' +
+      'checklist do ProjetoModelo da peca (CampoConferido nao os persiste) e ' +
+      'vem `null` se a peca nao tiver projeto vinculado.',
+  })
+  @ApiNotFoundResponse({ description: 'conferencia-inexistente' })
+  vereditoPorConferencia(@Param('id') id: string) {
+    return this.conferenciaConsultasService.vereditoPorConferencia(id);
   }
 
   @Get(':id')

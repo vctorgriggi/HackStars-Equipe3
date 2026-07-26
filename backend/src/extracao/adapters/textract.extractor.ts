@@ -14,7 +14,14 @@ import {
   LeituraExtraida,
   ResultadoExtracao,
 } from '../ports/extractor.port';
-import { ehMarcacaoEmRelevo } from '../ports/marcacao';
+import { ehMarcacaoEmRelevo, tipoDeMarcacaoDoCampo } from '../ports/marcacao';
+import {
+  AlvoTipado,
+  ClasseDeContraste,
+  casarPorContraste,
+  classificarMarcacao,
+  medicaoConclusiva,
+} from './contraste';
 import {
   CaixaNormalizada,
   ImagemRecortavel,
@@ -52,6 +59,20 @@ import {
  *    patrimonio em tinta preta era casado com o campo da serie chumbada — o
  *    numero errado entregue com confianca alta. Fixado em
  *    textract.extractor.spec.ts ("vista com duas marcacoes");
+ *
+ *    PASSO 3 (2026-07-26) — CONTRASTE: a recusa acima e correta mas cara, e o
+ *    que faltava era evidencia, nao coragem. A diferenca entre as duas
+ *    marcacoes e FISICA: patrimonio serigrafado e tinta preta (escuro contra o
+ *    tanque), serie chumbada e relevo da cor do fundo (contraste quase nulo).
+ *    Medindo a luminancia DENTRO do bounding box contra a do entorno
+ *    (`contraste.ts`), cada numero sem rotulo e classificado e vai para o alvo
+ *    cujo tipo esperado combina — e SO quando a classificacao e decisiva para
+ *    TODOS os numeros em disputa.
+ *
+ *    O passo 3 substitui o passo 2 quando roda, mas nunca o atropela por
+ *    ausencia: medicao inconclusiva (sem `sharp`, foto lisa, regiao pequena,
+ *    `EXTRACAO_RECORTE=off`) devolve o passo 2 intacto. So evidencia CONTRARIA
+ *    — classe decisiva que nao casa com alvo nenhum — deixa o campo nulo;
  * 4. `cliente-*` -> linha com mais letras;
  * 5. `potencia-*` -> linha que contem 'kVA'.
  *
@@ -100,6 +121,14 @@ const MAXIMO_DE_CHAMADAS_POR_FOTO = 1 + MARGENS_DE_CORROBORACAO.length;
 /** Valor que faz sentido corroborar por recorte: identificador numerico. */
 const PADRAO_VALOR_CORROBORAVEL = /^\d{6,}$/;
 
+/**
+ * Teto de regioes medidas por contraste numa foto. Nao e custo de AWS (medir e
+ * local), e teto de CPU e de ambicao: foto com uma duzia de numeros ambiguos e
+ * foto mal enquadrada, e a resposta certa para ela e reenquadrar, nao adivinhar
+ * mais forte. Passando do teto, nada e medido e os campos ficam nulos.
+ */
+const MAXIMO_DE_REGIOES_MEDIDAS = 8;
+
 /** Sequencia de digitos considerada candidata a serie/patrimonio. */
 const PADRAO_NUMERO = /\d{6,}/g;
 
@@ -125,6 +154,14 @@ interface CandidatoNumerico {
   valor: string;
   linha: LinhaOcr;
   familia: FamiliaNumerica | null;
+  /**
+   * Numero que so aparece DENTRO de uma linha com outro texto (o Textract junta
+   * marcacoes vizinhas: `"10 kVA 251328"` no topo da peca). Candidato fraco NAO
+   * participa dos passos 1 e 2 — la ele nao teria evidencia nenhuma a favor,
+   * so a posicao na frase. Ele so entra no passo 3, onde a classe de contraste
+   * paga por ele.
+   */
+  fraco: boolean;
 }
 
 /** Remove acentos e baixa a caixa — comparacao de rotulo, nao de valor. */
@@ -230,16 +267,56 @@ function lerLinhas(blocos: Block[]): LinhaOcr[] {
 }
 
 /**
+ * Classe de contraste medida em cada regiao (chave = `regiaoLeitura`, o JSON do
+ * bounding box). Mapa VAZIO = ninguem mediu nada, e o passo 3 nao acontece.
+ */
+export type ClassesPorRegiao = ReadonlyMap<string, ClasseDeContraste>;
+
+/**
+ * O que `interpretarBlocos` devolve MAIS o que o adapter precisa para decidir
+ * se vale medir pixel: as regioes dos numeros que sobraram sem dono.
+ *
+ * Elas nao entram em `ResultadoExtracao` de proposito — aquilo e contrato de
+ * porta (o que a visao afirma), e isto e andaime interno de UM adapter.
+ */
+export interface Interpretacao extends ResultadoExtracao {
+  regioesAmbiguas: string[];
+}
+
+/**
  * Blocos do Textract -> leituras + achados livres. Funcao PURA (sem I/O, sem
  * SDK em runtime, so o tipo `Block`), no mesmo espirito da engine de
  * conformidade: e a heuristica que decide o que a visao afirma, e todo
  * refinamento dela precisa ser exercitavel sem AWS.
+ *
+ * `classes` e a segunda evidencia opcional (`contraste.ts`): sem ela a funcao
+ * se comporta exatamente como antes de 2026-07-26. E por isso que a medicao de
+ * pixel pode faltar (sharp ausente, `EXTRACAO_RECORTE=off`, foto que nao
+ * decodifica) sem mudar nada alem da cobertura.
  */
 export function interpretarBlocos(
   blocos: Block[],
   alvos: CampoAlvo[],
   fonte: FonteImagem,
+  classes?: ClassesPorRegiao,
 ): ResultadoExtracao {
+  const { leituras, achadosLivres } = interpretarComPendencias(
+    blocos,
+    alvos,
+    fonte,
+    classes,
+  );
+
+  return { leituras, achadosLivres };
+}
+
+/** Como `interpretarBlocos`, mas conta tambem o que ficou ambiguo. PURA. */
+export function interpretarComPendencias(
+  blocos: Block[],
+  alvos: CampoAlvo[],
+  fonte: FonteImagem,
+  classes: ClassesPorRegiao = new Map(),
+): Interpretacao {
   const linhas = lerLinhas(blocos);
   const porCampo = new Map<string, LeituraExtraida>();
   // Linhas que viraram leitura de campo alvo. O que sobra e achado livre —
@@ -251,7 +328,14 @@ export function interpretarBlocos(
     porCampo.set(alvo.campo, leituraVazia(alvo.campo, fonte));
   }
 
-  resolverNumericos(linhas, alvos, fonte, porCampo, consumidas);
+  const regioesAmbiguas = resolverNumericos(
+    linhas,
+    alvos,
+    fonte,
+    porCampo,
+    consumidas,
+    classes,
+  );
   resolverTextuais(linhas, alvos, fonte, porCampo, consumidas);
 
   return {
@@ -260,6 +344,7 @@ export function interpretarBlocos(
       (alvo) => porCampo.get(alvo.campo) ?? leituraVazia(alvo.campo, fonte),
     ),
     achadosLivres: achadosDasLinhas(linhas, consumidas, fonte),
+    regioesAmbiguas,
   };
 }
 
@@ -281,18 +366,23 @@ function achadosDasLinhas(
     }));
 }
 
+/**
+ * Resolve os campos numericos e devolve as REGIOES que ficaram ambiguas (os
+ * numeros sem rotulo que sobraram com alvo pendente do outro lado).
+ */
 function resolverNumericos(
   linhas: LinhaOcr[],
   alvos: CampoAlvo[],
   fonte: FonteImagem,
   porCampo: Map<string, LeituraExtraida>,
   consumidas: Set<LinhaOcr>,
-): void {
+  classes: ClassesPorRegiao,
+): string[] {
   const alvosNumericos = alvos.filter(
     (alvo) => familiaDoCampo(alvo.campo) !== null,
   );
   if (alvosNumericos.length === 0) {
-    return;
+    return [];
   }
 
   const candidatos = candidatosNumericos(linhas);
@@ -304,7 +394,10 @@ function resolverNumericos(
   for (const alvo of alvosNumericos) {
     const familia = familiaDoCampo(alvo.campo);
     const daFamilia = candidatos.filter(
-      (candidato) => !usados.has(candidato) && candidato.familia === familia,
+      (candidato) =>
+        !usados.has(candidato) &&
+        !candidato.fraco &&
+        candidato.familia === familia,
     );
 
     if (daFamilia.length !== 1) {
@@ -321,6 +414,39 @@ function resolverNumericos(
     );
   }
 
+  const disponiveis = candidatos.filter((candidato) => !usados.has(candidato));
+  const tipados = pendentes.map((alvo) => ({
+    campo: alvo.campo,
+    tipo: tipoDeMarcacaoDoCampo(alvo.campo),
+  }));
+  // So vale medir pixel quando ha alvo pendente cujo TIPO o nome declara. A
+  // vista da PLACA cai fora de proposito: os dois campos dela sao `indefinido`
+  // (`ports/marcacao.ts`), e e o que preserva o cenario-ancora.
+  const podeMedir =
+    disponiveis.length > 0 &&
+    tipados.some((alvo) => alvo.tipo !== 'indefinido');
+
+  // Passo 3 — CONTRASTE (2026-07-26). Ele SUBSTITUI o passo 2 — mas SO quando a
+  // medicao concluiu alguma coisa sobre TODOS os numeros em disputa.
+  //
+  // A condicao e `medicaoConclusiva`, e ela separa dois estados que de longe
+  // parecem iguais: "a foto respondeu que este numero nao e desta marcacao"
+  // (evidencia contraria, que proibe o passo 2) e "nao deu para medir"
+  // (ausencia de evidencia, que nao pode custar nada). No segundo caso cai-se
+  // no passo 2 identico ao de antes — e e o que mantem a corroboracao por
+  // recorte funcionando em foto lisa, sem textura para medir.
+  if (podeMedir && medicaoConclusiva(classesDe(disponiveis, classes))) {
+    resolverPorContraste(
+      tipados,
+      disponiveis,
+      fonte,
+      porCampo,
+      consumidas,
+      classes,
+    );
+    return [];
+  }
+
   // Passo 2 — sem rotulo. Aceita apenas o caso 1-para-1: UM numero livre para
   // UM campo pendente (a vista que carrega uma marcacao numerica so, como a
   // traseira). Qualquer outra combinacao fica nula: chutar qual numero e serie
@@ -328,8 +454,12 @@ function resolverNumericos(
   // chumbada + patrimonio serigrafado) um unico numero legivel NAO resolve
   // nada — os dois campos saem nulos e viram `nao_conferivel`, que e o
   // veredito honesto para "vi uma marcacao das duas e nao sei qual".
-  const livres = candidatos.filter(
-    (candidato) => !usados.has(candidato) && candidato.familia === null,
+  //
+  // Continua sendo o caminho quando NAO ha o que medir: sem `sharp`, com
+  // `EXTRACAO_RECORTE=off` ou com foto que nao decodifica, o adapter degrada
+  // exatamente para o comportamento anterior a 2026-07-26.
+  const livres = disponiveis.filter(
+    (candidato) => candidato.familia === null && !candidato.fraco,
   );
   if (livres.length === 1 && pendentes.length === 1) {
     const alvo = pendentes[0];
@@ -338,11 +468,107 @@ function resolverNumericos(
       alvo.campo,
       leituraDaLinha(alvo.campo, livres[0].valor, livres[0].linha, fonte),
     );
-    return;
   }
 
-  // Campo pendente fica com a leitura vazia registrada no inicio; quem loga o
-  // caso e o adapter, que tem o Logger.
+  // Campo pendente que ficou sem leitura mantem a vazia registrada no inicio.
+  // As regioes voltam para o adapter medir — e ele reinterpreta com o mapa.
+  return podeMedir ? regioesDe(disponiveis) : [];
+}
+
+/**
+ * Classe medida de cada candidato. Candidato sem bounding box, ou que nao foi
+ * medido, entra como `indeterminado` — a duvida tem de ser VISIVEL para
+ * `medicaoConclusiva`, nunca sumir do conjunto.
+ */
+function classesDe(
+  candidatos: CandidatoNumerico[],
+  classes: ClassesPorRegiao,
+): ClasseDeContraste[] {
+  return candidatos.map((candidato) =>
+    candidato.linha.regiao === null
+      ? 'indeterminado'
+      : (classes.get(candidato.linha.regiao) ?? 'indeterminado'),
+  );
+}
+
+/**
+ * Regioes dos candidatos, ou VAZIO se algum nao tiver bounding box.
+ *
+ * Tudo ou nada de proposito: um numero que nao tem onde ser medido e um numero
+ * que poderia ser de qualquer alvo, e resolver os outros "por eliminacao" com
+ * ele solto na foto e exatamente o chute que este arquivo nao da.
+ */
+function regioesDe(candidatos: CandidatoNumerico[]): string[] {
+  const regioes = candidatos.map((candidato) => candidato.linha.regiao);
+
+  return regioes.some((regiao) => regiao === null) ? [] : (regioes as string[]);
+}
+
+/**
+ * Passo 3: casa numero -> campo pela classe de contraste medida na regiao.
+ *
+ * POR QUE ELE SUBSTITUI O PASSO 2 (e nao apenas complementa) quando ha medicao:
+ * o passo 2 resolve por CONTAGEM ("sobrou um numero e um campo, entao e ele"),
+ * e a contagem erra feio quando a foto de uma vista pega outra marcacao de
+ * relance. Medido em `LATERAL-DIREITA-2.jpg`: a foto mostra a serie chumbada
+ * (relevo), a etiqueta e a PLACA; a etiqueta leva rotulo `Núm Série:` e por
+ * proximidade rotula tambem o relevo, entao o unico numero "sem rotulo" que
+ * sobra e o `847833` DA PLACA — e o passo 2 o entregava como serie chumbada da
+ * lateral. Numero errado, campo errado, e uma peca correta caminhando para
+ * `divergente`. O contraste ve que aquele `847833` e texto CLARO sobre fundo
+ * PRETO (placa) e que o `847233` do tanque e relevo, e entrega o certo.
+ *
+ * DUAS EVIDENCIAS TEM DE CONCORDAR. O par so vale se o ROTULO nao contradisser:
+ * candidato rotulado como `patrimonio` nunca vai para campo de serie, mesmo que
+ * o pixel diga o contrario. Rotulo silencioso (o caso comum na serigrafia) nao
+ * veta nada — ele so nao ajuda.
+ *
+ * E SE A MEDICAO NAO DECIDIR? Os campos ficam nulos, e nao ha volta ao passo 2.
+ * E deliberado: quando se mediu e nao deu para afirmar, cair na contagem seria
+ * ignorar a evidencia que acabou de ser paga. Nulo vira `nao_conferivel` — a
+ * peca continua barrada, e a mensagem passa a ser "confira a foto".
+ */
+function resolverPorContraste(
+  tipados: AlvoTipado[],
+  disponiveis: CandidatoNumerico[],
+  fonte: FonteImagem,
+  porCampo: Map<string, LeituraExtraida>,
+  consumidas: Set<LinhaOcr>,
+  classes: ClassesPorRegiao,
+): void {
+  const pares = casarPorContraste(
+    tipados,
+    disponiveis.map((candidato) => ({
+      chave: candidato.linha.regiao ?? '',
+      // Ausencia vira `indeterminado` explicito: `casarPorContraste` trata
+      // duvida como veneno do conjunto, que e o que se quer.
+      classe:
+        candidato.linha.regiao === null
+          ? 'indeterminado'
+          : (classes.get(candidato.linha.regiao) ?? 'indeterminado'),
+    })),
+  );
+
+  for (const par of pares) {
+    const escolhido = disponiveis.find(
+      (candidato) => candidato.linha.regiao === par.chave,
+    );
+    if (escolhido === undefined) {
+      continue;
+    }
+
+    // VETO DO ROTULO: pixel propoe, rotulo pode recusar.
+    const familiaDoAlvo = familiaDoCampo(par.campo);
+    if (escolhido.familia !== null && escolhido.familia !== familiaDoAlvo) {
+      continue;
+    }
+
+    consumidas.add(escolhido.linha);
+    porCampo.set(
+      par.campo,
+      leituraDaLinha(par.campo, escolhido.valor, escolhido.linha, fonte),
+    );
+  }
 }
 
 function candidatosNumericos(linhas: LinhaOcr[]): CandidatoNumerico[] {
@@ -371,8 +597,17 @@ function candidatosNumericos(linhas: LinhaOcr[]): CandidatoNumerico[] {
     const familiaNaLinha = familiaDoTexto(linha.textoNormalizado);
 
     if (!soNumero && familiaNaLinha === null) {
-      // Linha com numero embutido em texto que nao e rotulo conhecido
-      // (ex.: uma norma tecnica) — nao e leitura de campo.
+      // Linha com numero embutido em texto que nao e rotulo conhecido. Entra
+      // como candidato FRACO — e so se o numero for um TOKEN inteiro.
+      if (!ehTokenIsolado(linha.texto, numeros[0])) {
+        continue;
+      }
+      candidatos.push({
+        valor: numeros[0],
+        linha,
+        familia: familiaVizinha(linha, rotulos),
+        fraco: true,
+      });
       continue;
     }
 
@@ -380,10 +615,27 @@ function candidatosNumericos(linhas: LinhaOcr[]): CandidatoNumerico[] {
       valor: numeros[0],
       linha,
       familia: familiaNaLinha ?? familiaVizinha(linha, rotulos),
+      fraco: false,
     });
   }
 
   return candidatos;
+}
+
+/**
+ * O numero e um TOKEN inteiro da linha, e nao um pedaco de codigo maior.
+ *
+ * POR QUE EXISTE (medido em `TOPO-2.jpg`): o Textract devolveu a serigrafia do
+ * topo como UMA linha, `"10 kVA 251328"` — potencia e patrimonio grudados. A
+ * regra antiga ("ou a linha e so o numero, ou tem rotulo conhecido") descartava
+ * essa linha inteira, e o patrimonio do topo ficava invisivel para a heuristica.
+ *
+ * `TPD-408136` continua descartado, e e o ponto: `408136` esta DENTRO de um
+ * codigo, nao e um numero por si. Exigir token inteiro separa os dois casos sem
+ * lista de excecoes.
+ */
+function ehTokenIsolado(texto: string, numero: string): boolean {
+  return texto.split(/\s+/).includes(numero);
 }
 
 /**
@@ -544,7 +796,8 @@ export class TextractExtractor extends ExtractorPort {
     // inteira. Sem retry proprio — o retry do SDK ja cobre falha transitoria e
     // reprocessar imagem em laco e o risco de custo que a constraint 4 proibe.
     const resposta = await this.detectar(fonte.imagem);
-    const resultado = interpretarBlocos(resposta.Blocks ?? [], alvos, fonte);
+    const blocos = resposta.Blocks ?? [];
+    const resultado = await this.interpretarComContraste(blocos, alvos, fonte);
 
     const semLeitura = resultado.leituras
       .filter((leitura) => leitura.valorLido === null)
@@ -560,6 +813,85 @@ export class TextractExtractor extends ExtractorPort {
       ...resultado,
       leituras: await this.corroborarRelevos(fonte, resultado.leituras),
     };
+  }
+
+  /**
+   * Interpreta os blocos e, se sobrou numero sem dono, MEDE o contraste das
+   * regioes ambiguas e interpreta de novo com essa evidencia.
+   *
+   * Duas passadas na mesma resposta, e a segunda e pura e de graca: ZERO
+   * chamada AWS a mais (constraint 4 do SPEC), so aritmetica sobre bytes que ja
+   * estao na memoria. O teto de 3 chamadas de visao por foto continua intacto.
+   *
+   * DEGRADACAO: sem `sharp`, com `EXTRACAO_RECORTE=off`, com foto que nao
+   * decodifica ou com ambiguidade grande demais, o mapa de classes sai vazio e
+   * o resultado e o da PRIMEIRA passada — exatamente o comportamento anterior a
+   * esta mudanca. A medicao so acrescenta cobertura; ela nunca e pre-requisito.
+   */
+  private async interpretarComContraste(
+    blocos: Block[],
+    alvos: CampoAlvo[],
+    fonte: FonteImagem,
+  ): Promise<ResultadoExtracao> {
+    const primeira = interpretarComPendencias(blocos, alvos, fonte);
+    if (primeira.regioesAmbiguas.length === 0) {
+      return primeira;
+    }
+
+    const classes = await this.classificarRegioes(
+      fonte,
+      primeira.regioesAmbiguas,
+    );
+    if (classes.size === 0) {
+      return primeira;
+    }
+
+    return interpretarBlocos(blocos, alvos, fonte, classes);
+  }
+
+  /** Mede cada regiao ambigua e a classifica. Mapa vazio = "nao deu para medir". */
+  private async classificarRegioes(
+    fonte: FonteImagem,
+    regioes: string[],
+  ): Promise<Map<string, ClasseDeContraste>> {
+    if (regioes.length > MAXIMO_DE_REGIOES_MEDIDAS) {
+      this.logger.warn(
+        `contraste-nao-medido em ${fonte.fonteFisica}: ${regioes.length} ` +
+          `numeros ambiguos (teto ${MAXIMO_DE_REGIOES_MEDIDAS}); ` +
+          `os campos seguem nulos (nao_conferivel)`,
+      );
+      return new Map();
+    }
+
+    const imagem = await abrirImagem(fonte.imagem);
+    if (imagem === null) {
+      this.logger.warn(
+        `contraste-nao-medido em ${fonte.fonteFisica}: imagem indisponivel ` +
+          `para leitura de pixel; os campos seguem nulos (nao_conferivel)`,
+      );
+      return new Map();
+    }
+
+    const classes = new Map<string, ClasseDeContraste>();
+
+    for (const regiao of regioes) {
+      const caixa = lerCaixa(regiao);
+      const estatisticas =
+        caixa === null ? null : await imagem.medirRegiao(caixa);
+      // `indeterminado` explicito, e nao ausencia: `casarPorContraste` trata a
+      // duvida como veneno do conjunto inteiro, e e isso que se quer aqui.
+      const classe =
+        estatisticas === null
+          ? 'indeterminado'
+          : classificarMarcacao(estatisticas);
+
+      this.logger.debug(
+        `contraste em ${fonte.fonteFisica}: ${regiao} -> ${classe}`,
+      );
+      classes.set(regiao, classe);
+    }
+
+    return classes;
   }
 
   private detectar(imagem: Buffer) {

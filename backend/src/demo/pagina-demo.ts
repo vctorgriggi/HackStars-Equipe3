@@ -15,6 +15,23 @@
  * sai da checklist do ProjetoModelo (campo 'etapa' por item) cruzada com a
  * 'ordem' dos Checkpoints, ambas buscadas na API depois do login. Sem esses
  * dados a página mostra todas as fontes sem destaque — nunca bloqueia.
+ *
+ * Três decisões de tela que valem mais que o CSS:
+ *
+ * 1. O passo 3 abre com PROGRESSO ("faltam 2 de 3 vistas desta etapa") e as
+ *    vistas sem campo na checklist ficam recolhidas em "outras vistas" — o
+ *    time se perdia entre nove cartões de peso igual. Vista com estado (foto,
+ *    envio em voo, falha) nunca é recolhida.
+ * 2. REPETIR o teste é o uso real: a página guarda o File de cada upload e o
+ *    botão do passo 4 vira "reenviar as mesmas fotos". Evidência não se
+ *    reaproveita (cada FotoEvidencia pertence a UMA conferência — 422
+ *    foto-evidencia-de-outra-conferencia), mas os bytes sobem de novo sem
+ *    ninguém voltar à peça.
+ * 3. O veredito abre com as DUAS PERGUNTAS do produto (serigrafia × etiqueta;
+ *    séries irmãs entre si) e os campos vêm agrupados por resultado, não pela
+ *    ordem da checklist. Isso é AGRUPAMENTO E ROTULAGEM do que a API mandou:
+ *    nenhuma comparação, nenhum limiar e nenhum veredito nascem aqui — a
+ *    página conta vereditos prontos (regra de ouro do CLAUDE.md).
  */
 export const PAGINA_DEMO = `<!doctype html>
 <html lang="pt-BR">
@@ -66,16 +83,30 @@ export const PAGINA_DEMO = `<!doctype html>
     padding: 14px;
     margin-bottom: 14px;
   }
-  section h2 {
+  /* ASSISTENTE: um passo aberto por vez. O concluído vira uma linha de resumo
+     clicável e o futuro fica inerte — empilhar seis formulários abertos é o
+     que fazia o time se perder no celular. */
+  section.passo { padding: 0; overflow: hidden; margin-bottom: 12px; }
+  section.passo.atual { border-color: var(--aco); }
+  section.passo.futuro { opacity: .5; }
+  .cabecalho {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin: 0 0 10px;
-    font-size: 15px;
-    letter-spacing: .02em;
+    width: 100%;
+    min-height: 62px;
+    padding: 11px 14px;
+    text-align: left;
+    font: inherit;
     color: var(--tinta);
+    background: #fff;
+    border: 0;
+    border-radius: 0;
+    cursor: pointer;
   }
-  section h2 .num {
+  section.passo.atual > .cabecalho { background: var(--aco); color: #fff; }
+  section.passo.futuro > .cabecalho { cursor: default; }
+  .cabecalho .num {
     flex: none;
     display: inline-flex;
     align-items: center;
@@ -87,6 +118,23 @@ export const PAGINA_DEMO = `<!doctype html>
     font-size: 16px;
     font-weight: 700;
   }
+  section.passo.atual > .cabecalho .num { background: #fff; color: var(--aco); }
+  section.passo.concluido > .cabecalho .num { background: var(--verde); color: #fff; }
+  .cabecalho .rotulo { flex: none; font-size: 15px; font-weight: 700; letter-spacing: .02em; }
+  .cabecalho .resumo {
+    flex: 1 1 auto; min-width: 0; text-align: right;
+    font-size: 14px; color: var(--tinta-fraca); word-break: break-word;
+  }
+  section.passo.atual > .cabecalho .resumo { color: #c6d2dd; }
+  .cabecalho .acao {
+    flex: none; font-size: 12px; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--acento); font-weight: 700;
+  }
+  section.passo.atual > .cabecalho .acao,
+  section.passo.futuro > .cabecalho .acao,
+  section.passo.pendente > .cabecalho .acao { visibility: hidden; }
+  section.passo .corpo { padding: 12px 14px 14px; border-top: 1px solid var(--borda); }
+  section.passo:not(.atual) > .corpo { display: none; }
   [data-bloqueado="1"] { opacity: .45; pointer-events: none; }
   .contexto {
     margin: 0 0 12px;
@@ -135,12 +183,6 @@ export const PAGINA_DEMO = `<!doctype html>
     text-transform: uppercase;
   }
   button.principal.alternativa { background: var(--aco); border-color: var(--aco); font-size: 17px; }
-  .resumo-passo {
-    display: flex; align-items: center; gap: 10px; justify-content: space-between;
-    padding: 10px 12px; border-radius: 4px; font-size: 14px;
-    background: var(--verde-fundo); border: 1px solid var(--verde); color: var(--verde);
-  }
-  .resumo-passo[hidden] { display: none; }
   #login-corpo[hidden] { display: none; }
   .faixa-extracao {
     font-size: 14px; padding: 10px 12px; margin-bottom: 10px;
@@ -160,21 +202,54 @@ export const PAGINA_DEMO = `<!doctype html>
   .linha-botoes { display: flex; flex-wrap: wrap; gap: 8px; }
   .linha-botoes > * { flex: 1 1 160px; }
   .grade-etapas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .grade-etapas button { min-height: 62px; line-height: 1.2; }
+  .grade-etapas button {
+    min-height: 76px; line-height: 1.2; padding: 10px 12px; text-align: left;
+  }
   .grade-etapas button[aria-pressed="true"] {
     background: var(--acento);
     border-color: var(--acento);
     color: #fff;
     box-shadow: inset 0 0 0 2px #fff, 0 0 0 2px var(--acento);
   }
+  .grade-etapas .nome-etapa { display: block; font-size: 15px; font-weight: 700; }
+  .grade-etapas .sub-etapa { display: block; font-size: 12px; margin-top: 4px; opacity: .85; }
+  .grade-etapas button.sem-etapa { grid-column: 1 / -1; min-height: 62px; }
   .aviso { font-size: 14px; padding: 10px 12px; border-radius: 4px; margin-top: 10px; }
   .aviso.erro { background: var(--vermelho-fundo); color: var(--vermelho); border: 1px solid var(--vermelho); }
   .aviso.ok { background: var(--verde-fundo); color: var(--verde); border: 1px solid var(--verde); }
   .aviso.neutro { background: #eef1f4; color: var(--tinta-fraca); border: 1px solid var(--borda); }
   .aviso[hidden] { display: none; }
+  /* Progresso do passo 3: a pergunta "o que falta AGORA" tem de caber num
+     relance, antes de qualquer cartão. */
+  .progresso {
+    margin: 0 0 10px;
+    padding: 11px 12px;
+    border: 1px solid var(--borda);
+    border-radius: 4px;
+    background: #eef1f4;
+  }
+  .progresso[hidden] { display: none; }
+  .progresso .texto { font-size: 16px; font-weight: 700; color: var(--tinta); }
+  .progresso .barra {
+    height: 10px; margin-top: 8px; border-radius: 5px;
+    background: #dbe0e6; overflow: hidden;
+  }
+  .progresso .cheio { height: 100%; background: var(--acento); }
+  .progresso .faltando {
+    font-size: 13px; margin-top: 6px; color: var(--tinta-fraca);
+    word-break: break-word;
+  }
+  .progresso .faltando b { font-family: ui-monospace, Menlo, Consolas, monospace; color: var(--tinta); }
+  .progresso.completo { background: var(--verde-fundo); border-color: var(--verde); }
+  .progresso.completo .texto { color: var(--verde); }
+  .progresso.completo .cheio { background: var(--verde); }
+  #outras-vistas { margin-top: 10px; }
+  #outras-vistas[hidden] { display: none; }
+  #outras-vistas .corpo-outras { padding: 0 10px 10px; }
   .item-foto {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 10px;
     padding: 10px;
     margin-bottom: 6px;
@@ -185,7 +260,11 @@ export const PAGINA_DEMO = `<!doctype html>
   }
   .item-foto.desta-etapa { border-color: var(--acento); background: #f4f8fb; }
   .item-foto.fora-etapa { opacity: .62; background: #f7f8f9; }
-  .item-foto .nome { flex: 1 1 auto; font-size: 15px; font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .item-foto.tem-foto { border-left-color: var(--verde); }
+  .item-foto .nome { flex: 1 1 150px; min-width: 0; font-size: 15px; font-family: ui-monospace, Menlo, Consolas, monospace; }
+  /* Duas portas para a mesma vista: a câmera (produção) e a galeria (repetir o
+     teste com as fotos que já estão no celular, sem refotografar a peça). */
+  .acoes-vista { display: flex; gap: 6px; flex: 0 0 auto; margin-left: auto; }
   .item-foto .estado { display: block; font-size: 13px; color: var(--tinta-fraca); font-family: inherit; }
   .item-foto .estado.falhou { color: var(--vermelho); }
   .item-foto .marca-etapa {
@@ -208,7 +287,8 @@ export const PAGINA_DEMO = `<!doctype html>
     font-size: 15px;
     cursor: pointer;
   }
-  .botao-foto.grande { min-height: 60px; min-width: 132px; font-size: 16px; font-weight: 600; }
+  .botao-foto.grande { min-height: 60px; min-width: 118px; font-size: 16px; font-weight: 600; }
+  .botao-foto.galeria { min-height: 60px; min-width: 78px; font-size: 14px; color: var(--tinta-fraca); }
   .miniatura {
     width: 46px; height: 46px; object-fit: cover;
     border: 1px solid var(--borda); border-radius: 4px; background: #e6e9ec;
@@ -238,6 +318,38 @@ export const PAGINA_DEMO = `<!doctype html>
   .v-divergente { background: var(--vermelho-fundo); border-color: var(--vermelho); color: var(--vermelho); }
   .v-nao_conferivel { background: var(--ambar-fundo); border-color: var(--ambar); color: var(--ambar); }
   .v-conforme { background: var(--verde-fundo); border-color: var(--verde); color: var(--verde); }
+  .v-incoerente { background: var(--violeta-fundo); border-color: var(--violeta); color: var(--violeta); }
+  .v-ausente { background: #eef1f4; border-color: var(--borda); color: var(--tinta-fraca); }
+  /* AS DUAS PERGUNTAS: no topo do veredito porque são o que o time realmente
+     pergunta na frente da peça. Só agrupa e rotula vereditos que a API emitiu —
+     nenhuma comparação acontece aqui (regra de ouro). */
+  .cartao-foco {
+    border: 2px solid; border-radius: 6px; padding: 12px 14px; margin-bottom: 10px;
+  }
+  .cartao-foco .pergunta { font-size: 15px; font-weight: 700; line-height: 1.3; }
+  .cartao-foco .resposta {
+    font-size: 20px; font-weight: 700; letter-spacing: .03em; margin-top: 6px; line-height: 1.2;
+  }
+  .cartao-foco .detalhe-foco { font-size: 14px; margin-top: 4px; color: var(--tinta); }
+  .cartao-foco .campos-foco {
+    font-size: 12px; margin-top: 6px; color: var(--tinta-fraca);
+    font-family: ui-monospace, Menlo, Consolas, monospace; word-break: break-word;
+  }
+  .nota-foco { font-size: 12px; color: var(--tinta-fraca); margin: -4px 0 14px; }
+  /* Campos agrupados por RESULTADO (divergente → não conferível → conforme):
+     na ordem da checklist, o que impede o conforme se perdia no meio. */
+  .grupo-campos { margin-bottom: 12px; }
+  .grupo-campos .titulo-grupo {
+    font-size: 14px; font-weight: 700; letter-spacing: .05em;
+    text-transform: uppercase; margin: 0 0 6px;
+  }
+  .grupo-campos.g-divergente .titulo-grupo { color: var(--vermelho); }
+  .grupo-campos.g-nao_conferivel .titulo-grupo { color: var(--ambar); }
+  .grupo-campos.g-conforme > summary { color: var(--verde); font-weight: 700; }
+  details.grupo-campos { background: transparent; border: 0; }
+  details.grupo-campos > summary {
+    padding: 10px 0; font-size: 14px; letter-spacing: .05em; text-transform: uppercase;
+  }
   .bloco-coerencia {
     border: 2px solid var(--violeta); background: var(--violeta-fundo);
     border-radius: 6px; padding: 14px; margin-bottom: 14px;
@@ -331,89 +443,146 @@ export const PAGINA_DEMO = `<!doctype html>
 <body>
 <header>
   <h1>TRAEL — conferência de peça</h1>
-  <p>Demonstração guiada: siga os passos 0 a 5. Cada passo diz o que a linha fará sozinha em produção.</p>
+  <p>Um passo por vez. Cada passo diz o que a linha fará sozinha em produção.</p>
 </header>
 <main>
 
-  <section id="sec-login">
-    <h2><span class="num">0</span> Entrar</h2>
-    <div id="login-corpo">
-      <label class="rotulo" for="email">E-mail</label>
-      <input type="email" id="email" value="admin@example.com" autocomplete="username" autocapitalize="none" spellcheck="false">
-      <label class="rotulo" for="senha">Senha</label>
-      <input type="password" id="senha" value="secret" autocomplete="current-password">
-      <div class="linha-botoes" style="margin-top:12px">
-        <button id="btn-login" class="largo">Entrar</button>
+  <section class="passo" id="sec-login" data-passo="login">
+    <button type="button" class="cabecalho" id="cab-login">
+      <span class="num">0</span>
+      <span class="rotulo">Entrar</span>
+      <span class="resumo" id="resumo-login">não conectado</span>
+      <span class="acao">trocar</span>
+    </button>
+    <div class="corpo">
+      <p class="contexto">Em produção o aparelho da etapa já nasce autenticado; aqui entramos com o usuário de demonstração para a API liberar as chamadas.</p>
+      <div id="login-corpo">
+        <label class="rotulo" for="email">E-mail</label>
+        <input type="email" id="email" value="admin@example.com" autocomplete="username" autocapitalize="none" spellcheck="false">
+        <label class="rotulo" for="senha">Senha</label>
+        <input type="password" id="senha" value="secret" autocomplete="current-password">
+        <div class="linha-botoes" style="margin-top:12px">
+          <button id="btn-login" class="principal largo">ENTRAR</button>
+        </div>
       </div>
+      <div class="linha-botoes" style="margin-top:10px">
+        <button id="btn-trocar-login" class="secundario compacto" hidden>Sair desta sessão</button>
+      </div>
+      <div id="login-aviso" class="aviso neutro" hidden></div>
     </div>
-    <div id="login-resumo" class="resumo-passo" hidden>
-      <span id="login-quem">Conectado.</span>
-      <button id="btn-trocar-login" class="secundario compacto">Trocar</button>
-    </div>
-    <div id="login-aviso" class="aviso neutro" hidden></div>
   </section>
 
-  <section id="sec-etapa" data-bloqueado="1">
-    <h2><span class="num">1</span> Etapa da linha</h2>
-    <p class="contexto">Em produção cada câmera fixa nasce amarrada a uma etapa; aqui você escolhe qual câmera está simulando.</p>
-    <div class="grade-etapas" id="grade-etapas">
-      <button class="secundario etapa" data-codigo="adesivacao" aria-pressed="false">Adesivação</button>
-      <button class="secundario etapa" data-codigo="serigrafia" aria-pressed="false">Serigrafia</button>
-      <button class="secundario etapa" data-codigo="oleo-conferencia" aria-pressed="false">Óleo e conferência</button>
-      <button class="secundario etapa" data-codigo="fixacao-placa" aria-pressed="false">Fixação da placa</button>
+  <section class="passo" id="sec-etapa" data-passo="etapa" data-bloqueado="1">
+    <button type="button" class="cabecalho" id="cab-etapa">
+      <span class="num">1</span>
+      <span class="rotulo">Etapa</span>
+      <span class="resumo" id="resumo-etapa">a escolher</span>
+      <span class="acao">trocar</span>
+    </button>
+    <div class="corpo">
+      <p class="contexto">Em produção cada câmera fixa nasce amarrada a <b>uma</b> etapa; aqui você escolhe qual câmera este celular está simulando. A escolha fica guardada neste aparelho — abrir a página de novo já volta nela.</p>
+      <div class="grade-etapas" id="grade-etapas"></div>
+      <p class="dica" id="etapa-dica">Carregando as etapas da linha...</p>
     </div>
-    <p class="dica" id="etapa-dica">Nenhuma etapa escolhida — a conferência será registrada sem etapa.</p>
   </section>
 
-  <section id="sec-qr" data-bloqueado="1">
-    <h2><span class="num">2</span> Escanear a etiqueta da peça</h2>
-    <p class="contexto">Em produção a câmera lê o QR sozinha quando a peça chega; a etiqueta é a fonte da verdade — o sistema nunca inventa valor esperado.</p>
-    <div class="linha-botoes">
-      <button id="btn-camera" class="principal alternativa largo">Ler QR com a câmera</button>
-    </div>
-    <div id="qr-aviso" class="aviso neutro" hidden></div>
-    <div id="camera-area" hidden>
-      <video id="video" playsinline muted></video>
+  <section class="passo" id="sec-qr" data-passo="etiqueta" data-bloqueado="1">
+    <button type="button" class="cabecalho" id="cab-etiqueta">
+      <span class="num">2</span>
+      <span class="rotulo">Etiqueta</span>
+      <span class="resumo" id="resumo-etiqueta">a ler</span>
+      <span class="acao">trocar</span>
+    </button>
+    <div class="corpo">
+      <p class="contexto">Em produção a câmera lê o QR sozinha quando a peça chega. A etiqueta é a <b>fonte da verdade</b>: todo valor esperado sai daqui, e o sistema nunca inventa nenhum. Esta página não interpreta o conteúdo — quem lê os campos é a API.</p>
+      <div class="linha-botoes">
+        <button id="btn-camera" class="principal alternativa largo">LER O QR COM A CÂMERA</button>
+      </div>
+      <div id="qr-aviso" class="aviso neutro" hidden></div>
+      <div id="camera-area" hidden>
+        <video id="video" playsinline muted></video>
+        <div class="linha-botoes" style="margin-top:8px">
+          <button id="btn-parar-camera" class="secundario">Parar câmera</button>
+        </div>
+      </div>
+      <div class="linha-botoes" style="margin-top:10px">
+        <button id="btn-etiqueta-demo" class="secundario">Atalho de teste: etiqueta da peça de demonstração</button>
+      </div>
+      <p class="dica">O atalho preenche a etiqueta da peça de demonstração (série 847233, patrimônio 251328, cliente Energisa) para repetir o teste sem escanear de novo. <b>Existe só nesta página de teste</b> — o caminho de verdade é ler o QR.</p>
+      <label class="rotulo" for="payload">Conteúdo da etiqueta (o texto que a API vai interpretar)</label>
+      <textarea id="payload" spellcheck="false" autocapitalize="none">Pedido: 68202\nNúm. Série: 847233\nSeq: 86\nPatrimônio: 251328\nCliente: 143091 - Energisa Rondônia Distribuidora de Energia S.A\nTPD-408136</textarea>
       <div class="linha-botoes" style="margin-top:8px">
-        <button id="btn-parar-camera" class="secundario">Parar câmera</button>
+        <button id="btn-usar-etiqueta" class="secundario">Usar esta etiqueta e seguir</button>
       </div>
-    </div>
-    <label class="rotulo" for="payload">Conteúdo da etiqueta (o que a API vai interpretar)</label>
-    <textarea id="payload" spellcheck="false" autocapitalize="none">Pedido: 68202\nNúm. Série: 847233\nSeq: 86\nPatrimônio: 251328\nCliente: 143091 - Energisa Rondônia Distribuidora de Energia S.A\nTPD-408136</textarea>
-    <div id="qr-bruto" class="bloco-bruto" hidden>
-      <p class="titulo-bruto">Conteúdo bruto lido do QR (texto exato da etiqueta)</p>
-      <pre id="qr-bruto-texto"></pre>
-      <div class="linha-botoes" style="margin-top:8px">
-        <button id="btn-copiar-qr" class="secundario">Copiar</button>
+      <div id="qr-bruto" class="bloco-bruto" hidden>
+        <p class="titulo-bruto">Conteúdo bruto lido do QR (texto exato da etiqueta)</p>
+        <pre id="qr-bruto-texto"></pre>
+        <div class="linha-botoes" style="margin-top:8px">
+          <button id="btn-copiar-qr" class="secundario">Copiar</button>
+        </div>
       </div>
+      <p class="dica">Se a API responder que o formato não é reconhecido, ou que o QR traz só um código de lookup (HTTP 422), <b>copie o conteúdo bruto e mande para o time</b>: o formato do QR da TRAEL ainda está sendo fechado. Não é defeito da peça nem erro seu.</p>
     </div>
-    <p class="dica">Se a API responder que o formato não é reconhecido, ou que o QR traz só um código de lookup (HTTP 422), <b>copie o conteúdo bruto e mande para o time</b>: o formato do QR da TRAEL ainda está sendo fechado. Não é defeito da peça nem erro seu.</p>
   </section>
 
-  <section id="sec-fotos" data-bloqueado="1">
-    <h2><span class="num">3</span> Fotografar a peça</h2>
-    <p class="contexto">Em produção a câmera captura sozinha as vistas ao detectar a peça. Uma foto por vista: cada cartão diz quais marcações daquela face o sistema vai conferir.</p>
-    <p class="contexto">Vista com <b>mais de uma marcação</b> (o topo tem série chumbada e patrimônio serigrafado): enquadre as duas. Se a visão só conseguir ler um número, o sistema devolve <b>não conferível</b> em vez de adivinhar qual dos dois ele é — é o que impede o patrimônio serigrafado de ser lido como série chumbada.</p>
-    <p class="dica" id="fotos-recorte">Escolha uma etapa no passo 1 para ver quais vistas ela confere.</p>
-    <div id="lista-fotos"></div>
-    <div id="fotos-aviso" class="aviso neutro" hidden></div>
-  </section>
-
-  <section id="sec-conferir" data-bloqueado="1">
-    <h2><span class="num">4</span> Extrair e conferir</h2>
-    <p class="contexto">Em produção dispara automático na passagem da peça; aqui é um toque porque cada chamada de visão consome crédito AWS (nada roda em loop).</p>
-    <div class="linha-botoes">
-      <button id="btn-extrair" class="principal largo" disabled>EXTRAIR COM TEXTRACT</button>
+  <section class="passo" id="sec-fotos" data-passo="fotos" data-bloqueado="1">
+    <button type="button" class="cabecalho" id="cab-fotos">
+      <span class="num">3</span>
+      <span class="rotulo">Fotos</span>
+      <span class="resumo" id="resumo-fotos">nenhuma vista</span>
+      <span class="acao">trocar</span>
+    </button>
+    <div class="corpo">
+      <p class="contexto">Em produção a câmera captura sozinha as vistas ao detectar a peça. Uma foto por vista: cada cartão diz quais marcações daquela face o sistema vai conferir.</p>
+      <div id="fotos-progresso" class="progresso" hidden></div>
+      <p class="dica" id="fotos-recorte">Escolha uma etapa no passo 1 para ver quais vistas ela confere.</p>
+      <div id="lista-fotos"></div>
+      <details id="outras-vistas" hidden>
+        <summary id="outras-vistas-titulo">Outras vistas</summary>
+        <div class="corpo-outras" id="lista-outras"></div>
+      </details>
+      <p class="dica">Vista com <b>mais de uma marcação</b> (o topo tem série chumbada e patrimônio serigrafado): enquadre as duas. Se a visão só ler um número, o sistema devolve <b>não conferível</b> em vez de adivinhar qual dos dois ele é — é o que impede o patrimônio serigrafado de entrar como série chumbada.</p>
+      <div id="fotos-aviso" class="aviso neutro" hidden></div>
     </div>
-    <p class="dica" id="extrair-dica">Envie ao menos uma foto no passo 3 para liberar a extração.</p>
-    <div id="conferir-aviso" class="aviso neutro" hidden></div>
   </section>
 
-  <section id="sec-veredito" data-bloqueado="1">
-    <h2><span class="num">5</span> Veredito</h2>
-    <p class="contexto">Esta resposta é exatamente o que a tela final do app vai renderizar — o veredito nasce na API, nunca no navegador.</p>
-    <p class="dica" id="veredito-vazio">Ainda sem veredito: conclua o passo 4.</p>
-    <div id="resultado"></div>
+  <section class="passo" id="sec-conferir" data-passo="conferir" data-bloqueado="1">
+    <button type="button" class="cabecalho" id="cab-conferir">
+      <span class="num">4</span>
+      <span class="rotulo">Conferir</span>
+      <span class="resumo" id="resumo-conferir">aguardando fotos</span>
+      <span class="acao">trocar</span>
+    </button>
+    <div class="corpo">
+      <p class="contexto">Em produção dispara automático na passagem da peça; aqui é um toque porque cada chamada de visão consome crédito AWS (nada roda em loop).</p>
+      <div class="linha-botoes">
+        <button id="btn-extrair" class="principal largo" disabled>EXTRAIR COM TEXTRACT</button>
+      </div>
+      <p class="dica" id="extrair-dica">Envie ao menos uma foto no passo 3 para liberar a extração.</p>
+      <div id="conferir-aviso" class="aviso neutro" hidden></div>
+    </div>
+  </section>
+
+  <section class="passo" id="sec-veredito" data-passo="veredito" data-bloqueado="1">
+    <button type="button" class="cabecalho" id="cab-veredito">
+      <span class="num">5</span>
+      <span class="rotulo">Veredito</span>
+      <span class="resumo" id="resumo-veredito">ainda não</span>
+      <span class="acao">abrir</span>
+    </button>
+    <div class="corpo">
+      <p class="dica" id="veredito-vazio">Ainda sem veredito: conclua o passo 4.</p>
+      <div id="resultado"></div>
+      <div class="linha-botoes" id="acoes-fim" style="margin-top:14px" hidden>
+        <button id="btn-de-novo" class="principal largo">CONFERIR DE NOVO</button>
+      </div>
+      <div class="linha-botoes" id="acoes-fim-2" style="margin-top:8px" hidden>
+        <button id="btn-trocar-etapa" class="secundario">Conferir em outra etapa</button>
+        <button id="btn-zerar" class="secundario">Começar do zero</button>
+      </div>
+      <p class="dica" id="dica-fim" hidden>"Conferir de novo" reaproveita a peça e as fotos desta sessão — as mesmas imagens sobem como evidências novas, porque cada foto pertence a uma conferência só. "Começar do zero" descarta as fotos e volta para a etiqueta, mantendo a etapa deste aparelho.</p>
+      <p class="contexto">Esta resposta é exatamente o que a tela final do app vai renderizar — o veredito nasce na API, nunca no navegador.</p>
+    </div>
   </section>
 
   <section id="sec-avancado" data-bloqueado="1" style="padding:0">
@@ -432,6 +601,9 @@ export const PAGINA_DEMO = `<!doctype html>
         <div id="lista-leituras"></div>
         <div class="linha-botoes" style="margin-top:12px">
           <button id="btn-conferir" class="principal alternativa largo">CONFERIR AGORA</button>
+        </div>
+        <div class="linha-botoes" style="margin-top:10px">
+          <button id="btn-limpar-fotos" class="secundario compacto" disabled>Descartar as fotos desta sessão</button>
         </div>
         <div id="avancado-aviso" class="aviso neutro" hidden></div>
       </div>
@@ -473,6 +645,19 @@ export const PAGINA_DEMO = `<!doctype html>
 
   var CLIENTE = '143091 - Energisa Rondônia Distribuidora de Energia S.A';
 
+  // Atalho de TESTE: o mesmo texto que a etiqueta da peça de demonstração
+  // carrega. Existe porque repetir o teste é o uso real desta página e
+  // reescanear o QR a cada rodada é a fricção que mais custa tempo — o caminho
+  // de verdade (e o único que existirá em produção) continua sendo a câmera.
+  var ETIQUETA_DEMO = [
+    'Pedido: 68202',
+    'Núm. Série: 847233',
+    'Seq: 86',
+    'Patrimônio: 251328',
+    'Cliente: ' + CLIENTE,
+    'TPD-408136'
+  ].join('\\n');
+
   // Confianças medidas pelo Textract nas fotos reais (docs/visao-ocr.md): o
   // relevo lê melhor de cima (98,8%) do que de lado (85,8%).
   var PRESET_DEMO = {
@@ -511,6 +696,42 @@ export const PAGINA_DEMO = `<!doctype html>
     'fixacao-placa': CAMPOS_FALLBACK.map(function (item) { return item.campo; })
   };
 
+  // Código de erro da API -> o que fazer, em português de chão de fábrica.
+  // A mensagem crua continua aparecendo junto (é ela que o time cola no chat
+  // quando pede ajuda); isto é tradução, não substituição.
+  var EXPLICACOES = [
+    ['foto-evidencia-de-outra-conferencia',
+      'Estas fotos já lastreiam uma conferência anterior. Cada evidência pertence a UMA conferência só — é o que mantém a trilha de auditoria honesta, e por isso a API recusa reaproveitar. Caminho: toque em "REENVIAR AS MESMAS FOTOS E CONFERIR", que sobe as mesmas imagens como evidências novas, sem refotografar a peça.'],
+    ['foto-evidencia-inexistente',
+      'A API não achou uma das fotos enviadas (o banco pode ter sido reiniciado). Caminho: "Descartar as fotos e recomeçar" no passo 4 e fotografar de novo.'],
+    ['etapa-desconhecida',
+      'A etapa escolhida no passo 1 (ou vinda do ?etapa= da URL) não existe como checkpoint no banco. Confira o código da etapa; rodar o seed recria as quatro etapas da linha.'],
+    ['etapa-sem-campos-conferiveis',
+      'Nenhuma marcação da checklist deste projeto já existe na peça até esta etapa — não há o que conferir aqui. Escolha uma etapa posterior.'],
+    ['checklist-sem-campo-avaliavel',
+      'A checklist até esta etapa só tem itens opcionais sem valor esperado na etiqueta. Nada a comparar.'],
+    ['projeto-modelo-indeterminado',
+      'Há mais de um ProjetoModelo cadastrado e a etiqueta não diz qual é o desta peça — a API se recusa a escolher no chute. Deixe só o projeto da demo cadastrado, ou inclua o código do projeto no QR.'],
+    ['payload-somente-codigo',
+      'O QR trouxe apenas um código de lookup, sem os campos da peça. Nesta rodada a etiqueta é a única fonte da verdade: use o atalho da peça de demonstração no passo 2 ou digite os campos.'],
+    ['formato-desconhecido',
+      'A API não reconheceu o formato do conteúdo da etiqueta. Copie o conteúdo bruto (passo 2) e mande para o time: o formato do QR da TRAEL ainda está sendo fechado.'],
+    ['campos-obrigatorios-ausentes',
+      'Faltam número de série e/ou patrimônio no conteúdo da etiqueta — sem eles não existe valor esperado para comparar.'],
+    ['payload-vazio',
+      'O conteúdo da etiqueta (passo 2) está vazio.'],
+    ['campo-conferido-imutavel',
+      'Veredito já emitido não pode ser editado — é assim de propósito.']
+  ];
+
+  function explicacaoDoErro(texto) {
+    var achada = '';
+    EXPLICACOES.forEach(function (par) {
+      if (!achada && texto.indexOf(par[0]) !== -1) { achada = par[1]; }
+    });
+    return achada;
+  }
+
   var TEXTO_VEREDITO = {
     divergente: ['DIVERGENTE — peça não pode seguir', 'Corrija a peça antes de liberar a etapa seguinte.'],
     nao_conferivel: ['NÃO CONFERÍVEL — exige conferência humana', 'Algum campo ficou ilegível ou abaixo do limiar de confiança.'],
@@ -519,7 +740,32 @@ export const PAGINA_DEMO = `<!doctype html>
 
   var estado = {
     token: null,
+    // Quem está logado (só para o resumo do passo 0).
+    usuario: null,
+    // Passo aberto do assistente: 'login' | 'etapa' | 'etiqueta' | 'fotos' |
+    // 'conferir' | 'veredito'.
+    passo: 'login',
     etapa: null,
+    // Escolha EXPLÍCITA de etapa já foi feita? "Sem etapa" é uma escolha
+    // válida (checklist inteira) e precisa ser distinguível de "ainda não
+    // decidiu" — por isso não dá para inferir de 'etapa === null'.
+    etapaDefinida: false,
+    // Etiqueta confirmada pelo operador (QR lido, atalho de teste ou texto
+    // aceito). A página nunca lê os CAMPOS do payload — só sabe que existe.
+    etiquetaPronta: false,
+    origemEtiqueta: '',
+    temVeredito: false,
+    vereditoTexto: '',
+    // Trava do avanço automático do passo 3: o assistente empurra para o
+    // passo 4 UMA vez por lote de fotos, nunca a cada foto reenviada.
+    avancouDasFotos: false,
+    // Uma chamada de conferência (ou o reenvio que a precede) em voo: segura o
+    // botão do passo 4 enquanto isso, para dois toques não gastarem visão duas
+    // vezes (SPEC, constraint 4).
+    ocupado: false,
+    // fonte -> { id, url, arquivo, usadaEm }: 'arquivo' é o File original (é
+    // ele que permite repetir sem refotografar) e 'usadaEm' é o id da
+    // conferência que já se lastreou nesta foto.
     fotos: {},
     // Slot reservado enquanto o upload está em voo: garante que duas capturas
     // seguidas não disputem a mesma fonte canônica.
@@ -568,20 +814,154 @@ export const PAGINA_DEMO = `<!doctype html>
     });
   }
 
+  // --- A0. Assistente: um passo aberto por vez -----------------------------
+
+  // 'concluido' NÃO é um checkbox que alguém marca: é DERIVADO do estado real
+  // (tem token? etapa definida? etiqueta pronta? foto enviada?). Voltar a um
+  // passo e desfazer a escolha reabre o caminho sozinho, sem nenhum
+  // "passo.feito = false" espalhado pelos handlers.
+  var PASSOS = [
+    {
+      nome: 'login',
+      secao: 'sec-login',
+      concluido: function () { return !!estado.token; },
+      texto: function () { return estado.usuario || 'não conectado'; }
+    },
+    {
+      nome: 'etapa',
+      secao: 'sec-etapa',
+      concluido: function () { return estado.etapaDefinida; },
+      texto: function () {
+        if (!estado.etapaDefinida) { return 'a escolher'; }
+        if (!estado.etapa) { return 'sem etapa — checklist inteira'; }
+        return nomeDaEtapa(estado.etapa);
+      }
+    },
+    {
+      nome: 'etiqueta',
+      secao: 'sec-qr',
+      concluido: function () { return !!estado.etiquetaPronta; },
+      // O resumo diz DE ONDE veio a etiqueta e o tamanho do texto — nunca um
+      // campo dela. Quem interpreta o payload do QR é a API (contrato do
+      // CLAUDE.md); a página exibiria um "peça 847233" que ela mesma teria
+      // extraído, e aí o front passaria a ter opinião sobre a fonte da verdade.
+      texto: function () {
+        if (!estado.etiquetaPronta) { return 'a ler'; }
+        return estado.origemEtiqueta + ' · ' +
+          el('payload').value.trim().length + ' caracteres';
+      }
+    },
+    {
+      nome: 'fotos',
+      secao: 'sec-fotos',
+      concluido: function () { return fotosEnviadas().length > 0; },
+      texto: function () {
+        var enviadas = fotosEnviadas();
+        var alvo = fontesAlvo();
+        if (!alvo.length) {
+          return enviadas.length ? enviadas.length + ' foto(s)' : 'nenhuma vista';
+        }
+        var feitas = alvo.filter(function (fonte) { return !!estado.fotos[fonte]; });
+        return feitas.length + ' de ' + alvo.length + ' vistas';
+      }
+    },
+    {
+      nome: 'conferir',
+      secao: 'sec-conferir',
+      concluido: function () { return !!estado.temVeredito; },
+      texto: function () {
+        if (estado.temVeredito) { return 'conferência feita'; }
+        var enviadas = fotosEnviadas();
+        return enviadas.length ? enviadas.length + ' foto(s) prontas' : 'aguardando fotos';
+      }
+    },
+    {
+      nome: 'veredito',
+      secao: 'sec-veredito',
+      concluido: function () { return !!estado.temVeredito; },
+      texto: function () { return estado.vereditoTexto || 'ainda não'; }
+    }
+  ];
+
+  function indiceDoPasso(nome) {
+    for (var i = 0; i < PASSOS.length; i += 1) {
+      if (PASSOS[i].nome === nome) { return i; }
+    }
+    return 0;
+  }
+
+  function atualizarPassos() {
+    var atual = indiceDoPasso(estado.passo);
+    PASSOS.forEach(function (passo, indice) {
+      var classe = 'passo';
+      if (passo.nome === estado.passo) {
+        classe += ' atual';
+      } else if (passo.concluido()) {
+        classe += ' concluido';
+      } else if (indice < atual) {
+        // Passo pulado (etapa opcional, por exemplo): continua clicável, mas
+        // não finge estar resolvido.
+        classe += ' pendente';
+      } else {
+        classe += ' futuro';
+      }
+      el(passo.secao).className = classe;
+      el('resumo-' + passo.nome).textContent = passo.texto();
+    });
+  }
+
+  function irPara(nome) {
+    estado.passo = nome;
+    atualizarPassos();
+    var secao = el(PASSOS[indiceDoPasso(nome)].secao);
+    if (secao.scrollIntoView) {
+      secao.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  // AVANÇO AUTOMÁTICO, e só onde não há ambiguidade: o próximo passo é o
+  // primeiro ainda não concluído. Se tudo adiante já estiver resolvido, para
+  // no passo 4 — que é onde mora a única ação que gasta crédito AWS, e essa
+  // ninguém dispara pelo operador.
+  function avancarDe(nome) {
+    for (var i = indiceDoPasso(nome) + 1; i < PASSOS.length; i += 1) {
+      if (!PASSOS[i].concluido()) {
+        irPara(PASSOS[i].nome);
+        return;
+      }
+    }
+    irPara('conferir');
+  }
+
+  PASSOS.forEach(function (passo) {
+    el('cab-' + passo.nome).addEventListener('click', function () {
+      // Passo futuro é indicado, não navegável: pular a etiqueta e cair nas
+      // fotos produziria um 422 que o time leria como defeito da peça.
+      if (el(passo.secao).className.indexOf('futuro') !== -1) { return; }
+      irPara(passo.nome);
+    });
+  });
+
+  // Erro cru da API + tradução. O cru vem primeiro porque é o que se cola no
+  // chat do time; a explicação vem logo atrás porque é o que destrava quem
+  // está com o celular na mão.
   function mensagemDeErro(corpo, status) {
+    var cru = 'HTTP ' + status + ' — falha na chamada da API.';
+
     if (corpo && corpo.errors && typeof corpo.errors === 'object') {
       var partes = Object.keys(corpo.errors).map(function (chave) {
         var valor = corpo.errors[chave];
         return chave + ': ' + (typeof valor === 'string' ? valor : JSON.stringify(valor));
       });
       if (partes.length) {
-        return 'HTTP ' + status + ' — ' + partes.join(' | ');
+        cru = 'HTTP ' + status + ' — ' + partes.join(' | ');
       }
+    } else if (corpo && typeof corpo.message === 'string') {
+      cru = 'HTTP ' + status + ' — ' + corpo.message;
     }
-    if (corpo && typeof corpo.message === 'string') {
-      return 'HTTP ' + status + ' — ' + corpo.message;
-    }
-    return 'HTTP ' + status + ' — falha na chamada da API.';
+
+    var explicacao = explicacaoDoErro(cru);
+    return explicacao ? explicacao + ' [' + cru + ']' : cru;
   }
 
   function pedir(caminho, opcoes) {
@@ -605,21 +985,25 @@ export const PAGINA_DEMO = `<!doctype html>
   // --- A. Passo 0: login --------------------------------------------------
 
   function mostrarLoginCompacto(usuario) {
+    estado.usuario = usuario;
     el('login-corpo').hidden = true;
-    el('login-resumo').hidden = false;
-    el('login-quem').textContent = 'Conectado como ' + usuario + '.';
+    el('btn-trocar-login').hidden = false;
     aviso('login-aviso', '');
+    atualizarPassos();
   }
 
   function mostrarLoginAberto() {
+    estado.usuario = null;
     el('login-corpo').hidden = false;
-    el('login-resumo').hidden = true;
+    el('btn-trocar-login').hidden = true;
+    atualizarPassos();
   }
 
   el('btn-trocar-login').addEventListener('click', function () {
     estado.token = null;
     liberar(false);
     mostrarLoginAberto();
+    irPara('login');
     aviso('login-aviso', 'Sessão encerrada nesta página — entre de novo.', 'neutro');
   });
 
@@ -644,6 +1028,9 @@ export const PAGINA_DEMO = `<!doctype html>
       var usuario = resposta.corpo.user && resposta.corpo.user.email ? resposta.corpo.user.email : el('email').value;
       mostrarLoginCompacto(usuario);
       carregarRecorte();
+      // A etapa deste aparelho já pode ter vindo da URL ou da memória local:
+      // nesse caso o assistente pula o passo 1 sozinho.
+      avancarDe('login');
     }).catch(function (erro) {
       liberar(false);
       mostrarLoginAberto();
@@ -769,6 +1156,40 @@ export const PAGINA_DEMO = `<!doctype html>
     });
   }
 
+  // A vista tem algo acontecendo (foto, envio em voo, falha)? Estado NUNCA se
+  // esconde atrás do recolhido: uma foto enviada por engano na vista errada
+  // precisa continuar visível para ser vista e corrigida.
+  function temEstado(fonte) {
+    return !!estado.fotos[fonte] || !!estado.enviando[fonte] || !!estado.falhas[fonte];
+  }
+
+  // As vistas que ESTA etapa cobra. É a base do progresso do passo 3 — a
+  // pergunta "o que falta agora" tem resposta contável, não 9 cartões iguais.
+  function fontesAlvo() {
+    return fontesOrdenadas().filter(function (fonte) {
+      var situacao = situacaoDaFonte(fonte).situacao;
+      return situacao === 'desta-etapa' || situacao === 'sem-etapa' || situacao === 'indefinido';
+    });
+  }
+
+  // Vistas em destaque = as da etapa + as que já têm estado. O resto vai para
+  // "outras vistas" (recolhido): a base e a lateral esquerda não têm campo na
+  // checklist da demo, e listá-las com o mesmo peso é o que fazia o time se
+  // perder no passo 3.
+  function fontesPrincipais() {
+    var alvo = fontesAlvo();
+    return fontesOrdenadas().filter(function (fonte) {
+      return alvo.indexOf(fonte) !== -1 || temEstado(fonte);
+    });
+  }
+
+  function fontesRecolhidas() {
+    var principais = fontesPrincipais();
+    return fontesOrdenadas().filter(function (fonte) {
+      return principais.indexOf(fonte) === -1;
+    });
+  }
+
   // Uma vista = um cartão = uma foto. Não existe mais agrupamento nem
   // numeração: o eixo de fonteFisica é a VISTA da peça, e "qual é o chumbado
   // 2" — a pergunta sem gabarito que o agrupamento resolvia — deixou de
@@ -810,45 +1231,159 @@ export const PAGINA_DEMO = `<!doctype html>
 
   // --- C. Passo 1: etapa --------------------------------------------------
 
+  // Só entra em cena antes de a API responder: os nomes de verdade (e a ordem)
+  // vêm dos Checkpoints do banco.
+  var ETAPAS_FALLBACK = [
+    { codigo: 'adesivacao', nome: 'Adesivação' },
+    { codigo: 'serigrafia', nome: 'Serigrafia' },
+    { codigo: 'oleo-conferencia', nome: 'Óleo e conferência' },
+    { codigo: 'fixacao-placa', nome: 'Fixação da placa' }
+  ];
+
+  function nomeDaEtapa(codigo) {
+    if (estado.nomePorCodigo && estado.nomePorCodigo[codigo]) {
+      return estado.nomePorCodigo[codigo];
+    }
+    var achada = null;
+    ETAPAS_FALLBACK.forEach(function (etapa) {
+      if (etapa.codigo === codigo) { achada = etapa.nome; }
+    });
+    return achada || codigo;
+  }
+
+  function etapasConhecidas() {
+    if (!estado.ordemPorCodigo) { return ETAPAS_FALLBACK; }
+    return Object.keys(estado.ordemPorCodigo).map(function (codigo) {
+      return { codigo: codigo, nome: nomeDaEtapa(codigo), ordem: estado.ordemPorCodigo[codigo] };
+    }).sort(function (a, b) { return a.ordem - b.ordem; });
+  }
+
+  // Quantas vistas a etapa X cobra — mesma regra cumulativa de
+  // situacaoDaFonte, mas para uma etapa que ainda não é a atual: é o que faz o
+  // botão dizer "confere 3 vistas" ANTES de ser tocado.
+  function vistasDaEtapa(codigo) {
+    if (!estado.mapaFontes || !estado.ordemPorCodigo) { return []; }
+    var ordem = estado.ordemPorCodigo[codigo];
+    if (ordem === undefined) { return []; }
+    return Object.keys(estado.mapaFontes).filter(function (fonte) {
+      var registro = estado.mapaFontes[fonte];
+      return registro.sempre || (registro.ordem !== null && registro.ordem <= ordem);
+    });
+  }
+
+  // A grade nasce dos dados, não do HTML: etapa nova no seed aparece aqui sem
+  // tocar esta página, e cada botão já diz o que aquele gate confere.
+  function montarEtapas() {
+    var html = etapasConhecidas().map(function (etapa) {
+      var vistas = vistasDaEtapa(etapa.codigo);
+      var sub = etapa.codigo;
+      if (vistas.length) {
+        sub = 'confere ' + vistas.length + ' vista(s)' +
+          (vistas.length <= 3 ? ': ' + resumoDeFontes(vistas) : '');
+      }
+      return '<button type="button" class="secundario etapa" data-codigo="' + esc(etapa.codigo) +
+        '" aria-pressed="' + (estado.etapaDefinida && estado.etapa === etapa.codigo ? 'true' : 'false') + '">' +
+        '<span class="nome-etapa">' + esc(etapa.nome) + '</span>' +
+        '<span class="sub-etapa">' + esc(sub) + '</span></button>';
+    }).join('');
+
+    html += '<button type="button" class="secundario etapa sem-etapa" data-codigo=""' +
+      ' aria-pressed="' + (estado.etapaDefinida && !estado.etapa ? 'true' : 'false') + '">' +
+      '<span class="nome-etapa">Sem etapa</span>' +
+      '<span class="sub-etapa">cobra a checklist inteira do projeto — a peça completa, não um gate</span></button>';
+
+    el('grade-etapas').innerHTML = html;
+  }
+
   function atualizarTextoEtapa() {
     var dica = el('etapa-dica');
-    if (!estado.etapa) {
-      dica.textContent = 'Nenhuma etapa escolhida — a conferência será registrada sem etapa, cobrando a checklist inteira.';
+    if (!estado.etapaDefinida) {
+      dica.textContent = 'Escolha a etapa que este aparelho simula. Em produção isso vem provisionado na câmera — aqui fica guardado no aparelho.';
+    } else if (!estado.etapa) {
+      dica.textContent = 'Sem etapa: a conferência cobra a checklist inteira do projeto. Serve para testar a peça completa, não um gate da linha.';
     } else {
-      var nome = estado.nomePorCodigo && estado.nomePorCodigo[estado.etapa]
-        ? estado.nomePorCodigo[estado.etapa]
-        : estado.etapa;
-      dica.textContent = 'Simulando a câmera de: ' + nome + ' (' + estado.etapa + ') — a conferência nasce vinculada a ela.';
+      dica.textContent = 'Simulando a câmera de: ' + nomeDaEtapa(estado.etapa) + ' (' + estado.etapa +
+        ') — a conferência nasce vinculada a ela, e o gate é cumulativo (confere o que esta etapa e as anteriores gravaram).';
     }
     atualizarTextoRecorte();
+    montarEtapas();
     montarFotos();
     atualizarBotaoExtrair();
+    atualizarPassos();
   }
 
   function selecionarEtapa(codigo) {
     estado.etapa = codigo;
-    Array.prototype.forEach.call(document.querySelectorAll('#grade-etapas .etapa'), function (botao) {
-      botao.setAttribute('aria-pressed', botao.getAttribute('data-codigo') === estado.etapa ? 'true' : 'false');
-    });
     atualizarTextoEtapa();
   }
 
-  Array.prototype.forEach.call(document.querySelectorAll('#grade-etapas .etapa'), function (botao) {
-    botao.addEventListener('click', function () {
-      var codigo = botao.getAttribute('data-codigo');
-      selecionarEtapa(estado.etapa === codigo ? null : codigo);
-    });
+  // Memória do APARELHO: cada celular simula uma câmera fixa, e a etapa é
+  // praticamente constante para ele. Repetir essa escolha a cada teste é a
+  // decisão mais repetida da página — e a mais fácil de eliminar.
+  var CHAVE_ETAPA = 'trael-demo-etapa';
+
+  function guardarEtapa() {
+    try {
+      window.localStorage.setItem(CHAVE_ETAPA, estado.etapa || '');
+    } catch (erro) {
+      estado.semMemoria = String(erro);
+    }
+  }
+
+  function etapaGuardada() {
+    try {
+      return window.localStorage.getItem(CHAVE_ETAPA);
+    } catch (erro) {
+      estado.semMemoria = String(erro);
+      return null;
+    }
+  }
+
+  function escolherEtapa(codigo) {
+    var limpo = typeof codigo === 'string' ? codigo.trim() : '';
+    estado.etapa = limpo === '' ? null : limpo;
+    estado.etapaDefinida = true;
+    guardarEtapa();
+    atualizarTextoEtapa();
+    avancarDe('etapa');
+  }
+
+  // Delegação: a grade é remontada quando os checkpoints chegam da API, e
+  // religar listener a cada remontagem é como se perde clique no celular.
+  el('grade-etapas').addEventListener('click', function (evento) {
+    var alvo = evento.target;
+    for (var salto = 0; alvo && salto < 4; salto += 1) {
+      if (alvo.getAttribute && String(alvo.className || '').indexOf('etapa') !== -1) {
+        escolherEtapa(alvo.getAttribute('data-codigo'));
+        return;
+      }
+      alvo = alvo.parentNode;
+    }
   });
 
   // Cada celular abre a URL da SUA etapa (?etapa=serigrafia): é o que, em
-  // produção, virá provisionado na câmera fixa.
-  function aplicarEtapaDaUrl() {
+  // produção, virá provisionado na câmera fixa. A URL VENCE a memória local —
+  // quem digitou o endereço está dizendo qual câmera este aparelho é agora.
+  function etapaDaUrl() {
     var busca = window.location.search || '';
     var achado = /[?&]etapa=([^&]*)/.exec(busca);
-    if (!achado) { return; }
+    if (!achado) { return null; }
     var codigo = decodeURIComponent(achado[1].replace(/\\+/g, ' ')).trim();
-    if (!codigo) { return; }
-    selecionarEtapa(codigo);
+    return codigo === '' ? null : codigo;
+  }
+
+  function restaurarEtapa() {
+    var daUrl = etapaDaUrl();
+    if (daUrl !== null) {
+      estado.etapaDefinida = true;
+      selecionarEtapa(daUrl);
+      guardarEtapa();
+      return;
+    }
+    var guardada = etapaGuardada();
+    if (guardada === null) { return; }
+    estado.etapaDefinida = true;
+    selecionarEtapa(guardada === '' ? null : guardada);
   }
 
   // --- D. Passo 2: QR -----------------------------------------------------
@@ -871,6 +1406,39 @@ export const PAGINA_DEMO = `<!doctype html>
   el('btn-parar-camera').addEventListener('click', function () {
     pararCamera();
     aviso('qr-aviso', 'Câmera desligada.', 'neutro');
+  });
+
+  // A etiqueta está "pronta" quando o operador CONFIRMOU de onde ela veio —
+  // QR lido, atalho de teste ou texto aceito. A página não olha o conteúdo:
+  // quem interpreta o payload é a API (contrato do CLAUDE.md).
+  function marcarEtiqueta(origem, avancar) {
+    if (!el('payload').value.trim()) {
+      aviso('qr-aviso', 'O conteúdo da etiqueta está vazio — leia o QR, use o atalho de teste ou cole o texto.', 'erro');
+      return;
+    }
+    estado.etiquetaPronta = true;
+    estado.origemEtiqueta = origem;
+    atualizarPassos();
+    if (avancar) { avancarDe('etiqueta'); }
+  }
+
+  el('btn-etiqueta-demo').addEventListener('click', function () {
+    el('payload').value = ETIQUETA_DEMO;
+    el('qr-bruto-texto').textContent = ETIQUETA_DEMO;
+    el('qr-bruto').hidden = false;
+    aviso('qr-aviso', 'Etiqueta da peça de demonstração preenchida (atalho de teste — em produção quem lê é a câmera).', 'ok');
+    marcarEtiqueta('atalho de teste', true);
+  });
+
+  el('btn-usar-etiqueta').addEventListener('click', function () {
+    marcarEtiqueta('digitada ou colada', true);
+  });
+
+  el('payload').addEventListener('input', function () {
+    if (estado.etiquetaPronta) {
+      estado.origemEtiqueta = 'editada à mão';
+      atualizarPassos();
+    }
   });
 
   el('btn-copiar-qr').addEventListener('click', function () {
@@ -915,6 +1483,9 @@ export const PAGINA_DEMO = `<!doctype html>
                 el('qr-bruto').hidden = false;
                 pararCamera();
                 aviso('qr-aviso', 'QR lido — o conteúdo bruto está abaixo, exatamente como veio da etiqueta.', 'ok');
+                // Leitura bem-sucedida não tem ambiguidade nenhuma: segue
+                // direto para as fotos.
+                marcarEtiqueta('lida do QR', true);
                 return;
               }
               window.setTimeout(procurar, 300);
@@ -972,42 +1543,112 @@ export const PAGINA_DEMO = `<!doctype html>
   function textoDoEnvio(fonte) {
     if (estado.enviando[fonte]) { return 'enviando...'; }
     if (estado.falhas[fonte]) { return 'falhou'; }
-    return estado.fotos[fonte] ? 'enviada' : 'sem foto';
+    if (!estado.fotos[fonte]) { return 'sem foto'; }
+    return estado.fotos[fonte].usadaEm
+      ? 'enviada · já usada na conferência anterior'
+      : 'enviada';
   }
 
   // Cartão de UMA vista: miniatura, o que aquela face alimenta na checklist e
-  // um único botão de captura. A vista é o destino da foto — nada a escolher.
+  // as duas portas de captura. A vista é o destino da foto — nada a escolher.
+  // "Galeria" existe porque repetir o teste é o uso real desta página: a foto
+  // boa já está no rolo do celular, e obrigar a refotografar a peça a cada
+  // rodada é fricção pura (em produção não existe nenhum dos dois — quem
+  // captura é a câmera fixa).
   function cartaoDaVista(fonte, info) {
     var foto = estado.fotos[fonte];
-    return '<div class="' + classeDoCartao(info) + '" data-fonte="' + esc(fonte) + '">' +
+    return '<div class="' + classeDoCartao(info) + (foto ? ' tem-foto' : '') +
+      '" data-fonte="' + esc(fonte) + '">' +
       '<img class="miniatura" alt="" ' + (foto && foto.url ? 'src="' + esc(foto.url) + '"' : 'hidden') + '>' +
       '<span class="nome">' + esc(fonte) +
       trechoDaMarca(info) + trechoDasMarcacoes(info) + trechoDosCampos(info) +
       '<span class="estado envio' + (estado.falhas[fonte] ? ' falhou' : '') + '">' +
       esc(textoDoEnvio(fonte)) + '</span></span>' +
+      '<span class="acoes-vista">' +
       '<label class="botao-foto grande">' + (foto ? 'Refotografar' : 'Fotografar') +
       '<input type="file" accept="image/*" capture="environment" hidden></label>' +
-      '</div>';
+      '<label class="botao-foto galeria">Galeria' +
+      '<input type="file" accept="image/*" hidden></label>' +
+      '</span></div>';
   }
 
-  function montarFotos() {
-    el('lista-fotos').innerHTML = fontesOrdenadas().map(function (fonte) {
-      return cartaoDaVista(fonte, situacaoDaFonte(fonte));
-    }).join('');
-
-    Array.prototype.forEach.call(el('lista-fotos').querySelectorAll('.item-foto'), function (cartao) {
-      var entrada = cartao.querySelector('input[type=file]');
-      if (!entrada) { return; }
-      entrada.addEventListener('change', function (evento) {
-        var arquivos = evento.target.files;
-        if (!arquivos || !arquivos.length) { return; }
-        // Uma foto por vista: se o operador escolher várias, a última vale —
-        // refotografar substitui, nunca acumula slot escondido.
-        enviarFoto(cartao.getAttribute('data-fonte'), arquivos[arquivos.length - 1]);
+  function ligarEntradas(container) {
+    Array.prototype.forEach.call(container.querySelectorAll('.item-foto'), function (cartao) {
+      Array.prototype.forEach.call(cartao.querySelectorAll('input[type=file]'), function (entrada) {
+        entrada.addEventListener('change', function (evento) {
+          var arquivos = evento.target.files;
+          if (!arquivos || !arquivos.length) { return; }
+          // Uma foto por vista: se o operador escolher várias, a última vale —
+          // refotografar substitui, nunca acumula slot escondido.
+          enviarFoto(cartao.getAttribute('data-fonte'), arquivos[arquivos.length - 1]);
+        });
       });
     });
   }
 
+  // "Faltam 2 de 3 vistas desta etapa" responde de relance a única pergunta do
+  // passo 3. A lista do que falta vem junto: saber que falta não adianta se
+  // ainda for preciso caçar qual cartão está vazio.
+  function atualizarProgresso() {
+    var caixa = el('fotos-progresso');
+    var alvo = fontesAlvo();
+
+    if (!alvo.length) {
+      caixa.hidden = true;
+      caixa.innerHTML = '';
+      return;
+    }
+
+    var faltando = alvo.filter(function (fonte) { return !estado.fotos[fonte]; });
+    var feitas = alvo.length - faltando.length;
+    var pronto = faltando.length === 0;
+    var quais = estado.etapa && ordemDaEtapaAtual() !== undefined ? 'desta etapa' : 'da checklist';
+    var largura = Math.round((feitas / alvo.length) * 100);
+
+    caixa.hidden = false;
+    caixa.className = 'progresso' + (pronto ? ' completo' : '');
+    caixa.innerHTML =
+      '<div class="texto">' + (pronto
+        ? 'Pronto: as ' + alvo.length + ' vistas ' + quais + ' estão fotografadas.'
+        : 'Faltam ' + faltando.length + ' de ' + alvo.length + ' vistas ' + quais + '.') +
+      '</div>' +
+      '<div class="barra"><div class="cheio" style="width:' + largura + '%"></div></div>' +
+      (pronto
+        ? '<div class="faltando">' + feitas + ' de ' + alvo.length + ' enviadas.</div>'
+        : '<div class="faltando">Sem foto: <b>' + esc(resumoDeFontes(faltando)) + '</b></div>');
+  }
+
+  function montarFotos() {
+    var principais = fontesPrincipais();
+    var recolhidas = fontesRecolhidas();
+
+    el('lista-fotos').innerHTML = principais.map(function (fonte) {
+      return cartaoDaVista(fonte, situacaoDaFonte(fonte));
+    }).join('');
+    ligarEntradas(el('lista-fotos'));
+
+    // O <details> em si nunca é recriado: reabrir "outras vistas" a cada
+    // upload seria uma fricção nova no lugar da que se está removendo.
+    if (!recolhidas.length) {
+      el('outras-vistas').hidden = true;
+      el('lista-outras').innerHTML = '';
+    } else {
+      el('outras-vistas').hidden = false;
+      el('outras-vistas-titulo').textContent =
+        'Outras ' + recolhidas.length + ' vista(s) — nada a conferir nelas aqui (' +
+        resumoDeFontes(recolhidas) + ')';
+      el('lista-outras').innerHTML = recolhidas.map(function (fonte) {
+        return cartaoDaVista(fonte, situacaoDaFonte(fonte));
+      }).join('');
+      ligarEntradas(el('lista-outras'));
+    }
+
+    atualizarProgresso();
+  }
+
+  // Guarda o ARQUIVO junto do id: é ele que permite repetir a conferência sem
+  // refotografar. A evidência não pode ser reaproveitada (cada foto pertence a
+  // uma conferência só — trilha de auditoria), mas os BYTES podem subir de novo.
   function enviarFoto(fonte, arquivo) {
     estado.enviando[fonte] = true;
     delete estado.falhas[fonte];
@@ -1022,16 +1663,22 @@ export const PAGINA_DEMO = `<!doctype html>
       delete estado.enviando[fonte];
       montarFotos();
       atualizarBotaoExtrair();
+      talvezAvancarDasFotos();
     };
 
-    pedir(API + '/fotos-evidencia/upload', { method: 'POST', body: dados })
+    return pedir(API + '/fotos-evidencia/upload', { method: 'POST', body: dados })
       .then(function (resposta) {
         if (!resposta.ok || !resposta.corpo || !resposta.corpo.id) {
           estado.falhas[fonte] = true;
           aviso('fotos-aviso', mensagemDeErro(resposta.corpo, resposta.status), 'erro');
           return;
         }
-        estado.fotos[fonte] = { id: resposta.corpo.id, url: resposta.corpo.url };
+        estado.fotos[fonte] = {
+          id: resposta.corpo.id,
+          url: resposta.corpo.url,
+          arquivo: arquivo,
+          usadaEm: null
+        };
       })
       .catch(function (erro) {
         estado.falhas[fonte] = true;
@@ -1044,15 +1691,86 @@ export const PAGINA_DEMO = `<!doctype html>
     return fontesOrdenadas().filter(function (fonte) { return !!estado.fotos[fonte]; });
   }
 
+  // Fotos que já lastreiam uma conferência: a API recusa reaproveitá-las (422
+  // foto-evidencia-de-outra-conferencia), e é por elas que o botão do passo 4
+  // troca de nome em vez de deixar o time bater no erro cru.
+  function fotosUsadas() {
+    return fotosEnviadas().filter(function (fonte) { return !!estado.fotos[fonte].usadaEm; });
+  }
+
+  // Última vista da etapa enviada = não há mais o que decidir no passo 3, e o
+  // operador não deveria rolar a tela procurando o que fazer. Empurra UMA vez
+  // por lote (a trava some no "começar do zero" e no descarte de fotos).
+  function talvezAvancarDasFotos() {
+    if (estado.avancouDasFotos || estado.passo !== 'fotos') { return; }
+    var alvo = fontesAlvo();
+    if (!alvo.length) { return; }
+    var faltando = alvo.filter(function (fonte) { return !estado.fotos[fonte]; });
+    if (faltando.length) { return; }
+    estado.avancouDasFotos = true;
+    aviso('fotos-aviso', 'Todas as vistas desta etapa estão fotografadas — passo 4 liberado.', 'ok');
+    irPara('conferir');
+  }
+
+  function marcarUsadas(fontes, conferenciaId) {
+    fontes.forEach(function (fonte) {
+      if (estado.fotos[fonte]) { estado.fotos[fonte].usadaEm = conferenciaId; }
+    });
+    montarFotos();
+    atualizarBotaoExtrair();
+  }
+
+  function descartarFotos() {
+    estado.fotos = {};
+    estado.falhas = {};
+    estado.avancouDasFotos = false;
+    aviso('fotos-aviso', '');
+    montarFotos();
+    atualizarBotaoExtrair();
+    atualizarPassos();
+  }
+
+  el('btn-limpar-fotos').addEventListener('click', function () {
+    descartarFotos();
+    aviso('avancado-aviso', 'Fotos descartadas desta página (as evidências já enviadas continuam no banco, presas às conferências delas).', 'neutro');
+  });
+
   // --- F. Passo 4: extrair ------------------------------------------------
 
   function atualizarBotaoExtrair() {
     var enviadas = fotosEnviadas();
-    el('btn-extrair').disabled = enviadas.length === 0;
-    el('extrair-dica').textContent = enviadas.length === 0
-      ? 'Envie ao menos uma foto no passo 3 para liberar a extração.'
-      : 'Vai enviar ' + enviadas.length + ' foto(s) (' + resumoDeFontes(enviadas) +
-        ') à visão da API. Uma chamada por foto, sem repetição automática.';
+    var usadas = fotosUsadas();
+    var botao = el('btn-extrair');
+    var dica = el('extrair-dica');
+
+    el('btn-limpar-fotos').disabled = enviadas.length === 0;
+    botao.disabled = enviadas.length === 0 || estado.ocupado;
+
+    if (enviadas.length === 0) {
+      botao.textContent = 'EXTRAIR COM TEXTRACT';
+      dica.textContent = 'Envie ao menos uma foto no passo 3 para liberar a extração.';
+      return;
+    }
+
+    if (usadas.length === 0) {
+      botao.textContent = 'EXTRAIR COM TEXTRACT';
+      dica.textContent = 'Vai enviar ' + enviadas.length + ' foto(s) (' +
+        resumoDeFontes(enviadas) + ') à visão da API. Uma chamada por foto, sem repetição automática.';
+      return;
+    }
+
+    var semArquivo = usadas.filter(function (fonte) { return !estado.fotos[fonte].arquivo; });
+    if (semArquivo.length) {
+      botao.textContent = 'EXTRAIR COM TEXTRACT';
+      dica.textContent = 'Estas fotos já lastreiam a conferência anterior e a página não guardou o arquivo original delas (' +
+        resumoDeFontes(semArquivo) + '): refotografe essas vistas no passo 3 antes de conferir de novo.';
+      return;
+    }
+
+    botao.textContent = 'REENVIAR AS MESMAS FOTOS E CONFERIR';
+    dica.textContent = 'Repetindo o teste: ' + usadas.length + ' foto(s) já lastreiam a conferência anterior (' +
+      resumoDeFontes(usadas) + ') e a API não reaproveita evidência — cada foto pertence a uma conferência só. ' +
+      'Este botão sobe as MESMAS imagens de novo, sem refotografar: dá para trocar a etapa no passo 1 e conferir outra vez.';
   }
 
   // --- G. Modo avançado: leituras digitadas -------------------------------
@@ -1307,6 +2025,166 @@ export const PAGINA_DEMO = `<!doctype html>
       fora + livres + '</div>';
   }
 
+  // --- H.1 As duas perguntas que importam ---------------------------------
+
+  // O produto pergunta duas coisas na frente da peça: a serigrafia bate com a
+  // etiqueta, e as séries são irmãs entre si. 'casa' agrupa por NOME de campo
+  // — o prefixo do nome é contrato do domínio (CLAUDE.md), não heurística
+  // desta página.
+  //
+  // O que este bloco NÃO faz: comparar valor, aplicar limiar, decidir
+  // veredito. Ele CONTA os vereditos que a API emitiu e os rotula. Se a API
+  // não apontou nada num grupo, a página diz "sem apontamento" — nunca
+  // "conforme", que é palavra da engine e só ela pode dizer.
+  var PERGUNTAS_FOCO = [
+    {
+      pergunta: '1. A serigrafia bate com a etiqueta?',
+      detalhe: 'patrimônio, cliente e potência pintados na peça × o que o QR manda',
+      casa: function (nome) { return String(nome).indexOf('serigrafia') !== -1; }
+    },
+    {
+      pergunta: '2. As séries são irmãs entre si?',
+      detalhe: 'as séries chumbadas nas vistas e a da placa têm de carregar o mesmo número',
+      casa: function (nome) { return String(nome).indexOf('serie-') === 0; }
+    }
+  ];
+
+  function cartaoDeFoco(item, campos, incoerencias) {
+    var meus = campos.filter(function (campo) { return item.casa(campo.campo); });
+    var divergentes = meus.filter(function (campo) { return campo.veredito === 'divergente'; });
+    var pendentes = meus.filter(function (campo) { return campo.veredito === 'nao_conferivel'; });
+    var minhas = (incoerencias || []).filter(function (incoerencia) {
+      return (incoerencia.campos || []).filter(item.casa).length > 0;
+    });
+
+    var classe;
+    var resposta;
+    var detalhe;
+
+    if (minhas.length) {
+      var valores = [];
+      minhas.forEach(function (incoerencia) {
+        (incoerencia.valoresLidos || []).forEach(function (valor) { valores.push(valor); });
+      });
+      classe = 'v-incoerente';
+      resposta = 'DISCORDAM ENTRE SI';
+      detalhe = 'A API apontou ' + minhas.length + ' grupo(s) de marcações irmãs com leituras diferentes (' +
+        valores.join(' · ') + '). Detalhe no bloco roxo abaixo.';
+    } else if (divergentes.length) {
+      classe = 'v-divergente';
+      resposta = 'PROBLEMA';
+      detalhe = divergentes.length + ' campo(s) que a API marcou divergente: ' +
+        divergentes.map(function (campo) { return campo.campo; }).join(', ') + '.';
+    } else if (pendentes.length) {
+      classe = 'v-nao_conferivel';
+      resposta = 'PENDENTE — PRECISA DE OLHO HUMANO';
+      detalhe = pendentes.length + ' campo(s) que a API marcou não conferível. Não é OK nem defeito: ' +
+        'a visão não leu com confiança suficiente, e a peça precisa ser olhada.';
+    } else if (meus.length) {
+      classe = 'v-conforme';
+      resposta = 'SEM APONTAMENTO';
+      detalhe = 'A API não apontou nada nos ' + meus.length + ' campo(s) desta pergunta.';
+    } else {
+      classe = 'v-ausente';
+      resposta = 'NÃO CONFERIDA NESTA ETAPA';
+      detalhe = 'Nenhum campo desta pergunta entrou no recorte desta conferência.';
+    }
+
+    return '<div class="cartao-foco ' + classe + '">' +
+      '<div class="pergunta">' + esc(item.pergunta) + '</div>' +
+      '<div class="resposta">' + esc(resposta) + '</div>' +
+      '<div class="detalhe-foco">' + esc(detalhe) + '</div>' +
+      '<div class="campos-foco">' + esc(item.detalhe) +
+      (meus.length ? ' · ' + esc(meus.map(function (campo) {
+        return campo.campo + ' [' + campo.veredito + ']';
+      }).join(' · ')) : '') +
+      '</div></div>';
+  }
+
+  function blocoDoFoco(resposta) {
+    return PERGUNTAS_FOCO.map(function (item) {
+      return cartaoDeFoco(item, resposta.campos || [], resposta.incoerencias);
+    }).join('') +
+      '<p class="nota-foco">Resumo das duas perguntas, montado a partir dos vereditos que a ' +
+      'API emitiu: esta página agrupa e rotula, nunca compara valor nem decide veredito.</p>';
+  }
+
+  // --- H.2 Campos agrupados por resultado ---------------------------------
+
+  // O motivo canônico da API, dito em português. Rotulagem pura: a página não
+  // deriva nada do motivo, só o traduz para quem está com o celular na mão.
+  var MOTIVOS = {
+    'sem-valor-esperado': 'a etiqueta não traz valor para este campo',
+    'sem-leitura': 'a visão não leu nada para este campo',
+    'leituras-conflitantes': 'a mesma vista produziu leituras diferentes para este campo',
+    'leitura-de-outro-campo': 'o valor lido casa com o valor esperado de OUTRO campo',
+    'confianca-abaixo-do-limiar': 'a visão leu, mas com confiança abaixo do limiar',
+    'leitura-nao-corroborada': 'marcação em relevo sem segunda leitura concordante — a API não acusa divergência com uma leitura só'
+  };
+
+  function cartaoDoCampo(campo) {
+    var url = urlDaFonte(campo.fonteFisica);
+    var bloco = '<div class="cartao-campo v-' + esc(campo.veredito) + '">' +
+      '<div class="topo"><span class="nome-campo">' + esc(campo.campo) + '</span>' +
+      '<span class="marca">' + esc(campo.veredito) + '</span></div>' +
+      '<dl>' +
+      '<dt>esperado</dt><dd class="mono">' + esc(campo.valorEsperado === null ? '(sem valor esperado)' : campo.valorEsperado) + '</dd>' +
+      '<dt>lido</dt><dd class="mono">' + esc(campo.valorLido === null ? '(sem leitura)' : campo.valorLido) + '</dd>' +
+      '<dt>confiança</dt><dd>' + esc(formatarConfianca(campo.confianca)) + '</dd>' +
+      '<dt>vista</dt><dd>' + esc(campo.fonteFisica) + (campo.obrigatorio ? ' (obrigatório)' : ' (opcional)') + '</dd>';
+    if (campo.motivo) {
+      bloco += '<dt>motivo</dt><dd>' + esc(campo.motivo) +
+        (MOTIVOS[campo.motivo] ? ' — ' + esc(MOTIVOS[campo.motivo]) : '') + '</dd>';
+    }
+    if (campo.campoDaLeitura) {
+      bloco += '<dt>casou com</dt><dd class="mono">' + esc(campo.campoDaLeitura) + '</dd>';
+    }
+    bloco += '</dl>';
+    if (url) {
+      bloco += '<a href="' + esc(url) + '" target="_blank" rel="noopener">ver foto (' + esc(campo.fonteFisica) + ')</a>';
+    }
+    return bloco + '</div>';
+  }
+
+  // Agrupar por RESULTADO, não pela ordem da checklist: o que impede o
+  // conforme tem de estar em cima. Os conformes vão recolhidos — são a maioria
+  // e são justamente os que ninguém precisa ler. Nenhum campo é omitido:
+  // veredito fora dos três conhecidos cai no grupo "não previsto".
+  var GRUPOS_VEREDITO = [
+    ['divergente', 'divergente(s) — a peça não segue'],
+    ['nao_conferivel', 'não conferível(is) — exigem olho humano']
+  ];
+
+  function blocoDosCampos(campos) {
+    var html = '';
+    var restantes = campos.slice();
+
+    GRUPOS_VEREDITO.forEach(function (grupo) {
+      var doGrupo = restantes.filter(function (campo) { return campo.veredito === grupo[0]; });
+      restantes = restantes.filter(function (campo) { return campo.veredito !== grupo[0]; });
+      if (!doGrupo.length) { return; }
+      html += '<div class="grupo-campos g-' + esc(grupo[0]) + '">' +
+        '<p class="titulo-grupo">' + doGrupo.length + ' ' + esc(grupo[1]) + '</p>' +
+        doGrupo.map(cartaoDoCampo).join('') + '</div>';
+    });
+
+    var conformes = restantes.filter(function (campo) { return campo.veredito === 'conforme'; });
+    restantes = restantes.filter(function (campo) { return campo.veredito !== 'conforme'; });
+    if (conformes.length) {
+      html += '<details class="grupo-campos g-conforme"><summary>' + conformes.length +
+        ' campo(s) conforme(s) — abrir</summary>' +
+        conformes.map(cartaoDoCampo).join('') + '</details>';
+    }
+
+    if (restantes.length) {
+      html += '<div class="grupo-campos"><p class="titulo-grupo">' + restantes.length +
+        ' campo(s) com veredito não previsto por esta página</p>' +
+        restantes.map(cartaoDoCampo).join('') + '</div>';
+    }
+
+    return html;
+  }
+
   function renderizar(resposta) {
     var geral = resposta.conferencia ? resposta.conferencia.vereditoGeral : 'nao_conferivel';
     var textos = TEXTO_VEREDITO[geral] || [String(geral).toUpperCase(), ''];
@@ -1321,40 +2199,35 @@ export const PAGINA_DEMO = `<!doctype html>
       '<div class="sub">' + esc(linhaDaEtapa(resposta)) + '</div>' +
       '</div>';
 
-    // Logo abaixo do veredito para não passar despercebido no celular, e com
-    // forma/cor próprias (âmbar, caixa de alarme) — nunca a faixa vermelha do
+    // As duas perguntas do produto vêm antes de qualquer lista de campo: é o
+    // que o time realmente quer saber, e no celular o que está embaixo não é
+    // lido.
+    html += blocoDoFoco(resposta);
+
+    // Logo abaixo para não passar despercebido no celular, e com forma/cor
+    // próprias (âmbar, caixa de alarme) — nunca a faixa vermelha do
     // divergente: confundir alarme com veredito é o erro caro aqui.
     // Ordem: incoerência primeiro (pode ter travado o conforme), achado livre
     // depois (é informativo puro).
     html += blocoDasIncoerencias(resposta.incoerencias);
     html += blocoDosAchados(resposta.achadosInconsistentes);
 
-    html += (resposta.campos || []).map(function (campo) {
-      var url = urlDaFonte(campo.fonteFisica);
-      var bloco = '<div class="cartao-campo v-' + esc(campo.veredito) + '">' +
-        '<div class="topo"><span class="nome-campo">' + esc(campo.campo) + '</span>' +
-        '<span class="marca">' + esc(campo.veredito) + '</span></div>' +
-        '<dl>' +
-        '<dt>esperado</dt><dd class="mono">' + esc(campo.valorEsperado === null ? '(sem valor esperado)' : campo.valorEsperado) + '</dd>' +
-        '<dt>lido</dt><dd class="mono">' + esc(campo.valorLido === null ? '(sem leitura)' : campo.valorLido) + '</dd>' +
-        '<dt>confiança</dt><dd>' + esc(formatarConfianca(campo.confianca)) + '</dd>' +
-        '<dt>vista</dt><dd>' + esc(campo.fonteFisica) + (campo.obrigatorio ? ' (obrigatório)' : ' (opcional)') + '</dd>';
-      if (campo.motivo) {
-        bloco += '<dt>motivo</dt><dd>' + esc(campo.motivo) + '</dd>';
-      }
-      bloco += '</dl>';
-      if (url) {
-        bloco += '<a href="' + esc(url) + '" target="_blank" rel="noopener">ver foto (' + esc(campo.fonteFisica) + ')</a>';
-      }
-      return bloco + '</div>';
-    }).join('');
+    html += blocoDosCampos(resposta.campos || []);
 
     html += '<details><summary>Resposta bruta da API</summary><pre>' +
       esc(JSON.stringify(resposta, null, 2)) + '</pre></details>';
 
     el('veredito-vazio').hidden = true;
     el('resultado').innerHTML = html;
-    el('sec-veredito').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    estado.temVeredito = true;
+    estado.vereditoTexto = textos[0];
+    el('acoes-fim').hidden = false;
+    el('acoes-fim-2').hidden = false;
+    el('dica-fim').hidden = false;
+    // O veredito é o produto: a tela ABRE nele, com os passos anteriores
+    // recolhidos numa linha de resumo cada. Continuar mostrando o formulário
+    // depois da resposta é o que fazia o resultado passar despercebido.
+    irPara('veredito');
   }
 
   function payloadAtual(avisoId) {
@@ -1369,12 +2242,16 @@ export const PAGINA_DEMO = `<!doctype html>
   // Uma só rotina de chamada: as duas ações mandam corpos diferentes para
   // rotas diferentes e recebem a MESMA resposta — quem decide o veredito é a
   // API nos dois casos.
-  function chamarConferencia(caminho, corpo, botao, avisoId, textoAndamento) {
+  function chamarConferencia(caminho, corpo, botao, avisoId, textoAndamento, aposSucesso) {
     botao.disabled = true;
+    estado.ocupado = true;
     aviso(avisoId, textoAndamento, 'neutro');
     el('resultado').innerHTML = '';
     el('veredito-vazio').hidden = false;
     el('veredito-vazio').textContent = textoAndamento;
+    el('acoes-fim').hidden = true;
+    el('acoes-fim-2').hidden = true;
+    el('dica-fim').hidden = true;
 
     pedir(API + caminho, {
       method: 'POST',
@@ -1393,13 +2270,25 @@ export const PAGINA_DEMO = `<!doctype html>
       }
       aviso(avisoId, '');
       renderizar(resposta.corpo);
+      if (aposSucesso) { aposSucesso(resposta.corpo); }
     }).catch(function (erro) {
       aviso(avisoId, 'Falha de rede: ' + erro.message, 'erro');
       el('veredito-vazio').textContent = 'Falha de rede — nada foi conferido.';
     }).then(function () {
+      estado.ocupado = false;
       botao.disabled = false;
       atualizarBotaoExtrair();
     });
+  }
+
+  // As fotos que a conferência acabou de consumir. Marca-se TODAS as enviadas,
+  // não só as que a API disse ter usado: a recusa da API (422) cai sobre o lote
+  // inteiro antes da visão, então marcar demais custa um upload extra e marcar
+  // de menos custa um erro na cara do time.
+  function marcarLoteUsado(fontes) {
+    return function (corpo) {
+      marcarUsadas(fontes, corpo && corpo.conferencia ? corpo.conferencia.id : 'anterior');
+    };
   }
 
   el('btn-conferir').addEventListener('click', function () {
@@ -1416,18 +2305,18 @@ export const PAGINA_DEMO = `<!doctype html>
       corpo.etapaCodigo = estado.etapa;
     }
 
-    chamarConferencia('/conferencias/executar', corpo, el('btn-conferir'), 'avancado-aviso', 'Conferindo na API...');
+    chamarConferencia(
+      '/conferencias/executar',
+      corpo,
+      el('btn-conferir'),
+      'avancado-aviso',
+      'Conferindo na API...',
+      marcarLoteUsado(fotosEnviadas())
+    );
   });
 
-  el('btn-extrair').addEventListener('click', function () {
+  function dispararExtracao(payload) {
     var enviadas = fotosEnviadas();
-    if (!enviadas.length) {
-      aviso('conferir-aviso', 'Envie ao menos uma foto no passo 3 para extrair.', 'erro');
-      return;
-    }
-    var payload = payloadAtual('conferir-aviso');
-    if (!payload) { return; }
-
     var corpo = {
       payloadQr: payload,
       fotoEvidenciaIds: enviadas.map(function (fonte) { return estado.fotos[fonte].id; })
@@ -1441,16 +2330,100 @@ export const PAGINA_DEMO = `<!doctype html>
       corpo,
       el('btn-extrair'),
       'conferir-aviso',
-      'Lendo as fotos... a visão da API leva alguns segundos por foto.'
+      'Lendo as fotos... a visão da API leva alguns segundos por foto.',
+      marcarLoteUsado(enviadas)
     );
+  }
+
+  // Uma rotina para as DUAS portas do passo 4: o botão principal e o "conferir
+  // de novo" do veredito. Repetir o teste tem de ser um toque, e um toque só
+  // pode significar uma coisa.
+  function dispararPasso4() {
+    if (!fotosEnviadas().length) {
+      aviso('conferir-aviso', 'Envie ao menos uma foto no passo 3 para extrair.', 'erro');
+      irPara('fotos');
+      return;
+    }
+    var payload = payloadAtual('conferir-aviso');
+    if (!payload) {
+      irPara('etiqueta');
+      return;
+    }
+
+    var usadas = fotosUsadas();
+    if (!usadas.length) {
+      dispararExtracao(payload);
+      return;
+    }
+
+    // Repetir o teste é o uso REAL desta página. A evidência não se
+    // reaproveita (cada foto pertence a uma conferência só), mas os bytes sim:
+    // sobem de novo como evidências novas, sem ninguém voltar à peça.
+    var semArquivo = usadas.filter(function (fonte) { return !estado.fotos[fonte].arquivo; });
+    if (semArquivo.length) {
+      aviso('conferir-aviso', 'Não guardei o arquivo original de: ' + resumoDeFontes(semArquivo) +
+        '. Refotografe essas vistas no passo 3 — a API não aceita reaproveitar evidência de outra conferência.', 'erro');
+      return;
+    }
+
+    estado.ocupado = true;
+    atualizarBotaoExtrair();
+    aviso('conferir-aviso', 'Reenviando ' + usadas.length + ' foto(s) já usadas como evidências novas...', 'neutro');
+
+    Promise.all(usadas.map(function (fonte) {
+      return enviarFoto(fonte, estado.fotos[fonte].arquivo);
+    })).then(function () {
+      estado.ocupado = false;
+      atualizarBotaoExtrair();
+      if (fotosUsadas().length) {
+        aviso('conferir-aviso', 'O reenvio de alguma foto falhou — veja o passo 3 e tente de novo.', 'erro');
+        return;
+      }
+      dispararExtracao(payload);
+    });
+  }
+
+  el('btn-extrair').addEventListener('click', dispararPasso4);
+
+  el('btn-de-novo').addEventListener('click', function () {
+    irPara('conferir');
+    dispararPasso4();
   });
 
+  el('btn-trocar-etapa').addEventListener('click', function () {
+    irPara('etapa');
+  });
+
+  // "Começar do zero" apaga a PEÇA (etiqueta, fotos, veredito) e mantém o que
+  // pertence ao APARELHO (sessão e etapa) — é a diferença entre pegar a
+  // próxima peça e reconfigurar a câmera.
+  el('btn-zerar').addEventListener('click', function () {
+    descartarFotos();
+    estado.etiquetaPronta = false;
+    estado.origemEtiqueta = '';
+    estado.temVeredito = false;
+    estado.vereditoTexto = '';
+    el('resultado').innerHTML = '';
+    el('veredito-vazio').hidden = false;
+    el('veredito-vazio').textContent = 'Ainda sem veredito: conclua o passo 4.';
+    el('acoes-fim').hidden = true;
+    el('acoes-fim-2').hidden = true;
+    el('dica-fim').hidden = true;
+    aviso('conferir-aviso', '');
+    aviso('qr-aviso', 'Sessão zerada — leia a etiqueta da próxima peça. A etapa deste aparelho foi mantida.', 'neutro');
+    irPara('etiqueta');
+  });
+
+  montarEtapas();
   montarFotos();
   montarLeituras();
   aplicarPreset(PRESET_DEMO);
-  aplicarEtapaDaUrl();
+  // URL vence memória do aparelho; nenhuma das duas abre passo — quem navega é
+  // o assistente, depois do login.
+  restaurarEtapa();
   atualizarTextoEtapa();
   atualizarBotaoExtrair();
+  atualizarPassos();
   aviso('conferir-aviso', '');
   aviso('avancado-aviso', '');
 })();

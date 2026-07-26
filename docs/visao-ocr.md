@@ -144,6 +144,11 @@ saíram os nomes atuais.
 | patrimonio-serigrafia (frente) | 251328 | 98,4% | conforme |
 | cliente-serigrafia (frente) | energisa | 99,7% | conforme |
 
+> CORREÇÃO (rodada do contraste, 2026-07-26): o `847833 @ 84,6%` da linha
+> `serie-chumbada-2` **não era erro de dígito**. É o número da PLACA, lido
+> muito bem numa foto que pegava tanque, etiqueta e placa juntos, e entregue no
+> campo errado pela regra da contagem. Medição e correção no fim do arquivo.
+
 > ATUALIZAÇÃO (rodada dos recortes, mais abaixo): o limiar sozinho **não**
 > resolve o relevo — na faixa de 84% convivem leitura certa e errada. O 0.9
 > continua valendo como piso; o que separa os dois casos é a corroboração por
@@ -169,10 +174,8 @@ correta.
 
 Mitigação implementada: leitura que bate exatamente com o valor esperado de
 OUTRO campo vira `nao_conferivel` (`leitura-de-outro-campo`). A correção
-definitiva é física e ainda não foi feita: **discriminar tinta de relevo pelo
-contraste** dentro do `regiaoLeitura` que já persistimos — tinta preta é
-escura contra o tanque, relevo tem a cor do fundo. Não exige modelo treinado,
-só amostragem de pixels.
+definitiva é física e **foi feita em 2026-07-26** — ver "Rodada do contraste",
+no fim deste arquivo.
 
 ## Rodada dos recortes (2026-07-25): a confiança do relevo mede enquadramento
 
@@ -258,3 +261,144 @@ bloqueio de conta (que caiu), mas por medição. Onde ele continua fazendo
 sentido é o check qualitativo de layout (Could do SPEC): "as marcações
 esperadas estão presentes e na disposição do projeto?" — pergunta em que
 alucinação pesa menos e para a qual não há concorrente OCR.
+
+## Adendo (2026-07-26): modelos Claude leem relevo — quando recebem o recorte
+
+A medição anterior foi **injusta com os LLMs** e o registro precisa dizer isso.
+Naquela rodada as imagens foram enviadas inteiras (4096×2304), e nelas o
+chumbado ocupa ~85×51 px. Modelos de visão reduzem a imagem antes de
+processar, então o número virava ~30 px e sumia — as abstenções (`null`) não
+mediam incapacidade de leitura, mediam resolução. O Textract não sofre disso
+porque processa em resolução de OCR.
+
+Refeito o teste com o MESMO recorte que a corroboração usa (a conta liberou os
+modelos Claude atuais; antes só respondiam Nova e Pixtral):
+
+| Foto | Textract + recorte | Haiku 4.5 | Sonnet 4.5 | Opus 4.5 |
+| --- | --- | --- | --- | --- |
+| TOPO-2 (fácil) | **847233 @ 98,8%** | `847283` ✗ | `847288` ✗ | **847233** ✓ |
+| LATERAL-DIREITA-2 (difícil) | **847233 @ 94,5%** | **847233** ✓ | `847293` ✗ | `null` |
+
+**Conclusão revista.** Não é que "Bedrock não lê": os modelos Claude leem
+relevo quando enxergam o recorte — o Haiku acertou justamente a foto difícil,
+a mesma que na imagem inteira dava 41% no Textract. O que os desqualifica para
+o caminho de leitura é outra coisa:
+
+1. **Inconsistência** — cada modelo acertou uma foto e errou a outra; nenhum
+   foi confiável nas duas.
+2. **Formato do erro** — todos os erros são de um dígito (`847283`, `847288`,
+   `847293`): plausíveis, indistinguíveis de leitura boa sem gabarito.
+3. **Ausência de confiança calibrada** — a engine precisa de um score para
+   aplicar limiar, e LLM não fornece.
+4. **O recorte é que consertou a leitura**, não a troca de motor: o Textract
+   com recorte acertou as duas.
+
+Fica registrado o que seria a próxima investigação, se houvesse tempo: os
+erros dos modelos são **descorrelacionados** (Haiku acertou onde o Opus
+falhou e vice-versa), que é justamente a propriedade que faria uma votação
+funcionar. Com duas fotos de amostra não dá para afirmar nada — é pesquisa,
+não decisão de rodada.
+
+## Rodada do contraste (2026-07-26): discriminar tinta de relevo por pixel
+
+A rodada anterior deixou uma dívida nomeada — "discriminar tinta de relevo pelo
+contraste dentro do `regiaoLeitura` que já persistimos". Foi feita, e resolveu
+mais do que o previsto.
+
+### O gargalo
+
+A vista `topo` declara DUAS marcações: `serie-chumbada-topo` (relevo) e
+`patrimonio-serigrafia-topo` (tinta preta). Quando o Textract achava um número
+só, a heurística se recusava a adivinhar e devolvia os **dois** campos nulos.
+A recusa é correta — antes dela o patrimônio em tinta era casado com o campo da
+série chumbada e acusava peça correta —, mas custava um dos 3 irmãos da série e
+um dos 2 patrimônios: exatamente o que a demo precisa mostrar.
+
+### A métrica
+
+Recorta-se a região do bounding box (que o Textract já devolve) e mede-se a
+luminância dela contra a de um **anel** de 1,0 altura da caixa em cada lado:
+
+- `escuridao = (anel.p50 − dentro.p10) / 255` — quanto o traço mais escuro está
+  abaixo do fundo imediato. Tinta preta sobre o tanque dispara;
+- `claridade = (dentro.p90 − anel.p50) / 255` — quanto o traço mais claro está
+  acima do fundo. Texto branco sobre placa preta dispara;
+- `desvio` da região — textura. Separa relevo (tem sombra) de região chapada.
+
+O anel é o que torna a medida invariante à iluminação: luminância absoluta não
+diz nada, a mesma tinta sai a 40 na sombra e a 120 no sol.
+
+### Calibração com as fotos reais (`fotos-demo/`)
+
+`npx ts-node -r tsconfig-paths/register scripts/spike-contraste.ts <dir-fotos>`
+reexecuta e reimprime esta tabela.
+
+| Foto | Marcação | escuridão | claridade | desvio | px |
+| --- | --- | --- | --- | --- | --- |
+| TOPO-2 | 847233 chumbado (**relevo**) | 0,114 | 0,122 | 23,1 | 28560 |
+| DIAGONAL-TRAS-DIR-2 | 847233 chumbado (**relevo**) | 0,059 | 0,047 | 11,3 | 6930 |
+| LATERAL-DIREITA-2 | 847233 chumbado (**relevo**) | 0,031 | 0,075 | 12,6 | 4698 |
+| FRENTE-2 | 251328 serigrafia (**tinta**) | 0,608 | 0,008 | 68,0 | 135339 |
+| ETIQUETA-1 | 847233 etiqueta (**tinta**) | 0,600 | 0,047 | 57,0 | 64293 |
+| TOPO-2 | "10 kVA 251328" (**tinta**) | 0,588 | 0,035 | 55,8 | 445047 |
+| LATERAL-DIREITA-2 | 847233 etiqueta (**tinta**) | 0,502 | 0,055 | 55,7 | 533 |
+| PLACA-4 | 847833 placa (**claro/escuro**) | 0,051 | 0,722 | 79,5 | 10800 |
+| DIAGONAL-TRAS-DIR-2 | 847833 placa (**claro/escuro**) | 0,035 | 0,510 | 53,8 | 594 |
+| LATERAL-DIREITA-2 | 847833 placa (**claro/escuro**) | 0,043 | 0,290 | 32,2 | 851 |
+
+**As classes não se tocam.** Escuridão: relevo até 0,114, tinta a partir de
+0,502 (4,4×). Claridade: relevo até 0,122, claro a partir de 0,290 (2,4×).
+Textura: região chapada 1,3, relevo a partir de 11,3 (8,7×).
+
+Limiares escolhidos, dentro dos vazios e com faixa morta declarada:
+`escuridao ≥ 0,30` → tinta; `claridade ≥ 0,22` → claro-sobre-escuro; ambos
+abaixo de 0,20/0,18 **e** desvio ≥ 5,0 → relevo; qualquer outra coisa →
+`indeterminado`.
+
+**A PLACA é um terceiro caso, não "tinta".** Texto claro sobre fundo preto tem
+claridade alta e escuridão baixa. Sem classe própria para ela, o `847833` da
+placa que aparece de relance numa foto de vista seria confundido com serigrafia
+sobre metal — e é justamente ele que a peça de demo tem errado.
+
+### O que mudou nas leituras (Textract real, 5 vistas)
+
+| Campo | Antes | Depois |
+| --- | --- | --- |
+| serie-chumbada-topo | sem leitura | **847233** @ 98,4% · confirmada |
+| serie-chumbada-lateral-direita | **847833** @ 84,6% (número da PLACA) | **847233** @ 58,3% · confirmada |
+| serie-chumbada-traseira | sem leitura | **847233** @ 97,7% · confirmada |
+| patrimonio-serigrafia-topo | sem leitura | **251328** @ 98,5% |
+| serie-placa | 847833 @ 99,9% | 847833 @ 99,9% (cenário-âncora intacto) |
+| patrimonio-serigrafia-frente | 251328 @ 98,4% | 251328 @ 98,4% |
+| patrimonio-placa | sem leitura | sem leitura |
+
+As **3 séries chumbadas** passam a ler, todas com o valor certo e corroboradas
+por recorte. A linha da lateral é a mais importante: ela não estava "sem
+leitura", estava **com a leitura errada** — o `847833` da placa entregue como
+série chumbada da lateral, uma acusação falsa em peça correta. A confiança de
+84,6% que a rodada anterior atribuiu a "erro de dígito no relevo" era, na
+verdade, o Textract lendo a placa muito bem.
+
+### Dois achados de tabela
+
+1. **O Textract junta marcações vizinhas numa linha só.** Em TOPO-2 a
+   serigrafia saiu como `"10 kVA 251328"`. A regra antiga ("ou a linha é só o
+   número, ou tem rótulo conhecido") descartava a linha inteira, e o patrimônio
+   do topo era invisível. Agora um número que é **token inteiro** dentro de
+   texto entra como candidato FRACO — reivindicável só por contraste, nunca
+   pela contagem. `TPD-408136` continua fora: ali o número está *dentro* de um
+   código, não é um número por si.
+2. **Bug de coordenada EXIF, silencioso, que já custava a corroboração.**
+   `sharp(buf, { autoOrient: true }).metadata()` devolve as dimensões CRUAS, não
+   as de depois da rotação (sharp 0.35.3). Em `PLACA-4.jpg` (orientation 6) a
+   metadata dizia 4096×2304 enquanto o pipeline recortava 2304×4096 — o
+   `extract` estourava ou caía numa região vazia. O Textract, esse, **respeita
+   o EXIF**: verificado recortando o bounding box de `847833` nos dois
+   referenciais (no cru sai um borrão, no orientado sai o número legível).
+   Corrigido em `recorte.ts` (`dimensoesOrientadas`).
+
+### Custo
+
+Zero chamada AWS a mais: a classificação é aritmética sobre bytes que já estão
+na memória, e o teto de 3 chamadas de visão por foto (constraint 4 do SPEC)
+não mudou.

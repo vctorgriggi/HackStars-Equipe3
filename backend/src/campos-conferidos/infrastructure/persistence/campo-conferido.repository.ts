@@ -14,6 +14,25 @@ export abstract class CampoConferidoRepository {
     paginationOptions: IPaginationOptions;
   }): Promise<CampoConferido[]>;
 
+  /**
+   * Campos de UMA conferencia, em ordem estavel (createdAt ASC, id como
+   * desempate) — a ordem em que a execucao os gravou, que e a da checklist.
+   *
+   * Existe porque a releitura do veredito (`GET /conferencias/:id/campos`) nao
+   * tinha como chegar aos campos: `findAllWithPagination` pagina o banco
+   * inteiro (gap 4 do CLAUDE.md) e o veredito campo a campo so existia na
+   * resposta do POST. Sem filtro por conferencia, um refresh perdia a tela.
+   *
+   * Sem paginacao de proposito: o conjunto e limitado pela checklist do
+   * ProjetoModelo (9 itens no modelo da demo), e paginar o veredito de UMA
+   * conferencia esconderia campo divergente atras de uma segunda pagina.
+   */
+  abstract findByConferencia({
+    conferenciaId,
+  }: {
+    conferenciaId: string;
+  }): Promise<CampoConferido[]>;
+
   abstract findById(
     id: CampoConferido['id'],
   ): Promise<NullableType<CampoConferido>>;

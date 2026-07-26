@@ -2,7 +2,9 @@ import {
   CaixaNormalizada,
   abrirImagem,
   areaDaIntersecao,
+  calcularEnvelope,
   calcularRecorte,
+  dimensoesOrientadas,
   lerCaixa,
   mapearCaixaNoRecorte,
   recorteLigado,
@@ -136,5 +138,61 @@ describe('abrirImagem — chave de desligamento', () => {
     // Foto corrompida vira "sem corroboracao", nunca 500: o campo cai para
     // nao_conferivel, que e o veredito honesto.
     await expect(abrirImagem(Buffer.from('nao-e-imagem'))).resolves.toBeNull();
+  });
+});
+
+describe('dimensoesOrientadas', () => {
+  // ARMADILHA MEDIDA em 2026-07-26 (`PLACA-4.jpg`, orientation 6): a metadata
+  // do sharp com `autoOrient` reporta as dimensoes CRUAS, e o pipeline recorta
+  // a imagem JA rotacionada. Sem esta correcao, o `extract` estourava com
+  // `bad extract area` — ou, pior, caia numa regiao vazia e falhava calado.
+  // O Textract, esse, respeita o EXIF: verificado recortando o bounding box de
+  // `847833` nos dois referenciais (no cru sai borrao, no orientado sai o
+  // numero legivel).
+
+  it('should manter as dimensoes quando nao ha transposicao (1..4)', () => {
+    expect(dimensoesOrientadas(4096, 2304, 1)).toEqual({
+      largura: 4096,
+      altura: 2304,
+    });
+    expect(dimensoesOrientadas(4096, 2304, 3)).toEqual({
+      largura: 4096,
+      altura: 2304,
+    });
+  });
+
+  it('should trocar largura por altura nas orientacoes de 90 graus (5..8)', () => {
+    for (const orientacao of [5, 6, 7, 8]) {
+      expect(dimensoesOrientadas(4096, 2304, orientacao)).toEqual({
+        largura: 2304,
+        altura: 4096,
+      });
+    }
+  });
+
+  it('should manter as dimensoes quando a foto nao declara orientacao', () => {
+    expect(dimensoesOrientadas(800, 600, undefined)).toEqual({
+      largura: 800,
+      altura: 600,
+    });
+  });
+});
+
+describe('calcularEnvelope', () => {
+  it('should crescer o retangulo igualmente nos quatro lados', () => {
+    expect(
+      calcularEnvelope(
+        { left: 100, top: 100, width: 60, height: 20 },
+        20,
+        1000,
+        1000,
+      ),
+    ).toEqual({ left: 80, top: 80, width: 100, height: 60 });
+  });
+
+  it('should cortar nas bordas da foto', () => {
+    expect(
+      calcularEnvelope({ left: 5, top: 5, width: 20, height: 10 }, 20, 30, 30),
+    ).toEqual({ left: 0, top: 0, width: 30, height: 30 });
   });
 });

@@ -37,7 +37,7 @@ não conformidade que chega ao cliente hoje).
 | ------- | ---------------------------------------------------------------- |
 | API     | NestJS (base brocoders/nestjs-boilerplate), TypeORM + PostgreSQL |
 | Front   | Next.js 16 (React 19, Tailwind 4), mobile-first; `mobile/` (Expo) é experimento do time |
-| Visão   | AWS Textract (escolhido e medido no spike T2.1); Bedrock reprovado para leitura numérica — docs/visao-ocr.md |
+| Visão   | AWS Textract (escolhido e medido no spike T2.1); Bedrock fora do caminho de leitura: leem com recorte, mas inconsistentes e sem confiança calibrada — docs/visao-ocr.md |
 | Storage | AWS S3 (fallback: disco local, se S3 ameaçar o prazo)            |
 | Deploy  | ECR + App Runner (HTTPS), RDS PostgreSQL — receita em docs/deploy.md |
 
@@ -168,10 +168,30 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
   é **3 chamadas, fixo**: a foto inteira + 2 recortes de corroboração do relevo
   (`adapters/recorte.ts`, margens 50%/150%, resolução nativa, sem filtro de
   pixel — ampliar e pré-processar foram medidos e reprovados). Teto, não laço.
+- **Discriminação tinta × relevo por contraste** (`adapters/contraste.ts`):
+  quando sobra número numérico sem dono numa vista que declara 2+ marcações, o
+  adapter mede a luminância DENTRO do bounding box contra a de um anel em volta
+  e classifica a leitura em `tinta` | `relevo` | `claro-sobre-escuro` |
+  `indeterminado` — tinta preta é escura contra o tanque, relevo tem a cor do
+  fundo, placa é claro sobre preto. O número vai para o alvo cujo tipo esperado
+  (`tipoDeMarcacaoDoCampo`, derivado do nome do campo) combina, e SÓ quando o
+  casamento é único nos dois sentidos. Zero chamada AWS a mais: é aritmética
+  sobre bytes já em memória. Limiares e a tabela de calibração com as fotos
+  reais moram no próprio arquivo; `scripts/spike-contraste.ts` reexecuta.
+- Medição INCONCLUSIVA (`indeterminado`, sem `sharp`, foto lisa) nunca pode
+  piorar o resultado: cai-se na regra antiga, intacta. Só evidência CONTRÁRIA
+  (classe decisiva que não casa com alvo nenhum) deixa o campo nulo. Essa
+  distinção é `medicaoConclusiva` — sem ela, uma foto sem textura zerava
+  leituras boas e quebrava a corroboração por recorte.
 - `sharp` é dependência OPCIONAL em runtime: import dinâmico em try/catch, e
-  `EXTRACAO_RECORTE=off` desliga a corroboração sem deploy. Sem ela o adapter
-  volta a 1 chamada por foto e leitura em relevo sai `nao-confirmada` (deixa de
-  poder acusar, continua podendo confirmar `conforme`).
+  `EXTRACAO_RECORTE=off` desliga recorte E medição de contraste sem deploy. Sem
+  ela o adapter volta a 1 chamada por foto, leitura em relevo sai
+  `nao-confirmada` (deixa de poder acusar, continua podendo confirmar
+  `conforme`) e a heurística volta ao casamento por contagem.
+- Bounding box do Textract vem no referencial da foto JÁ ORIENTADA pelo EXIF,
+  mas `sharp(...).metadata()` reporta as dimensões CRUAS: use
+  `dimensoesOrientadas` (recorte.ts) para converter. Ignorar isso faz o recorte
+  cair em outro lugar da peça e falhar CALADO em toda foto de celular deitada.
 - Leitura retornada pelo adapter sempre carrega: valor, confiança, vista de
   origem (`fonteFisica`: topo, frente, placa…), referência à foto e, quando
   o serviço fornecer, o bounding box da leitura (`regiaoLeitura`) — dado
@@ -269,11 +289,12 @@ do hackathon:
    duplicados; aceitável no volume da demo, e os endpoints das Fases 3–4
    selecionam o que expõem.
 4. Listagens sem filtro por relação — PARCIALMENTE RESOLVIDO (2026-07-25):
-   `GET /transformadores?numeroSerie=&pedido=` e as duas consultas por relação
+   `GET /transformadores?numeroSerie=&pedido=`, as duas consultas por relação
    (`GET /transformadores/:id/passagens`, `GET /transformadores/:id/conferencias`)
-   existem e recortam o payload. O que segue global é a paginação das demais
-   listagens geradas (conferências, campos conferidos, fotos, passagens) — sem
-   dono na demo, porque as telas leem sempre pela peça.
+   e a releitura do veredito (`GET /conferencias/:id/campos`) existem e
+   recortam o payload. O que segue global é a paginação das demais listagens
+   geradas (conferências, campos conferidos, fotos, passagens) — sem dono na
+   demo, porque as telas leem sempre pela peça.
 5. `checklist` como varchar validado só por `@IsString` — vira jsonb com
    validação estruturada quando a ingestão de projeto (Fase 6) existir; até
    lá, a única escrita é o seed.
@@ -366,6 +387,23 @@ do hackathon:
     `EXTRACTOR_DRIVER=textract` e conferir no log as linhas `chamada-de-visao:
     recorte` (se o bounding box e a orientação EXIF não casarem, o efeito é
     tudo `nao-confirmada`, nunca leitura errada aceita).
+22. O PORQUÊ do veredito não sobrevive à releitura: `CampoConferido` persiste
+    valor, confiança, veredito, região e foto — mas NÃO o `motivo`
+    (`MotivoCampo`: `sem-leitura`, `confianca-abaixo-do-limiar`,
+    `leituras-conflitantes`, `leitura-de-outro-campo`,
+    `leitura-nao-corroborada`), nem as `incoerencias` entre campos irmãos, nem
+    os `achadosInconsistentes` da extração. Tudo isso só existe na resposta do
+    POST; `GET /conferencias/:id/campos` devolve o veredito sem a explicação.
+    Custa caro justamente onde mais importa: os três motivos novos distinguem
+    "reenquadre a foto" de "a peça está gravada errada", e o operador que abrir
+    a conferência pelo histórico vê só `nao_conferivel`. O efeito das
+    incoerências sobre o `vereditoGeral` ESTÁ gravado — o detalhe é que é
+    efêmero. Correção: coluna `motivo` em `campo_conferido` (pelos generators)
+    e persistir incoerência como alerta na T4.3; não entrou nesta rodada para
+    não inventar dado que o banco não tem.
+    `fonteFisica`/`obrigatorio` também não são persistidos, mas esses a
+    releitura RE-RESOLVE da checklist do ProjetoModelo da peça (e devolve
+    `null` se a peça não tiver projeto ou a checklist estiver ilegível).
 
 ## Decisões em aberto
 

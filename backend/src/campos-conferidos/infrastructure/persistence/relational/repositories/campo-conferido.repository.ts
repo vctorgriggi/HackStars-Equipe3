@@ -36,6 +36,19 @@ export class CampoConferidoRelationalRepository implements CampoConferidoReposit
     return entities.map((entity) => CampoConferidoMapper.toDomain(entity));
   }
 
+  async findByConferencia({
+    conferenciaId,
+  }: {
+    conferenciaId: string;
+  }): Promise<CampoConferido[]> {
+    const entities = await this.campoConferidoRepository.find({
+      where: { conferencia: { id: conferenciaId } },
+      order: { createdAt: 'ASC', id: 'ASC' },
+    });
+
+    return entities.map((entity) => CampoConferidoMapper.toDomain(entity));
+  }
+
   async findById(
     id: CampoConferido['id'],
   ): Promise<NullableType<CampoConferido>> {

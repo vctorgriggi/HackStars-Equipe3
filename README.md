@@ -62,7 +62,7 @@ caminho único de escrita de veredito) existe para tornar isso impossível.
 | API     | NestJS (base brocoders/nestjs-boilerplate), TypeORM + PostgreSQL |
 | Front   | Next.js 16 (React 19, Tailwind 4), mobile-first (`frontend/`)    |
 | Cliente móvel | `mobile/`: app Expo (React Native) subido pelo time — **experimento**; qual dos dois vai à demo é decisão em aberto |
-| Visão   | AWS Textract (escolhido no spike T2.1 e mantido depois de medir a peça inteira); Bedrock reprovado para leitura numérica |
+| Visão   | AWS Textract (escolhido no spike T2.1 e mantido depois de medir a peça inteira); Bedrock fora do caminho de leitura (medido: modelos Claude leem com recorte, mas de forma inconsistente e sem confiança calibrada) |
 | Storage | AWS S3 (fallback: disco local)                                   |
 
 ## Como rodar
