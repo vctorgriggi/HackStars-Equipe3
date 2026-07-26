@@ -12,7 +12,10 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { PassagensService } from './passagens.service';
-import { PassagemRegistroService } from './passagem-registro.service';
+import {
+  PassagemRegistroService,
+  ResultadoRegistroPassagem,
+} from './passagem-registro.service';
 import { CreatePassagemDto } from './dto/create-passagem.dto';
 import { RegistrarPassagemDto } from './dto/registrar-passagem.dto';
 import { UpdatePassagemDto } from './dto/update-passagem.dto';
@@ -48,6 +51,13 @@ export class PassagensController {
   ) {}
 
   @Post()
+  @ApiOperation({
+    summary: 'CRUD gerado: cria a passagem por UUIDs (nao use no fluxo)',
+    description:
+      'Pede dois UUIDs que o celular do operador nao tem. O caminho do scan e ' +
+      '`POST /passagens/registrar`, que resolve peca pelo QR e etapa pelo ' +
+      '`codigo` do Checkpoint.',
+  })
   @ApiCreatedResponse({
     type: Passagem,
   })
@@ -70,20 +80,32 @@ export class PassagensController {
       'geram eventos distintos, de proposito: sao passagens reais.',
   })
   @ApiCreatedResponse({
+    type: ResultadoRegistroPassagem,
     description:
       'Passagem criada: { passagem, checkpoint, transformador, ' +
-      'ultimaConferencia }.',
+      'ultimaConferencia }. `ultimaConferencia` e o dado do ALERTA (criterio ' +
+      '6 do SPEC) — `null` quando a peca nunca foi conferida.',
   })
   @ApiUnprocessableEntityResponse({
     description:
-      'payloadQr ilegivel/somente-codigo ou etapa-desconhecida. Os dois saem ' +
-      'antes da primeira escrita: 422 nunca deixa peca orfa.',
+      'Codigos possiveis (em `errors`): `payload-invalido` / ' +
+      '`payload-somente-codigo` (QR ilegivel ou so com codigo de lookup) e ' +
+      '`etapa-desconhecida: <codigo>` (nao existe Checkpoint com esse ' +
+      '`codigo` — mesmo codigo de erro do `/conferencias/executar`, um ' +
+      'contrato so). Os dois saem antes da primeira escrita: 422 nunca deixa ' +
+      'peca orfa.',
   })
   registrar(@Body() registrarPassagemDto: RegistrarPassagemDto) {
     return this.passagemRegistroService.registrar(registrarPassagemDto);
   }
 
   @Get()
+  @ApiOperation({
+    summary: 'CRUD gerado: pagina todas as passagens do banco',
+    description:
+      'Sem filtro por peca (gap 4 do CLAUDE.md). Para o historico de uma peca ' +
+      'use `GET /transformadores/{id}/passagens`.',
+  })
   @ApiOkResponse({
     type: InfinityPaginationResponse(Passagem),
   })
@@ -113,6 +135,7 @@ export class PassagensController {
     type: String,
     required: true,
   })
+  @ApiOperation({ summary: 'CRUD gerado: uma passagem pelo id' })
   @ApiOkResponse({
     type: Passagem,
   })
@@ -125,6 +148,9 @@ export class PassagensController {
     name: 'id',
     type: String,
     required: true,
+  })
+  @ApiOperation({
+    summary: 'CRUD gerado: edita a passagem (uso previsto: `observacao`)',
   })
   @ApiOkResponse({
     type: Passagem,
@@ -141,6 +167,12 @@ export class PassagensController {
     name: 'id',
     type: String,
     required: true,
+  })
+  @ApiOperation({
+    summary: 'CRUD gerado: apaga a passagem (a UI nao expoe)',
+    description:
+      'Apagar passagem reescreve o historico de transito da peca — hard ' +
+      'delete, sem trilha (gap 2 do CLAUDE.md).',
   })
   remove(@Param('id') id: string) {
     return this.passagensService.remove(id);

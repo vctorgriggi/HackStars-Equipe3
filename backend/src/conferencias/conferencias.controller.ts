@@ -30,6 +30,9 @@ import {
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import { Conferencia } from './domain/conferencia';
+import { ResultadoExecucao } from './dto/resultado-execucao.dto';
+import { ResultadoExecucaoComExtracao } from './dto/resultado-execucao-com-extracao.dto';
+import { VereditoConferencia } from './consultas/veredito-conferencia';
 import { AuthGuard } from '@nestjs/passport';
 import {
   InfinityPaginationResponse,
@@ -54,6 +57,13 @@ export class ConferenciasController {
   ) {}
 
   @Post()
+  @ApiOperation({
+    summary: 'CRUD gerado: cria uma Conferencia crua (nao use no fluxo)',
+    description:
+      'Endpoint do gerador, mantido para inspecao/manutencao. Ele NAO executa ' +
+      'a engine e nao grava veredito — quem confere e ' +
+      '`POST /conferencias/executar-com-fotos` (ou `/executar`).',
+  })
   @ApiCreatedResponse({
     type: Conferencia,
   })
@@ -63,7 +73,17 @@ export class ConferenciasController {
 
   @Post('executar')
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Executa a conferencia com leituras DIGITADAS (modo avancado)',
+    description:
+      'Mesma engine do caminho principal, mas as leituras (valor + confianca) ' +
+      'vem no corpo em vez da visao. Use para testar sem AWS, para a tela ' +
+      '/demo e para reproduzir cenarios; o fluxo do operador e ' +
+      '`POST /conferencias/executar-com-fotos`. A confianca aqui e informada ' +
+      'pelo cliente e portanto forjavel (gap 10 do CLAUDE.md).',
+  })
   @ApiCreatedResponse({
+    type: ResultadoExecucao,
     description:
       'Conferencia executada: peca (find-or-create pelo numero de serie), ' +
       'veredito geral calculado pela engine e um CampoConferido por campo ' +
@@ -75,8 +95,14 @@ export class ConferenciasController {
   })
   @ApiUnprocessableEntityResponse({
     description:
-      'payloadQr ilegivel/somente-codigo, etapa-desconhecida, ' +
-      'projeto-modelo-indeterminado ou etapa-sem-campos-conferiveis. ' +
+      'Codigos possiveis (em `errors`): `payload-invalido` / ' +
+      '`payload-somente-codigo` (QR ilegivel ou so com codigo de lookup), ' +
+      '`etapa-desconhecida` (nao existe Checkpoint com esse `codigo`), ' +
+      '`projeto-modelo-indeterminado` (o QR nao aponta projeto, a peca nao tem ' +
+      'vinculo e ha 0 ou 2+ projetos cadastrados), ' +
+      '`etapa-sem-campos-conferiveis` (nenhum item da checklist e conferivel ' +
+      'ate essa etapa) e `checklist-sem-campo-avaliavel` (o recorte so tinha ' +
+      'itens opcionais sem valor esperado no QR). ' +
       'Todos saem antes da primeira escrita: 422 nunca deixa peca orfa.',
   })
   executar(@Body() executarConferenciaDto: ExecutarConferenciaDto) {
@@ -85,7 +111,18 @@ export class ConferenciasController {
 
   @Post('executar-com-fotos')
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary:
+      'CAMINHO PRINCIPAL: confere a peca a partir do QR + fotos ja enviadas',
+    description:
+      'O fluxo do operador: suba as fotos em `POST /fotos-evidencia/upload`, ' +
+      'mande os ids aqui junto do payload do QR e da etapa da URL do ' +
+      'dispositivo. A visao le as fotos, a engine compara e o veredito volta ' +
+      'pronto — o front nao compara nada. Chamada de visao acontece SO neste ' +
+      'disparo (creditos AWS sao finitos).',
+  })
   @ApiCreatedResponse({
+    type: ResultadoExecucaoComExtracao,
     description:
       'Mesma conferencia do POST /executar, mas as leituras vem da VISAO: ' +
       'so as fotos cuja fonte fisica tem campo no recorte da etapa sao lidas ' +
@@ -101,9 +138,13 @@ export class ConferenciasController {
   })
   @ApiUnprocessableEntityResponse({
     description:
-      'payloadQr ilegivel/somente-codigo, etapa-desconhecida, ' +
-      'projeto-modelo-indeterminado, etapa-sem-campos-conferiveis, ' +
-      'foto-evidencia-inexistente ou foto-evidencia-de-outra-conferencia. ' +
+      'Os mesmos codigos do `/executar` (`payload-invalido`, ' +
+      '`payload-somente-codigo`, `etapa-desconhecida`, ' +
+      '`projeto-modelo-indeterminado`, `etapa-sem-campos-conferiveis`, ' +
+      '`checklist-sem-campo-avaliavel`) mais dois de evidencia: ' +
+      '`foto-evidencia-inexistente` (id que nao existe) e ' +
+      '`foto-evidencia-de-outra-conferencia` (foto ja presa a outra ' +
+      'conferencia — evidencia emprestada falsificaria a trilha). ' +
       'Todos sao avaliados ANTES de qualquer chamada paga de visao.',
   })
   executarComFotos(@Body() executarComFotosDto: ExecutarComFotosDto) {
@@ -113,6 +154,12 @@ export class ConferenciasController {
   }
 
   @Get()
+  @ApiOperation({
+    summary: 'CRUD gerado: pagina todas as conferencias do banco',
+    description:
+      'Sem filtro por peca (gap 4 do CLAUDE.md). Para as telas do operador ' +
+      'use `GET /transformadores/{id}/conferencias`.',
+  })
   @ApiOkResponse({
     type: InfinityPaginationResponse(Conferencia),
   })
@@ -166,7 +213,13 @@ export class ConferenciasController {
       'checklist do ProjetoModelo da peca (CampoConferido nao os persiste) e ' +
       'vem `null` se a peca nao tiver projeto vinculado.',
   })
-  @ApiNotFoundResponse({ description: 'conferencia-inexistente' })
+  @ApiOkResponse({ type: VereditoConferencia })
+  @ApiNotFoundResponse({
+    description:
+      '`conferencia-inexistente: <id>`. E 404 de proposito, nunca lista ' +
+      'vazia: `campos: []` passaria por "conferencia sem nenhuma ' +
+      'divergencia" — falso OK.',
+  })
   vereditoPorConferencia(@Param('id') id: string) {
     return this.conferenciaConsultasService.vereditoPorConferencia(id);
   }
@@ -176,6 +229,12 @@ export class ConferenciasController {
     name: 'id',
     type: String,
     required: true,
+  })
+  @ApiOperation({
+    summary: 'CRUD gerado: a linha crua da conferencia',
+    description:
+      'Sem os campos conferidos. Para a tela de veredito use ' +
+      '`GET /conferencias/{id}/campos`.',
   })
   @ApiOkResponse({
     type: Conferencia,
@@ -189,6 +248,13 @@ export class ConferenciasController {
     name: 'id',
     type: String,
     required: true,
+  })
+  @ApiOperation({
+    summary: 'CRUD gerado: edita a conferencia (uso previsto: `observacao`)',
+    description:
+      'O caso legitimo e registrar a excecao aceita pelo time em ' +
+      '`observacao`. `vereditoGeral` fica FORA do DTO: veredito so nasce na ' +
+      'engine.',
   })
   @ApiOkResponse({
     type: Conferencia,
@@ -205,6 +271,12 @@ export class ConferenciasController {
     name: 'id',
     type: String,
     required: true,
+  })
+  @ApiOperation({
+    summary: 'CRUD gerado: apaga a conferencia (a UI nao expoe)',
+    description:
+      'Hard delete com FKs `NO ACTION` (gap 2 do CLAUDE.md): conferencia com ' +
+      'campos conferidos estoura 500.',
   })
   remove(@Param('id') id: string) {
     return this.conferenciasService.remove(id);

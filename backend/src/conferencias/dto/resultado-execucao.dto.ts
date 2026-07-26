@@ -46,7 +46,7 @@ export const MOTIVOS_CAMPO: MotivoCampo[] = [
   'leitura-nao-corroborada',
 ];
 
-const DESCRICAO_VEREDITO_CAMPO =
+export const DESCRICAO_VEREDITO_CAMPO =
   'Veredito DESTE campo, como a engine decidiu — o front nunca recalcula. ' +
   '`conforme`: valor lido igual ao esperado do QR, com confiança >= limiar. ' +
   '`divergente`: leitura com lastro e DIFERENTE do esperado (a peça está ' +
@@ -54,7 +54,7 @@ const DESCRICAO_VEREDITO_CAMPO =
   '— o porquê vem em `motivo`. Campo ilegível NUNCA é rebaixado para ' +
   '`conforme`: o falso OK é a não conformidade que chega ao cliente.';
 
-const DESCRICAO_VEREDITO_GERAL =
+export const DESCRICAO_VEREDITO_GERAL =
   'Veredito da conferência inteira, agregado pela engine na precedência ' +
   '`divergente` > `nao_conferivel` > `conforme`: basta UM campo divergente ' +
   'para o geral ser `divergente`; sem divergência, basta um campo ' +
@@ -64,7 +64,7 @@ const DESCRICAO_VEREDITO_GERAL =
   '(critério 4 do SPEC). Atenção: com `etapaAvaliada` preenchida este veredito ' +
   'cobre apenas o recorte daquela etapa — não atesta a peça inteira.';
 
-const DESCRICAO_MOTIVO =
+export const DESCRICAO_MOTIVO =
   'Por que o campo não pôde ser afirmado. Só vem com `nao_conferivel`; ' +
   'ausente em `conforme`/`divergente`. É o dado que separa "reenquadre a ' +
   'foto" de "a peça está gravada errada":\n' +
@@ -118,7 +118,8 @@ export class LeituraDoGrupoResposta implements LeituraDoGrupo {
   @ApiProperty({
     enum: VEREDITOS,
     example: 'divergente',
-    description: 'Veredito que este campo já recebeu; a coerência não o reescreve.',
+    description:
+      'Veredito que este campo já recebeu; a coerência não o reescreve.',
   })
   veredito: Veredito;
 }
@@ -138,14 +139,16 @@ export class IncoerenciaEntreCamposResposta implements IncoerenciaEntreCampos {
   @ApiProperty({
     type: [String],
     example: ['serie-chumbada-topo', 'serie-placa'],
-    description: 'Campos que produziram leitura comparável, em ordem de checklist.',
+    description:
+      'Campos que produziram leitura comparável, em ordem de checklist.',
   })
   campos: string[];
 
   @ApiProperty({
     type: [String],
     example: ['847233', '847833'],
-    description: 'Valores distintos lidos no grupo, em ordem de primeira aparição.',
+    description:
+      'Valores distintos lidos no grupo, em ordem de primeira aparição.',
   })
   valoresLidos: string[];
 
@@ -374,5 +377,9 @@ export type EQUIVALENCIA_COM_A_ENGINE = [
   >,
   Exige<LeituraDoGrupo extends LeituraDoGrupoResposta ? true : false>,
   Exige<LeituraDoGrupoResposta extends LeituraDoGrupo ? true : false>,
-  Exige<ResultadoCampo extends Omit<CampoExecutado, 'campoConferidoId'> ? true : false>,
+  Exige<
+    ResultadoCampo extends Omit<CampoExecutado, 'campoConferidoId'>
+      ? true
+      : false
+  >,
 ];

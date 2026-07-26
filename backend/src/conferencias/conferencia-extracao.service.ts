@@ -19,68 +19,27 @@ import { PayloadEtiqueta } from '../transformadores/qr/payload-etiqueta';
 import {
   ConferenciaExecucaoService,
   ContextoExecucao,
-  ResultadoExecucao,
 } from './conferencia-execucao.service';
+import {
+  AchadoInconsistente,
+  OcorrenciaAchado,
+  ResultadoExecucaoComExtracao,
+} from './dto/resultado-execucao-com-extracao.dto';
 import { ConferenciasService } from './conferencias.service';
 import { ExecutarComFotosDto } from './dto/executar-com-fotos.dto';
 import { LeituraCampoDto } from './dto/executar-conferencia.dto';
 import { normalizar } from './engine/engine-conformidade';
 
-/** O que a visao efetivamente fez nesta execucao (transparencia de custo). */
-export interface ResumoExtracao {
-  /** Adapter ativo: 'mock' | 'textract' | 'bedrock'. */
-  driver: string;
-  /** Fotos enviadas ao extrator (teto de UMA chamada de visao por foto). */
-  fotos: number;
-  /** Leituras que a visao produziu, antes da engine julgar qualquer uma. */
-  leiturasProduzidas: number;
-  /**
-   * Fotos informadas que NAO foram enviadas: nenhum campo do recorte desta
-   * etapa sai da fonte fisica delas (a foto 'geral' e o caso classico, e no
-   * gate da adesivacao a foto da placa tambem). Nao e erro — e o custo que
-   * deixou de ser pago, explicito para quem le a resposta.
-   */
-  fotosForaDoRecorte: number;
-  /**
-   * Total BRUTO de achados livres (todo texto lido que nao virou leitura de
-   * campo), antes de qualquer filtro do cruzamento. Transparencia: mostra o
-   * quanto o alarme filtrou — `achadosLivres: 34` com
-   * `achadosInconsistentes: []` significa "34 textos vistos, nenhum parecido
-   * com identificador estranho".
-   */
-  achadosLivres: number;
-}
-
-/** Uma evidencia de onde o texto estranho apareceu. */
-export interface OcorrenciaAchado {
-  fotoEvidenciaId: string | null;
-  confianca: number;
-  regiaoLeitura: string | null;
-}
-
 /**
- * Texto lido na peca que PARECE um identificador (mesmo formato dos do QR) e
- * nao bate com nenhum valor da etiqueta. E ALARME, nao veredito: pega placa de
- * outra peca, etiqueta impressa divergente e peca trocada na esteira, casos que
- * a checklist sozinha nao ve porque ninguem sabia procurar por eles.
+ * O contrato de resposta deste endpoint vive em
+ * `dto/resultado-execucao-com-extracao.dto.ts`, como CLASSE: interface (e
+ * intersecao de tipos) some na compilacao, e o Swagger devolvia o CAMINHO
+ * PRINCIPAL do front com schema de resposta vazio — `incoerencias`, `extracao`
+ * e `achadosInconsistentes` eram exatamente o que ninguem consegue adivinhar.
+ * Re-exportado daqui para nao mudar o import de quem ja consumia.
  */
-export interface AchadoInconsistente {
-  /** Texto como o servico de visao leu (sem normalizacao). */
-  texto: string;
-  /** Todas as vezes que ele apareceu — 1 alarme, N evidencias. */
-  ocorrencias: OcorrenciaAchado[];
-}
-
-export type ResultadoExecucaoComExtracao = ResultadoExecucao & {
-  extracao: ResumoExtracao;
-  /**
-   * Alarmes de consistencia (SPEC, Could). SEMPRE informativo: nao entra no
-   * `vereditoGeral` nem em campo nenhum — consistencia nao enxerga ausencia
-   * (peca com uma marcacao so e trivialmente consistente), entao promover
-   * `conforme` a partir daqui seria o falso OK que a regra de ouro proibe.
-   */
-  achadosInconsistentes: AchadoInconsistente[];
-};
+export { AchadoInconsistente, OcorrenciaAchado, ResultadoExecucaoComExtracao };
+export { ResumoExtracao } from './dto/resultado-execucao-com-extracao.dto';
 
 /**
  * Costura VISAO -> conferencia: ids de fotos ja enviadas viram bytes, os bytes

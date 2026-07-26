@@ -215,6 +215,30 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
   NestJS.
 - Payload do QR é decodificado no front (leitura da câmera) mas interpretado
   na API (parser em `transformadores`) — o front não extrai campos do payload.
+- **Resposta de endpoint de domínio é CLASSE com `@ApiProperty`, nunca
+  interface**: o Swagger só enxerga classes, e interface some na compilação —
+  a rota chega ao front com schema de resposta vazio. Regra prática: se um tipo
+  aparece no retorno de um método de controller, ele é classe. As respostas dos
+  endpoints do fluxo moram em `conferencias/dto/resultado-execucao*.dto.ts`,
+  `conferencias/consultas/veredito-conferencia.ts`,
+  `transformadores/consultas/*.ts` e `passagens/passagem-registro.service.ts`;
+  as projeções repetidas (`CheckpointResumo`, `EtapaResumo`,
+  `TransformadorResumo`) vivem uma única vez em
+  `conferencias/dto/resumos-compartilhados.dto.ts` — nome de schema é global no
+  documento OpenAPI, cópia por módulo vira schema duplicado para o front
+  escolher.
+- `engine/tipos.ts` é a exceção e continua SEM `@nestjs/swagger`: a engine é
+  pura. As classes de resposta que espelham tipos da engine (`CampoExecutado`,
+  `IncoerenciaEntreCamposResposta`, `LeituraDoGrupoResposta`) declaram
+  `implements` e são checadas nos DOIS sentidos por
+  `EQUIVALENCIA_COM_A_ENGINE` (resultado-execucao.dto.ts) — divergir quebra o
+  build, não o contrato em silêncio.
+- Documentar o que não é óbvio é parte do endpoint: `@ApiOperation({ summary })`
+  em toda rota de domínio, `description` nas propriedades que carregam regra
+  (precedência do veredito, união completa de `motivo`, o que NÃO é persistido,
+  validade de 1 h da URL assinada) e os códigos de 422/404 por rota
+  (`etapa-desconhecida`, `projeto-modelo-indeterminado`,
+  `foto-evidencia-de-outra-conferencia`, `conferencia-inexistente`…).
 
 ## Convenções
 

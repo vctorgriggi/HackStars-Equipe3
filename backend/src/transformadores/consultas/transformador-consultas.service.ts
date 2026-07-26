@@ -5,7 +5,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
+import { ApiProperty } from '@nestjs/swagger';
+
 import { ConferenciaRepository } from '../../conferencias/infrastructure/persistence/conferencia.repository';
+import { EtapaResumo } from '../../conferencias/dto/resumos-compartilhados.dto';
 import { PassagemRepository } from '../../passagens/infrastructure/persistence/passagem.repository';
 import { IPaginationOptions } from '../../utils/types/pagination-options';
 
@@ -13,12 +16,43 @@ import { Transformador } from '../domain/transformador';
 import { TransformadorRepository } from '../infrastructure/persistence/transformador.repository';
 import { ConferenciaResumo, resumirConferencia } from './conferencia-resumo';
 
-/** Um evento de transito como a tela de historico precisa dele. */
-export interface PassagemResumo {
+/**
+ * Um evento de transito como a tela de historico precisa dele.
+ *
+ * CLASSE, nao interface: o Swagger so documenta classes, e sem ela o
+ * `GET /transformadores/{id}/passagens` chegava ao front com schema de
+ * resposta vazio.
+ */
+export class PassagemResumo {
+  @ApiProperty({
+    type: String,
+    example: '7c2b9e10-4d5a-4b6c-8e9f-0a1b2c3d4e5f',
+  })
   id: string;
+
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    example: '2026-07-26T13:02:11.412Z',
+    description: 'Timestamp da passagem — o eixo da ordenacao cronologica.',
+  })
   createdAt: Date;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: null,
+    description:
+      'Anotacao do operador no scan (ex.: "parou por erro aceito pelo time — ' +
+      'motivo"); `null` quando nao houve.',
+  })
   observacao: string | null;
-  checkpoint: { codigo: string; nome: string; ordem: number };
+
+  @ApiProperty({
+    type: EtapaResumo,
+    description: 'Etapa da linha em que o scan aconteceu.',
+  })
+  checkpoint: EtapaResumo;
 }
 
 /**

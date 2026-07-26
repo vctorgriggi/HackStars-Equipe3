@@ -22,13 +22,12 @@ import { ehMarcacaoEmRelevo } from '../extracao/ports/marcacao';
 
 import { conferir, normalizar, temLastro } from './engine/engine-conformidade';
 import { temConteudo } from './engine/normalizacao';
-import {
-  IncoerenciaEntreCampos,
-  ItemChecklist,
-  LeituraCampo,
-  ResultadoCampo,
-} from './engine/tipos';
+import { ItemChecklist, LeituraCampo } from './engine/tipos';
 import { ExecutarConferenciaDto } from './dto/executar-conferencia.dto';
+import {
+  CampoExecutado,
+  ResultadoExecucao,
+} from './dto/resultado-execucao.dto';
 import { ConferenciaRepository } from './infrastructure/persistence/conferencia.repository';
 
 /**
@@ -44,49 +43,14 @@ import { ConferenciaRepository } from './infrastructure/persistence/conferencia.
  */
 export const LIMIAR_CONFIANCA_PADRAO = 0.9;
 
-export interface CampoExecutado extends ResultadoCampo {
-  campoConferidoId: string;
-}
-
-export interface ResultadoExecucao {
-  conferencia: {
-    id: string;
-    vereditoGeral: string;
-    createdAt: Date;
-    checkpoint: { codigo: string; nome: string } | null;
-  };
-  transformador: {
-    id: string;
-    numeroSerie: string;
-    patrimonio: string;
-    cliente: string;
-    projetoModeloCodigo: string;
-  };
-  /**
-   * Etapa que definiu o RECORTE da checklist (null = checklist inteira). O
-   * chamador precisa dela para exibir "conferência parcial da etapa X" em vez
-   * de dar a conferência como completa.
-   */
-  etapaAvaliada: { codigo: string; nome: string; ordem: number } | null;
-  /**
-   * Quantos itens da checklist entraram no recorte. Pode ser MAIOR que
-   * `campos.length`: item opcional sem valor esperado é omitido pela engine.
-   */
-  camposAvaliados: number;
-  campos: CampoExecutado[];
-  /**
-   * Campos irmãos (mesmo valor esperado do QR — as 3 séries chumbadas + a da
-   * placa, os patrimônios entre si) que NÃO leram a mesma coisa. Sai da engine
-   * junto do veredito; o front renderiza "as N posições da série não concordam
-   * entre si" sem comparar nada.
-   *
-   * Vazio na esmagadora maioria das execuções. NÃO é persistido nesta rodada
-   * (mesma decisão de `achadosInconsistentes`): gravar exigiria entidade nova e
-   * trilha própria. O EFEITO dele no veredito é persistido — incoerência
-   * impede o `conforme` geral.
-   */
-  incoerencias: IncoerenciaEntreCampos[];
-}
+/**
+ * O contrato de resposta da execução vive em `dto/resultado-execucao.dto.ts`,
+ * como CLASSE: interface some na compilação e o Swagger devolvia esta rota —
+ * a principal do front — com schema de resposta vazio. Re-exportado daqui para
+ * quem já importava do serviço continuar importando do mesmo lugar; a
+ * equivalência com os tipos da engine é checada em compilação lá.
+ */
+export { CampoExecutado, ResultadoExecucao };
 
 /**
  * Tudo que a execução consegue resolver SEM escrever nada e SEM pagar visão:

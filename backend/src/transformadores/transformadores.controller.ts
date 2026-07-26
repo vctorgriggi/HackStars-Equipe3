@@ -10,7 +10,11 @@ import {
   Query,
 } from '@nestjs/common';
 import { TransformadoresService } from './transformadores.service';
-import { TransformadorConsultasService } from './consultas/transformador-consultas.service';
+import {
+  PassagemResumo,
+  TransformadorConsultasService,
+} from './consultas/transformador-consultas.service';
+import { ConferenciaResumo } from './consultas/conferencia-resumo';
 import { CreateTransformadorDto } from './dto/create-transformador.dto';
 import { UpdateTransformadorDto } from './dto/update-transformador.dto';
 import {
@@ -49,6 +53,13 @@ export class TransformadoresController {
   ) {}
 
   @Post()
+  @ApiOperation({
+    summary: 'CRUD gerado: cadastra a peca a mao (nao use no fluxo)',
+    description:
+      'No fluxo real a peca nasce por find-or-create a partir do QR, dentro ' +
+      'de `POST /conferencias/executar-com-fotos` ou ' +
+      '`POST /passagens/registrar`.',
+  })
   @ApiCreatedResponse({
     type: Transformador,
   })
@@ -104,7 +115,13 @@ export class TransformadoresController {
       'recente (criterio 5 do SPEC). Scans repetidos na mesma etapa aparecem ' +
       'como eventos distintos e ordenados.',
   })
-  @ApiNotFoundResponse({ description: 'transformador-inexistente' })
+  @ApiOkResponse({ type: InfinityPaginationResponse(PassagemResumo) })
+  @ApiNotFoundResponse({
+    description:
+      '`transformador-inexistente: <id>`. E 404 de proposito, nunca lista ' +
+      'vazia: id errado passaria por "peca que nunca passou por lugar ' +
+      'nenhum".',
+  })
   async historicoDePassagens(
     @Param('id') id: string,
     @Query() query: HistoricoPassagensDto,
@@ -138,7 +155,15 @@ export class TransformadoresController {
       'gravou — o front nao recalcula nada. `checkpoint` diz em que etapa o ' +
       'veredito saiu: conferencia parcial de gate nao atesta a peca inteira.',
   })
-  @ApiNotFoundResponse({ description: 'transformador-inexistente' })
+  @ApiOkResponse({
+    type: [ConferenciaResumo],
+    description:
+      'Lista simples (sem envelope de paginacao), da mais recente para a mais ' +
+      'antiga. A primeira e o veredito vigente.',
+  })
+  @ApiNotFoundResponse({
+    description: '`transformador-inexistente: <id>`.',
+  })
   historicoDeConferencias(
     @Param('id') id: string,
     @Query() query: HistoricoConferenciasDto,
@@ -160,6 +185,7 @@ export class TransformadoresController {
     type: String,
     required: true,
   })
+  @ApiOperation({ summary: 'CRUD gerado: a peca pelo id interno' })
   @ApiOkResponse({
     type: Transformador,
   })
@@ -172,6 +198,13 @@ export class TransformadoresController {
     name: 'id',
     type: String,
     required: true,
+  })
+  @ApiOperation({
+    summary: 'CRUD gerado: edita a peca (cuidado: reescreve a identidade)',
+    description:
+      'Alterar `numeroSerie`/`patrimonio` depois de a conferencia existir ' +
+      'reescreve o valor ESPERADO retroativamente (gap 16 do CLAUDE.md). ' +
+      'Nao e caminho de fluxo.',
   })
   @ApiOkResponse({
     type: Transformador,
@@ -188,6 +221,12 @@ export class TransformadoresController {
     name: 'id',
     type: String,
     required: true,
+  })
+  @ApiOperation({
+    summary: 'CRUD gerado: apaga a peca (a UI nao expoe)',
+    description:
+      'Hard delete com FKs `NO ACTION` (gap 2): peca com conferencias ou ' +
+      'passagens estoura 500.',
   })
   remove(@Param('id') id: string) {
     return this.transformadoresService.remove(id);
