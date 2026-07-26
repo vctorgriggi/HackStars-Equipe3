@@ -18,7 +18,7 @@ import path from "path";
 // sem nada em cache -> fallback para data/estacao/etapas.json.
 // ---------------------------------------------------------------------------
 
-const API_URL = process.env.ESTACAO_API_URL ?? "http://localhost:3001";
+const API_URL = process.env.ESTACAO_API_URL ?? process.env.API_URL ?? "http://localhost:3001";
 const API_EMAIL = process.env.ESTACAO_API_EMAIL ?? "admin@example.com";
 const API_PASSWORD = process.env.ESTACAO_API_PASSWORD ?? "secret";
 const TTL_MS = Number(process.env.ESTACAO_ETAPAS_TTL_MS ?? 60_000);

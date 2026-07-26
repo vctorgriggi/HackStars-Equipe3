@@ -7,8 +7,7 @@
 // o quadro do feed é PLACEHOLDER declarado (backdrop CSS), e `ativa` é
 // estado administrativo do cadastro — nunca medição de "online".
 
-import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
+import { useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { CameraApi } from "@/lib/domain/camera-api";
 import type { AtualizarCameraPayload } from "@/lib/domain/camera-api";
@@ -21,14 +20,14 @@ import {
   useExcluirCamera,
 } from "@/lib/data/use-cameras-api";
 import { useEtapasLinha } from "@/lib/data/use-transformadores-api";
-import { useCameraLocalPorNome, useDispositivosLocais } from "@/lib/webrtc/preview-local";
+import { useDispositivosLocais } from "@/lib/webrtc/preview-local";
+import { CameraFeedCard } from "@/components/camera/camera-feed-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icon } from "@/components/ui/icon";
 import { PillSwitcher } from "@/components/ui/pill-switcher";
 import { Select } from "@/components/ui/select";
 import { SkeletonKpis, SkeletonRows } from "@/components/ui/skeleton";
 import { ToggleSwitch } from "@/components/ui/toggle-switch";
-import fotoTransformador from "@/public/transformador.png";
 
 const OPCOES_FONTE = FONTES_FISICAS_API.map((fonte) => ({
   value: fonte,
@@ -40,95 +39,6 @@ function MiniKpi({ label, valor }: { label: string; valor: string }) {
     <div className="grid gap-0.5 rounded-lg border border-line bg-surface-1 px-4 py-3 shadow-1">
       <span className="t-caps text-2xs text-text-3">{label}</span>
       <span className="t-mono text-xl font-bold text-text-1">{valor}</span>
-    </div>
-  );
-}
-
-// Quadro do feed: placeholder CSS declarado (não há stream nesta rodada).
-// O que é REAL aqui: nome, vista (fonteFisica) e o estado `ativa` do cadastro.
-function FeedCamera({ camera }: { camera: CameraApi }) {
-  const { stream, encontrada } = useCameraLocalPorNome(camera.nome);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const aoVivo = encontrada === true;
-
-  useEffect(() => {
-    if (videoRef.current) videoRef.current.srcObject = stream;
-  }, [stream]);
-
-  return (
-    <div className="overflow-hidden rounded-lg border border-line bg-surface-1 shadow-1">
-      <div
-        className="relative bg-surface-inset"
-        style={{ aspectRatio: "16/9" }}
-      >
-        {aoVivo ? (
-          <video
-            ref={videoRef}
-            autoPlay
-            muted
-            playsInline
-            className="absolute inset-0 h-full w-full object-cover"
-          />
-        ) : (
-          <>
-            <div
-              aria-hidden
-              className="absolute inset-0"
-              style={{
-                background:
-                  "radial-gradient(120% 90% at 30% 20%, #1a222c 0%, #0c1117 65%), repeating-linear-gradient(90deg, rgba(255,255,255,.03) 0 2px, transparent 2px 26px)",
-              }}
-            />
-            {camera.ativa && (
-              <Image
-                src={fotoTransformador}
-                alt=""
-                aria-hidden
-                className="absolute left-1/2 top-1/2 h-[72%] w-auto -translate-x-1/2 -translate-y-1/2 opacity-40"
-              />
-            )}
-          </>
-        )}
-        <div
-          aria-hidden
-          className="absolute inset-0 opacity-40"
-          style={{ background: "var(--overlay-scrim)" }}
-        />
-        <span
-          className="t-mono absolute left-2 top-2 flex items-center gap-1.5 rounded-[var(--radius-pill)] px-2 py-0.5 text-2xs text-white"
-          style={{ background: "var(--overlay-chip-bg)" }}
-        >
-          <span
-            aria-hidden
-            className={`h-1.5 w-1.5 rounded-full ${aoVivo ? "tv-pulse bg-reading-success" : "bg-surface-3"}`}
-          />
-          {camera.nome}
-        </span>
-        <span
-          className="t-mono absolute bottom-2 left-2 rounded-[var(--radius-pill)] px-2 py-0.5 text-2xs text-white"
-          style={{ background: "var(--overlay-chip-bg)" }}
-        >
-          vista: {camera.fonteFisica}
-        </span>
-      </div>
-      <div className="flex items-center gap-2 px-3 py-2">
-        <span
-          aria-hidden
-          className="h-2 w-2 flex-none rounded-full"
-          style={{
-            background: aoVivo
-              ? "var(--color-reading-success)"
-              : "var(--text-3)",
-          }}
-        />
-        <span className="text-xs text-text-2">
-          {aoVivo
-            ? "Ao vivo (preview local)"
-            : encontrada === null
-              ? "Procurando a câmera nesta máquina…"
-              : "Sem sinal — esta câmera não está conectada a esta máquina"}
-        </span>
-      </div>
     </div>
   );
 }
@@ -426,7 +336,7 @@ export default function CamerasPage() {
                 ) : (
                   <div className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-3">
                     {grupo.cameras.map((camera) => (
-                      <FeedCamera key={camera.id} camera={camera} />
+                      <CameraFeedCard key={camera.id} camera={camera} />
                     ))}
                   </div>
                 )}

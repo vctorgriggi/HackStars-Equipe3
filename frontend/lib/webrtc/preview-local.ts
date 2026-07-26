@@ -26,7 +26,27 @@ export function useDispositivosLocais() {
           "API de câmera indisponível — acesse por localhost ou HTTPS válido.",
         );
       }
-      const tmp = await navigator.mediaDevices.getUserMedia({ video: true });
+      // getUserMedia pode ficar pendurado sem nunca resolver nem rejeitar se
+      // o SO bloquear a câmera silenciosamente (comum no Windows) ou se o
+      // popup de permissão perder o foco — timeout evita "Detectando..."
+      // eterno e dá uma mensagem acionável.
+      const tmp = await Promise.race([
+        navigator.mediaDevices.getUserMedia({ video: true }),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                new Error(
+                  "Sem resposta após 10s — confira o ícone de câmera na " +
+                    "barra de endereço, e em Windows: Configurações > " +
+                    "Privacidade e segurança > Câmera > \"Permitir que apps " +
+                    "de área de trabalho acessem sua câmera\".",
+                ),
+              ),
+            10000,
+          ),
+        ),
+      ]);
       tmp.getTracks().forEach((t) => t.stop());
       const lista = (await navigator.mediaDevices.enumerateDevices())
         .filter((d) => d.kind === "videoinput")
