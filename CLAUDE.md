@@ -113,6 +113,18 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
   medido, a confiança do OCR no relevo mede enquadramento, não correção
   (docs/visao-ocr.md). A regra restringe ACUSAÇÃO, nunca aprovação — e a placa
   IMPRESSA continua `divergente` com uma leitura (cenário-âncora).
+- **Comparação é exata; a única exceção é medida.** O critério de igualdade
+  textual é parâmetro por campo (`modosPorCampo`, `engine/comparacao.ts`):
+  `exato` para todo identificador, e `contem-token` só para `cliente-*` — o
+  lido precisa ser TOKEN INTEIRO (ou sequência consecutiva) do esperado, sem
+  acento e sem caixa. Motivo (medido em 2026-07-26 com o Textract no ar, gap
+  21): a serigrafia carrega a MARCA (`Energisa`) e o QR a razão social com
+  código (`143091 - Energisa Rondônia…`), então a igualdade exata acusava a
+  peça CORRETA e quebrava o critério 2 do SPEC em toda conferência com QR real.
+  Não é fuzzy match (`ener` segue `divergente`) e não vale invertido. Quem
+  escolhe o modo é o chamador, no mesmo lugar do contrato de prefixo
+  (`ORIGENS_DO_ESPERADO`) — a engine não conhece prefixo, e a checklist (dado)
+  não pode afrouxar comparação de campo nenhum.
 - CampoConferido é IMUTÁVEL via HTTP (update → 422): PATCH no lastro
   (valores/confiança/foto) de um veredito já emitido falsificaria a trilha de
   auditoria (revisão R1). Comparação usa Unicode NFC; confiança <= 0 nunca é
@@ -215,6 +227,21 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
   NestJS.
 - Payload do QR é decodificado no front (leitura da câmera) mas interpretado
   na API (parser em `transformadores`) — o front não extrai campos do payload.
+- `GET /conferencias/plano-de-fotos` é a fonte ÚNICA do recorte por etapa para
+  clientes: quais vistas cada gate pede, já com a semântica cumulativa
+  aplicada no servidor. Nenhum cliente reimplementa a regra — a `/demo`
+  carregava 3 cópias dela e foi migrada para consulta de pertencimento
+  ("esta vista está nas desta etapa?"). Sem plano, o cliente não pede foto
+  nenhuma: "não sei" nunca vira "preciso de todas".
+- A resposta de execução carrega `regiaoLeitura` + `fotoEvidencia` POR CAMPO,
+  e resposta e lastro persistido saem da MESMA leitura — nunca de duas
+  resoluções independentes (é o mesmo erro do ProjetoModelo resolvido duas
+  vezes: elas divergem, e aí a tela mostra evidência de um veredito que o
+  banco gravou com outra).
+- Evidência de campo é a classe compartilhada `FotoDaEvidenciaResposta`
+  (`conferencias/dto/resumos-compartilhados.dto.ts`), usada também pelos
+  achados e pela releitura — nome de schema OpenAPI é global, cópia por módulo
+  vira schema duplicado para o front escolher.
 - **Resposta de endpoint de domínio é CLASSE com `@ApiProperty`, nunca
   interface**: o Swagger só enxerga classes, e interface some na compilação —
   a rota chega ao front com schema de resposta vazio. Regra prática: se um tipo
@@ -453,8 +480,24 @@ do hackathon:
       sempre, com limiar 0.9 medido na peça real; nada de similaridade
       aproximada. Leitura fraca vira `nao_conferivel` e vai para o olho
       humano com a foto (rodada nomes-e-analise, 2026-07-25).
-- [ ] **Formato do payload do QR** — campos embutidos ou código de lookup
-      (afeta T1.1, T3.1).
+- [x] **Formato do payload do QR** — resolvido por medição em 2026-07-26: são
+      os dois, um por QR. PLACA = payload posicional de IDENTIFICAÇÃO sem
+      rótulo — projeto, série, patrimônio, potência, classe e data, SEM
+      cliente/pedido/seq (âncora `TPD-408136`, série 2 linhas depois,
+      patrimônio 6);
+      ETIQUETA = código de lookup de 13 dígitos, que sem ERP não resolve — a
+      digitação manual da T3.1 virou necessidade, não plano B. O parser
+      (`transformadores/qr/`) cobre os dois; detecção estreita e 422
+      `posicional-*` em vez de campo chutado, porque a amostra é de UMA peça.
+      Duas limitações do QR da placa, documentadas e NÃO contornadas: sem
+      cliente ele nunca fecha `conforme` no seed atual
+      (`cliente-serigrafia-frente` sai `nao_conferivel` motivo
+      `sem-valor-esperado` — a régua não se rebaixa), e ele é AUTO-REFERENTE
+      (vive na placa que `serie-placa`/`patrimonio-placa` conferem), então
+      placa trocada se confirma sozinha e a acusação recai nas chumbadas. A
+      fonte da verdade do fluxo segue sendo a ETIQUETA.
+      Detalhe, linhas ainda sem significado e o efeito no código do
+      ProjetoModelo (o TPD viaja no QR): SPEC.md, decisões em aberto.
 - [x] **Textract vs Bedrock** — resolvido: Textract (spike T2.1 com fotos
       reais, docs/visao-ocr.md). `EXTRACTOR_DRIVER=textract`. Reavaliado na
       noite de 2026-07-25, quando a conta destravou o Bedrock: os modelos Nova
