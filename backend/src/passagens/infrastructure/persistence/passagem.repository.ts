@@ -38,6 +38,15 @@ export abstract class PassagemRepository {
     transformadorIds: Transformador['id'][],
   ): Promise<Map<Transformador['id'], Passagem>>;
 
+  /**
+   * Apaga TODAS as passagens de uma peca — reservado ao reinicio de
+   * apresentacao (demo): reescreve o historico de transito, entao nenhum
+   * fluxo de operacao normal pode chamar isto.
+   */
+  abstract removeAllByTransformador(
+    transformadorId: Transformador['id'],
+  ): Promise<void>;
+
   abstract findById(id: Passagem['id']): Promise<NullableType<Passagem>>;
 
   abstract findByIds(ids: Passagem['id'][]): Promise<Passagem[]>;

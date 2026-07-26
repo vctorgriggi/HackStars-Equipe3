@@ -36,18 +36,28 @@ export class ProjetoModeloSeedService {
     // | campo                          | vista            | obrig. | etapa         |
     // |--------------------------------|------------------|--------|---------------|
     // | serie-chumbada-topo            | topo             | sim    | adesivacao    |
-    // | serie-chumbada-lateral-direita | lateral-direita  | sim    | adesivacao    |
-    // | serie-chumbada-traseira        | traseira         | sim    | adesivacao    |
+    // | serie-chumbada-lateral-direita | lateral-direita  | NAO    | adesivacao    |
+    // | serie-chumbada-traseira        | traseira         | NAO    | adesivacao    |
     // | patrimonio-serigrafia-topo     | topo             | sim    | serigrafia    |
-    // | patrimonio-serigrafia-frente   | frente           | sim    | serigrafia    |
-    // | cliente-serigrafia-frente      | frente           | sim    | serigrafia    |
+    // | patrimonio-serigrafia-frente   | frente           | NAO    | serigrafia    |
+    // | cliente-serigrafia-frente      | frente           | NAO    | serigrafia    |
     // | potencia-serigrafia-frente     | frente           | NAO    | serigrafia    |
     // |   ^ esperado do PROJETO: '1H - 10 kVA' (esperadoFixo — ver o item)      |
-    // | serie-placa                    | placa (close)    | sim    | fixacao-placa |
+    // | serie-placa                    | placa (close)    | NAO    | fixacao-placa |
     // | patrimonio-placa               | placa (close)    | NAO    | fixacao-placa |
     // |   ^ nunca leu em medição real — ver o item (2026-07-26)                 |
-    // | serie-placa-qr                 | placa (close)    | sim    | fixacao-placa |
-    // | patrimonio-placa-qr            | placa (close)    | sim    | fixacao-placa |
+    // | serie-placa-qr                 | placa (close)    | NAO    | fixacao-placa |
+    // | patrimonio-placa-qr            | placa (close)    | NAO    | fixacao-placa |
+    //
+    // SÓ O TOPO É OBRIGATÓRIO (decisão do time, 2026-07-26): a demo confere a
+    // peça com UMA câmera fixa, a do topo — a vista que carrega as duas
+    // marcações-chave (série chumbada + patrimônio serigrafado) e a melhor
+    // leitura medida (98–99%). Rebaixar em vez de remover segue o precedente
+    // da traseira: as demais vistas continuam conferidas E ACUSANDO quando a
+    // foto existir (campo opcional divergente conta no veredito geral — o
+    // cenário-âncora da placa 847833 segue de pé com foto da placa), mas sem
+    // foto não travam o `conforme`. Reverter = voltar `obrigatorio: true`
+    // nos itens abaixo.
     //
     // PATRIMÔNIO EM DUAS FACES: o desenho pede a marcação no topo E na frente
     // (medido: 2 patrimônios em faces diferentes, 100% e 98,5%). A checklist
@@ -67,9 +77,10 @@ export class ProjetoModeloSeedService {
         etapa: 'adesivacao',
       },
       {
+        // OPCIONAL — só o topo é obrigatório na demo (ver bloco acima).
         campo: 'serie-chumbada-lateral-direita',
         fonteFisica: 'lateral-direita',
-        obrigatorio: true,
+        obrigatorio: false,
         etapa: 'adesivacao',
       },
       {
@@ -91,15 +102,17 @@ export class ProjetoModeloSeedService {
         etapa: 'serigrafia',
       },
       {
+        // OPCIONAL — só o topo é obrigatório na demo (ver bloco acima).
         campo: 'patrimonio-serigrafia-frente',
         fonteFisica: 'frente',
-        obrigatorio: true,
+        obrigatorio: false,
         etapa: 'serigrafia',
       },
       {
+        // OPCIONAL — só o topo é obrigatório na demo (ver bloco acima).
         campo: 'cliente-serigrafia-frente',
         fonteFisica: 'frente',
-        obrigatorio: true,
+        obrigatorio: false,
         etapa: 'serigrafia',
       },
       {
@@ -133,9 +146,12 @@ export class ProjetoModeloSeedService {
         esperadoFixo: '1H - 10 kVA',
       },
       {
+        // OPCIONAL — só o topo é obrigatório na demo (ver bloco acima). Com
+        // foto da placa, o cenário-âncora (847833 impresso × 847233 esperado)
+        // continua acusando `divergente` normalmente.
         campo: 'serie-placa',
         fonteFisica: 'placa',
-        obrigatorio: true,
+        obrigatorio: false,
         etapa: 'fixacao-placa',
       },
       {
@@ -191,15 +207,17 @@ export class ProjetoModeloSeedService {
       // verdade continua sendo a ETIQUETA adesiva (SPEC, constraint 5); é o
       // cruzamento entre as duas fontes que dá valor a estes dois itens.
       {
+        // OPCIONAL — só o topo é obrigatório na demo (ver bloco acima).
         campo: 'serie-placa-qr',
         fonteFisica: 'placa',
-        obrigatorio: true,
+        obrigatorio: false,
         etapa: 'fixacao-placa',
       },
       {
+        // OPCIONAL — só o topo é obrigatório na demo (ver bloco acima).
         campo: 'patrimonio-placa-qr',
         fonteFisica: 'placa',
-        obrigatorio: true,
+        obrigatorio: false,
         etapa: 'fixacao-placa',
       },
     ];

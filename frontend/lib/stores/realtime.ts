@@ -5,6 +5,12 @@
 // e pelo re-snapshot do reconnect). Sem conexão, o estado CONGELA e o header
 // anuncia — movimento inventado numa tela de monitoramento é o análogo do
 // falso OK.
+// Animação da CONFIRMAÇÃO do gate: quando a conferência `conforme` nasceu na
+// MESMA etapa da passagem (endpoint de visão com registrarPassagemSeConforme),
+// a peça estava fisicamente sob a câmera do gate — o sprite anima a LIBERAÇÃO
+// (gate → próxima etapa da linha), no instante do evento. É visualização de um
+// fato do servidor (veredito + passagem registrada), não movimento inventado:
+// posição e totais continuam sendo os da passagem gravada.
 // Selectors de folha devem retornar PRIMITIVOS (countByStage[i], hot === i)
 // para um evento re-renderizar ≤3 componentes.
 
@@ -148,18 +154,35 @@ export const useRealtime = create<RealtimeState>((set, get) => ({
       { serie, stage: idxNovo },
     ];
 
-    const viagem = from >= 0 && from !== idxNovo;
+    // Confirmação do gate: `conforme` emitido NESTA etapa (a conferência do
+    // evento nasceu no mesmo checkpoint da passagem). A peça já estava sob a
+    // câmera do gate, então a animação certa é o avanço para o próximo passo
+    // da linha — não a chegada ao gate (que, com a peça já lá, nem animava).
+    // Na última etapa não há próximo box: cai na animação de chegada.
+    const confirmadaNesteGate =
+      resultado.ultimaConferencia?.vereditoGeral === "conforme" &&
+      resultado.ultimaConferencia.checkpoint?.codigo ===
+        resultado.checkpoint.codigo;
+    const idxProximo = idxNovo + 1 < etapas.length ? idxNovo + 1 : -1;
+
+    let movimento: MovimentoEsteira | null = null;
+    if (confirmadaNesteGate && idxProximo >= 0) {
+      movimento = { seq: Date.now(), from: idxNovo, to: idxProximo, serie };
+    } else if (from >= 0 && from !== idxNovo) {
+      movimento = { seq: Date.now(), from, to: idxNovo, serie };
+    }
+
+    const mensagem =
+      confirmadaNesteGate && idxProximo >= 0
+        ? `Conforme em ${resultado.checkpoint.nome} — segue para ${etapas[idxProximo].nome}`
+        : `Passou por ${resultado.checkpoint.nome}${alerta}`;
+
     set({
       unidades: novasUnidades,
       countByStage: novoCount,
-      eventos: [
-        evento(`Passou por ${resultado.checkpoint.nome}${alerta}`, serie, status),
-        ...eventos,
-      ].slice(0, MAX_EVENTOS),
+      eventos: [evento(mensagem, serie, status), ...eventos].slice(0, MAX_EVENTOS),
       hot: idxNovo,
-      ...(viagem
-        ? { movimento: { seq: Date.now(), from, to: idxNovo, serie } }
-        : {}),
+      ...(movimento ? { movimento } : {}),
     });
   },
 
