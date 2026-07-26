@@ -8,6 +8,7 @@ import {
   ArrayMaxSize,
   ArrayNotEmpty,
   IsArray,
+  IsBoolean,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -76,6 +77,24 @@ export class ExecutarComFotosDto {
   // versao seria 400 em foto que existe.
   @IsUUID(undefined, { each: true })
   fotoEvidenciaIds: string[];
+
+  @ApiProperty({
+    required: false,
+    type: () => Boolean,
+    description:
+      'GATE da estacao: com `true`, veredito `conforme` registra a Passagem ' +
+      'pela etapa AUTOMATICAMENTE (a peca avanca na esteira e o evento de ' +
+      'tempo real e emitido), vinculada a esta conferencia. Exige ' +
+      '`etapaCodigo` (422 `registro-de-passagem-exige-etapa` — passagem e de ' +
+      'um gate, nunca da checklist inteira). Veredito `divergente` ou ' +
+      '`nao_conferivel` NUNCA registra passagem: a liberacao passa pela ' +
+      'decisao humana (`POST /passagens/registrar` com `conferenciaId` + ' +
+      '`observacao`). Falha no registro nao derruba o veredito ja gravado: a ' +
+      'resposta sai com `passagemRegistrada: null`.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  registrarPassagemSeConforme?: boolean;
 
   // leituras NAO entram aqui de proposito: neste endpoint quem produz leitura
   // e a visao, e o veredito continua nascendo na engine (regra de ouro).

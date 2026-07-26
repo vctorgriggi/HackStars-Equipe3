@@ -1,3 +1,5 @@
+import { ConferenciaEntity } from '../../../../../conferencias/infrastructure/persistence/relational/entities/conferencia.entity';
+
 import { CheckpointEntity } from '../../../../../checkpoints/infrastructure/persistence/relational/entities/checkpoint.entity';
 
 import { TransformadorEntity } from '../../../../../transformadores/infrastructure/persistence/relational/entities/transformador.entity';
@@ -16,6 +18,9 @@ import { EntityRelationalHelper } from '../../../../../utils/relational-entity-h
   name: 'passagem',
 })
 export class PassagemEntity extends EntityRelationalHelper {
+  @ManyToOne(() => ConferenciaEntity, { eager: true, nullable: true })
+  conferencia?: ConferenciaEntity | null;
+
   @Column({
     nullable: true,
     type: String,

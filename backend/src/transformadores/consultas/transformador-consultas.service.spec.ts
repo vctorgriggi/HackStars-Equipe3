@@ -271,8 +271,33 @@ describe('historicoDePassagens — criterio 5 do SPEC', () => {
         nome: 'oleo-conferencia',
         ordem: 3,
       },
+      // Scan avulso: sem conferencia vinculada, e a ausencia e explicita.
+      conferencia: null,
     });
     expect(evento).not.toHaveProperty('transformador');
+  });
+
+  it('should resumir a conferencia que comprovou a passagem (gate)', async () => {
+    const comprovada = passagem('passagem-1', checkpoint('serigrafia', 2), 0);
+    comprovada.conferencia = conferencia(
+      'conferencia-9',
+      'conforme',
+      checkpoint('serigrafia', 2),
+      -5,
+    );
+
+    const { service } = montarBancada({ passagens: [comprovada] });
+
+    const [evento] = await service.historicoDePassagens({
+      transformadorId: 'transformador-1',
+      paginationOptions: { page: 1, limit: 10 },
+    });
+
+    expect(evento.conferencia).toMatchObject({
+      id: 'conferencia-9',
+      vereditoGeral: 'conforme',
+      checkpoint: { codigo: 'serigrafia' },
+    });
   });
 
   it('should repassar a paginacao ao repositorio', async () => {

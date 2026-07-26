@@ -31,11 +31,17 @@ type CampoExecutado = {
   veredito: "conforme" | "divergente" | "nao_conferivel";
   motivo?: string;
   campoDaLeitura?: string;
+  confianca?: number | null;
+  // URL assinada pronta (expira em 1h) — o kiosk so exibe, nunca persiste.
+  fotoEvidencia?: { id: string; url: string; fonteFisica: string } | null;
+  regiaoLeitura?: string | null;
 };
 
 type RespostaExecucao = {
   conferencia?: { id: string; vereditoGeral: string };
   campos?: CampoExecutado[];
+  // Passagem que o GATE do backend registrou (flag + veredito conforme).
+  passagemRegistrada?: { passagem: { id: string } } | null;
 };
 
 type Divergencia = { ponto: string; esperado: string; lido: string };
@@ -130,7 +136,13 @@ export async function POST(req: NextRequest) {
     );
 
     const corpo: Record<string, unknown> = { payloadQr, fotoEvidenciaIds };
-    if (etapaCodigo) corpo.etapaCodigo = etapaCodigo;
+    if (etapaCodigo) {
+      corpo.etapaCodigo = etapaCodigo;
+      // GATE no servidor: veredito `conforme` ja registra a passagem pela
+      // etapa (vinculada a conferencia) e o tempo real anima sozinho. Quem
+      // decide segue sendo a engine — o kiosk so le `passagemRegistrada`.
+      corpo.registrarPassagemSeConforme = true;
+    }
 
     const execResp = await fetch(`${API_URL}/api/v1/conferencias/executar-com-fotos`, {
       method: "POST",
@@ -154,6 +166,11 @@ export async function POST(req: NextRequest) {
       ok: true,
       vereditoGeral: resultado.conferencia?.vereditoGeral ?? "desconhecido",
       conferenciaId: resultado.conferencia?.id ?? null,
+      passagemRegistrada: Boolean(resultado.passagemRegistrada),
+      // Campo a campo COMPLETO (evidencia com URL assinada + bounding box):
+      // e o que o modal de decisao humana mostra ao operador. `resultados`
+      // continua para compatibilidade com o resumo por checagem.
+      campos,
       resultados,
     });
   } catch (e) {

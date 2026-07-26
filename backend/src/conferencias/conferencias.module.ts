@@ -1,5 +1,6 @@
 import { CamposConferidosModule } from '../campos-conferidos/campos-conferidos.module';
 import { CheckpointsModule } from '../checkpoints/checkpoints.module';
+import { PassagensModule } from '../passagens/passagens.module';
 import { ExtracaoModule } from '../extracao/extracao.module';
 import { FotosEvidenciaModule } from '../fotos-evidencia/fotos-evidencia.module';
 import { ProjetosModeloModule } from '../projetos-modelo/projetos-modelo.module';
@@ -34,6 +35,12 @@ import { RelationalConferenciaPersistenceModule } from './infrastructure/persist
 
     // Sem ciclo: `extracao` e modulo de servico, nao conhece dominio.
     ExtracaoModule,
+
+    // Mao UNICA (gate da estacao): conferencias registra a passagem quando o
+    // veredito aprova; passagens NUNCA importa este modulo (ele le a ultima
+    // conferencia pelo modulo FOLHA de persistencia). Sem forwardRef de
+    // proposito — se um dia der ciclo, e porque a mao deixou de ser unica.
+    PassagensModule,
 
     // Ciclo inevitavel: CampoConferido aponta para Conferencia (filho -> pai)
     // e a execucao precisa gravar os campos do resultado da engine.

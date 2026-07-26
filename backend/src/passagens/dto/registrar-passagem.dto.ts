@@ -3,6 +3,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
 } from 'class-validator';
 
 import {
@@ -43,9 +44,30 @@ export class RegistrarPassagemDto {
     required: false,
     type: () => String,
     description:
-      'Excecao anotada na passagem (ex.: "parou por erro aceito pelo time")',
+      'Excecao anotada na passagem (ex.: "parou por erro aceito pelo time"). ' +
+      'OBRIGATORIA quando `conferenciaId` aponta uma conferencia nao-conforme ' +
+      '(liberacao com excecao) — sem ela a request responde 422 ' +
+      '`excecao-sem-observacao`.',
   })
   @IsOptional()
   @IsString()
   observacao?: string | null;
+
+  @ApiProperty({
+    required: false,
+    type: () => String,
+    format: 'uuid',
+    description:
+      'Conferencia que COMPROVA esta passagem (fluxo do gate da estacao). ' +
+      'Deve ser da MESMA peca do QR e do MESMO checkpoint de `etapaCodigo` — ' +
+      'senao 422 `conferencia-de-outra-peca` / `conferencia-de-outra-etapa` ' +
+      '(conferencia sem checkpoint tambem cai na de etapa: passagem e de um ' +
+      'gate). Conferencia `conforme`: passagem normal. Nao-conforme: e a ' +
+      'REPROVA HUMANA da leitura — exige `observacao` (422 ' +
+      '`excecao-sem-observacao`), e a excecao fica auditavel na passagem. ' +
+      'Id desconhecido: 422 `conferencia-inexistente`.',
+  })
+  @IsOptional()
+  @IsUUID()
+  conferenciaId?: string | null;
 }

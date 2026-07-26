@@ -7,6 +7,7 @@ import {
 
 import { CheckpointsService } from '../checkpoints/checkpoints.service';
 import { Checkpoint } from '../checkpoints/domain/checkpoint';
+import { Conferencia } from '../conferencias/domain/conferencia';
 import { EtapaResumo } from '../conferencias/dto/resumos-compartilhados.dto';
 import { ConferenciaRepository } from '../conferencias/infrastructure/persistence/conferencia.repository';
 import { AnuncioPassagemService } from '../tempo-real/anuncio-passagem.service';
@@ -51,6 +52,13 @@ export class PassagemRegistroService {
     const payload = this.transformadorService.lerPayloadDoQr(dto.payloadQr);
     const checkpoint = await this.resolverCheckpoint(dto.etapaCodigo);
 
+    // Vinculo de comprovacao (gate da estacao): validado ainda na fase barata
+    // — os 422 daqui tambem nao podem deixar peca orfa.
+    const conferenciaVinculada = await this.resolverConferenciaVinculada(
+      dto,
+      payload.numeroSerie,
+    );
+
     const transformador =
       await this.transformadorService.buscarOuCriarPorPayload(payload);
 
@@ -64,14 +72,21 @@ export class PassagemRegistroService {
 
     const passagem = await this.passagemRepository.create({
       observacao: dto.observacao ?? null,
+      conferencia: conferenciaVinculada,
       checkpoint,
       transformador,
     });
 
-    const [ultima] = await this.conferenciaRepository.findAllByTransformador({
-      transformadorId: transformador.id,
-      limit: 1,
-    });
+    // Com vinculo, a conferencia da resposta e a que COMPROVOU este scan;
+    // sem ele, mantem-se a ultima da peca (o veredito vigente do criterio 6).
+    const ultima =
+      conferenciaVinculada ??
+      (
+        await this.conferenciaRepository.findAllByTransformador({
+          transformadorId: transformador.id,
+          limit: 1,
+        })
+      )[0];
 
     const resultado: ResultadoRegistroPassagem = {
       passagem: {
@@ -98,6 +113,60 @@ export class PassagemRegistroService {
     await this.anuncioPassagem.anunciar(resultado, checkpointAnterior);
 
     return resultado;
+  }
+
+  /**
+   * Resolve e valida a conferencia que comprova esta passagem (fluxo do gate).
+   * Regras, todas 422 e todas ANTES de qualquer escrita:
+   * - a conferencia precisa existir, ser da MESMA peca do QR e do MESMO
+   *   checkpoint da passagem (sem checkpoint = checklist inteira, que nao
+   *   comprova gate nenhum);
+   * - conferencia nao-`conforme` vinculada e a REPROVA HUMANA da leitura:
+   *   exige `observacao` — e o que torna a excecao auditavel por construcao
+   *   (mesma convencao do aceite de excecao do SPEC).
+   */
+  private async resolverConferenciaVinculada(
+    dto: RegistrarPassagemDto,
+    numeroSerieDoQr: string,
+  ): Promise<Conferencia | null> {
+    if (!dto.conferenciaId) {
+      return null;
+    }
+
+    const conferencia = await this.conferenciaRepository.findById(
+      dto.conferenciaId,
+    );
+    if (!conferencia) {
+      throw this.erroDeVinculo(`conferencia-inexistente: ${dto.conferenciaId}`);
+    }
+
+    if (conferencia.transformador.numeroSerie !== numeroSerieDoQr) {
+      throw this.erroDeVinculo(
+        `conferencia-de-outra-peca: ${dto.conferenciaId}`,
+      );
+    }
+
+    if (conferencia.checkpoint?.codigo !== dto.etapaCodigo) {
+      throw this.erroDeVinculo(
+        `conferencia-de-outra-etapa: ${dto.conferenciaId}`,
+      );
+    }
+
+    const liberacaoComExcecao = conferencia.vereditoGeral !== 'conforme';
+    if (liberacaoComExcecao && !dto.observacao?.trim()) {
+      throw this.erroDeVinculo('excecao-sem-observacao');
+    }
+
+    return conferencia;
+  }
+
+  private erroDeVinculo(mensagem: string): UnprocessableEntityException {
+    return new UnprocessableEntityException({
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      errors: {
+        conferenciaId: mensagem,
+      },
+    });
   }
 
   private async lerCheckpointAnterior(
