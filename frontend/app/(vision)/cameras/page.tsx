@@ -336,7 +336,7 @@ export default function CamerasPage() {
                 ) : (
                   <div className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-3">
                     {grupo.cameras.map((camera) => (
-                      <CameraFeedCard key={camera.id} camera={camera} />
+                      <CameraFeedCard key={camera.id} camera={camera} mostrarAcoes={false} />
                     ))}
                   </div>
                 )}

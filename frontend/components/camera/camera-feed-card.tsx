@@ -16,7 +16,15 @@ export type CameraFeedInfo = {
   ativa?: boolean;
 };
 
-export function CameraFeedCard({ camera }: { camera: CameraFeedInfo }) {
+export function CameraFeedCard({
+  camera,
+  mostrarAcoes = true,
+}: {
+  camera: CameraFeedInfo;
+  /** Esconde o botão "Capturar" e o link da última captura (usado na tela
+   *  principal, que deve ficar limpa; a tela escondida de operação mostra). */
+  mostrarAcoes?: boolean;
+}) {
   const { stream, encontrada } = useCameraLocalPorNome(camera.nome);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const aoVivo = encontrada === true;
@@ -147,27 +155,29 @@ export function CameraFeedCard({ camera }: { camera: CameraFeedInfo }) {
               : "Sem sinal — esta câmera não está conectada a esta máquina"}
         </span>
       </div>
-      <div className="flex items-center gap-2 border-t border-line px-3 py-2">
-        <button
-          type="button"
-          onClick={dispararCaptura}
-          disabled={pendente}
-          className="flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1 text-2xs text-text-2 hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <Icon name="camera" size={13} />
-          {pendente ? "Capturando…" : "Capturar"}
-        </button>
-        {ultimaCapturaTs && (
-          <a
-            href={`/api/estacao/ordens/resultado?id=${camera.id}`}
-            target="_blank"
-            rel="noreferrer"
-            className="text-2xs text-text-3 underline hover:text-text-1"
+      {mostrarAcoes && (
+        <div className="flex items-center gap-2 border-t border-line px-3 py-2">
+          <button
+            type="button"
+            onClick={dispararCaptura}
+            disabled={pendente}
+            className="flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1 text-2xs text-text-2 hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            última captura {new Date(ultimaCapturaTs).toLocaleTimeString()}
-          </a>
-        )}
-      </div>
+            <Icon name="camera" size={13} />
+            {pendente ? "Capturando…" : "Capturar"}
+          </button>
+          {ultimaCapturaTs && (
+            <a
+              href={`/api/estacao/ordens/resultado?id=${camera.id}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-2xs text-text-3 underline hover:text-text-1"
+            >
+              última captura {new Date(ultimaCapturaTs).toLocaleTimeString()}
+            </a>
+          )}
+        </div>
+      )}
     </div>
   );
 }
