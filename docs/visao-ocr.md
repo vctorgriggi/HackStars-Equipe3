@@ -112,3 +112,73 @@ passaria despercebida.
 
 15 chamadas `detect-document-text` (dois conjuntos de fotos) ≈ USD 0,023. O OCR
 não é o custo relevante do projeto.
+
+## Rodada de validação com a peça inteira (2026-07-25, noite)
+
+Cinco fotos reais (3 chumbados, serigrafia, placa) pela API no ar, com
+`EXTRACTOR_DRIVER=textract`. É a primeira medição do fluxo COMPLETO, não do
+spike isolado.
+
+| Campo | Leitura | Confiança | Veredito |
+| --- | --- | --- | --- |
+| serie-chumbada-1 (topo) | 847233 | 98,8% | conforme |
+| serie-chumbada-2 (lateral) | **847833** | **84,6%** | erro de dígito |
+| serie-chumbada-3 (diagonal) | — | — | sem leitura |
+| serie-placa | 847833 | 99,9% | divergente (defeito real) |
+| patrimonio-placa | — | — | sem leitura |
+| patrimonio-serigrafia | 251328 | 98,4% | conforme |
+| cliente-serigrafia | energisa | 99,7% | conforme |
+
+### O limiar 0.9 saiu daqui
+
+As leituras corretas ficaram entre **98,4% e 99,9%**; o único erro de dígito
+(2 lido como 8, foto lateral do chumbado) veio a **84,6%** — dentro do limiar
+antigo de 0,8, onde virava um `divergente` FALSO e quebrava o critério 2 do
+SPEC ("o único campo divergente é a série da placa"). Com 0,9 ele vira
+`nao_conferivel`. Os dois grupos se separam limpo; não há leitura correta
+entre 84,6% e 98,4% em nenhuma medição até aqui.
+
+### Troca de campo entre marcações da mesma face
+
+Teste no celular expôs um modo de falha que as fotos de arquivo não mostravam:
+fotografando só a tampa, o Textract lê o **patrimônio serigrafado** (tinta
+preta, alto contraste) e NÃO lê a **série chumbada** (relevo da cor do
+tanque). Sobra um número só, e a heurística "1 número livre + 1 campo
+pendente" o casa com o campo pedido — acusando `divergente` numa peça
+correta.
+
+Mitigação implementada: leitura que bate exatamente com o valor esperado de
+OUTRO campo vira `nao_conferivel` (`leitura-de-outro-campo`). A correção
+definitiva é física e ainda não foi feita: **discriminar tinta de relevo pelo
+contraste** dentro do `regiaoLeitura` que já persistimos — tinta preta é
+escura contra o tanque, relevo tem a cor do fundo. Não exige modelo treinado,
+só amostragem de pixels.
+
+## Bedrock reavaliado (2026-07-25): reprovado para leitura numérica
+
+A conta destravou o Bedrock, mas só os modelos **Amazon Nova** (os Claude 3
+estão bloqueados como "legacy" por desuso da conta). Medição com prompt
+explícito de "responda null se não conseguir ler":
+
+| Foto | Gabarito | Nova Lite | Nova Pro | Textract |
+| --- | --- | --- | --- | --- |
+| Placa | série 847833 | 847833 / patrimônio **"847233"** | 847833 / null | 847833 @ 99,9% / null |
+| Topo | chumbado 847233 | 847233 / patrimônio **"251328"** | **campos trocados** | 847233 @ 98,8% |
+| Lateral | chumbado 847233 | "84725" / "8802" | "847253" | 847833 @ 84,6% |
+
+O caso decisivo é o primeiro: o Nova Lite **inventou** o patrimônio como
+`847233` — que é o número de série real da peça. Não é ruído aleatório, é um
+número plausível e existente na peça, colocado no campo errado. Se o
+patrimônio do QR fosse esse, o sistema teria emitido **`conforme` para uma
+peça defeituosa** — o falso OK, o bug mais caro do domínio, produzido por
+alucinação. O Textract, na mesma foto, devolveu null.
+
+Some-se a isso o problema estrutural: **LLM não devolve confiança
+calibrada**, e a regra de ouro exige confiança por leitura para aplicar
+limiar.
+
+**Conclusão**: Bedrock fica FORA do caminho de leitura numérica — não por
+bloqueio de conta (que caiu), mas por medição. Onde ele continua fazendo
+sentido é o check qualitativo de layout (Could do SPEC): "as marcações
+esperadas estão presentes e na disposição do projeto?" — pergunta em que
+alucinação pesa menos e para a qual não há concorrente OCR.

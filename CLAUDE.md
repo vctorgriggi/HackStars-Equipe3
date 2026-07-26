@@ -135,7 +135,10 @@ cd backend && npm run test        # unit da engine e do parser (existem a partir
 - Serviços, modelos (IDs Bedrock), custos e checklist de setup AWS:
   docs/aws.md. Resultado do spike e limites medidos: docs/visao-ocr.md.
 - `EXTRACTOR_DRIVER`: `mock` (default, funciona sem AWS), `textract` (a escolha
-  do spike) ou `bedrock` (reforço; hoje bloqueado pela conta AWS).
+  do spike E do ambiente no ar) ou `bedrock` — este último NÃO deve ser usado
+  para leitura numérica: medido em 2026-07-25, alucina número plausível onde o
+  Textract admite não ter lido (docs/visao-ocr.md). Fica no código para o
+  check qualitativo de layout.
 - SSL do banco é condicional a `DATABASE_SSL_ENABLED` — RDS exige TLS, o
   Postgres local do docker não suporta; fixar um dos dois quebra o outro.
 - Spike T2.1 executável: `npx ts-node -r tsconfig-paths/register
@@ -307,7 +310,12 @@ do hackathon:
 - [ ] **Formato do payload do QR** — campos embutidos ou código de lookup
       (afeta T1.1, T3.1).
 - [x] **Textract vs Bedrock** — resolvido: Textract (spike T2.1 com fotos
-      reais, docs/visao-ocr.md). `EXTRACTOR_DRIVER=textract`; Bedrock fica
-      como reforço opcional para foto ruim (2026-07-25).
+      reais, docs/visao-ocr.md). `EXTRACTOR_DRIVER=textract`. Reavaliado na
+      noite de 2026-07-25, quando a conta destravou o Bedrock: os modelos Nova
+      ALUCINARAM número plausível onde o Textract devolveu null (um deles
+      inventou o patrimônio como o número de série real da peça — falso OK em
+      potencial) e não dão confiança calibrada. Bedrock fica FORA da leitura
+      numérica por medição, não por bloqueio; segue candidato só ao check
+      qualitativo de layout.
 - [x] **Framework do front** — resolvido: Next.js 16; scaffold já subido pelo
       time venceu o Angular combinado na entrevista (2026-07-25).
